@@ -62,28 +62,10 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 				MarkdownDescription: "A description of the compute cluster.",
 				Computed:            true,
 			},
-			"ssh_private_key": schema.StringAttribute{
-				MarkdownDescription: "The SSH private key for accessing the compute cluster.",
+			"workload_pools": schema.ListNestedAttribute{
+				MarkdownDescription: "A list of pools of workload nodes in the compute cluster.",
 				Computed:            true,
-				Sensitive:           true,
-			},
-			"region_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the region where the compute cluster is provisioned.",
-				Computed:            true,
-			},
-			"provisioning_status": schema.StringAttribute{
-				MarkdownDescription: "The provisioning status of the compute cluster.",
-				Computed:            true,
-			},
-			"creation_time": schema.StringAttribute{
-				MarkdownDescription: "The timestamp when the compute cluster was created.",
-				Computed:            true,
-			},
-		},
-		Blocks: map[string]schema.Block{
-			"workload_pool": schema.ListNestedBlock{
-				MarkdownDescription: "A pool of workload nodes in the compute cluster.",
-				NestedObject: schema.NestedBlockObject{
+				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
 							MarkdownDescription: "The name of the workload pool.",
@@ -101,10 +83,10 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 							MarkdownDescription: "The identifier of the flavor (machine type) used for the workload pool VMs.",
 							Computed:            true,
 						},
-						"disk_size": schema.Int64Attribute{
-							MarkdownDescription: "The size of the boot disk for each VM in the workload pool, in GiB.",
-							Computed:            true,
-						},
+						//"disk_size": schema.Int64Attribute{
+						//	MarkdownDescription: "The size of the boot disk for each VM in the workload pool, in GiB.",
+						//	Computed:            true,
+						//},
 						"user_data": schema.StringAttribute{
 							MarkdownDescription: "The data to pass to the VMs at boot time.",
 							Computed:            true,
@@ -113,11 +95,10 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 							MarkdownDescription: "Whether to assign a public IP address to each VM in this workload pool.",
 							Computed:            true,
 						},
-					},
-					Blocks: map[string]schema.Block{
-						"firewall_rule": schema.ListNestedBlock{
-							MarkdownDescription: "A firewall rule to apply to the VMs in this workload pool.",
-							NestedObject: schema.NestedBlockObject{
+						"firewall_rules": schema.ListNestedAttribute{
+							MarkdownDescription: "A list of firewall rules applied to the VMs in this workload pool.",
+							Computed:            true,
+							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"direction": schema.StringAttribute{
 										MarkdownDescription: "The direction of the traffic to which this firewall rule applies.",
@@ -139,9 +120,10 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 								},
 							},
 						},
-						"machine": schema.ListNestedBlock{
-							MarkdownDescription: "A machine in this workload pool.",
-							NestedObject: schema.NestedBlockObject{
+						"machines": schema.ListNestedAttribute{
+							MarkdownDescription: "A list of machines in this workload pool.",
+							Computed:            true,
+							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"hostname": schema.StringAttribute{
 										MarkdownDescription: "The hostname of the machine.",
@@ -160,6 +142,23 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 						},
 					},
 				},
+			},
+			"ssh_private_key": schema.StringAttribute{
+				MarkdownDescription: "The SSH private key for accessing the compute cluster.",
+				Computed:            true,
+				Sensitive:           true,
+			},
+			"region_id": schema.StringAttribute{
+				MarkdownDescription: "The identifier of the region where the compute cluster is provisioned.",
+				Computed:            true,
+			},
+			"provisioning_status": schema.StringAttribute{
+				MarkdownDescription: "The provisioning status of the compute cluster.",
+				Computed:            true,
+			},
+			"creation_time": schema.StringAttribute{
+				MarkdownDescription: "The timestamp when the compute cluster was created.",
+				Computed:            true,
 			},
 		},
 	}

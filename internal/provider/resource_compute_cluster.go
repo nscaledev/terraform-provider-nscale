@@ -14,7 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -89,37 +89,10 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 				MarkdownDescription: "The description of the compute cluster.",
 				Optional:            true,
 			},
-			"ssh_private_key": schema.StringAttribute{
-				MarkdownDescription: "The SSH private key for accessing the compute cluster.",
-				Computed:            true,
-				Sensitive:           true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"region_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the region where the compute cluster is provisioned.",
+			"workload_pools": schema.ListNestedAttribute{
+				MarkdownDescription: "A list of pools of workload nodes in the compute cluster.",
 				Required:            true,
-			},
-			"provisioning_status": schema.StringAttribute{
-				MarkdownDescription: "The provisioning status of the compute cluster.",
-				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"creation_time": schema.StringAttribute{
-				MarkdownDescription: "The timestamp when the compute cluster was created.",
-				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-		},
-		Blocks: map[string]schema.Block{
-			"workload_pool": schema.ListNestedBlock{
-				MarkdownDescription: "A pool of workload nodes in the compute cluster.",
-				NestedObject: schema.NestedBlockObject{
+				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
 							MarkdownDescription: "The name of the workload pool.",
@@ -143,13 +116,13 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 							MarkdownDescription: "The identifier of the flavor (machine type) used for the workload pool VMs.",
 							Required:            true,
 						},
-						"disk_size": schema.Int64Attribute{
-							MarkdownDescription: "The size of the boot disk for each VM in the workload pool, in GiB.",
-							Optional:            true,
-							Validators: []validator.Int64{
-								int64validator.AtLeast(10),
-							},
-						},
+						//"disk_size": schema.Int64Attribute{
+						//	MarkdownDescription: "The size of the boot disk for each VM in the workload pool, in GiB.",
+						//	Optional:            true,
+						//	Validators: []validator.Int64{
+						//		int64validator.AtLeast(10),
+						//	},
+						//},
 						"user_data": schema.StringAttribute{
 							MarkdownDescription: "The data to pass to the VMs at boot time.",
 							Optional:            true,
@@ -163,11 +136,10 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 							Computed:            true,
 							Default:             booldefault.StaticBool(true),
 						},
-					},
-					Blocks: map[string]schema.Block{
-						"firewall_rule": schema.ListNestedBlock{
-							MarkdownDescription: "A firewall rule to apply to the VMs in this workload pool.",
-							NestedObject: schema.NestedBlockObject{
+						"firewall_rules": schema.ListNestedAttribute{
+							MarkdownDescription: "A list of firewall rules to apply to the VMs in this workload pool.",
+							Optional:            true,
+							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"direction": schema.StringAttribute{
 										MarkdownDescription: "The direction of the traffic to which this firewall rule applies. Default is `ingress`.",
@@ -204,9 +176,10 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 								},
 							},
 						},
-						"machine": schema.ListNestedBlock{
-							MarkdownDescription: "A machine in this workload pool.",
-							NestedObject: schema.NestedBlockObject{
+						"machines": schema.ListNestedAttribute{
+							MarkdownDescription: "A list of machines in this workload pool.",
+							Computed:            true,
+							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
 									"hostname": schema.StringAttribute{
 										MarkdownDescription: "The hostname of the machine.",
@@ -221,12 +194,38 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 										Computed:            true,
 									},
 								},
-								PlanModifiers: []planmodifier.Object{
-									objectplanmodifier.UseStateForUnknown(),
-								},
+							},
+							PlanModifiers: []planmodifier.List{
+								listplanmodifier.UseStateForUnknown(),
 							},
 						},
 					},
+				},
+			},
+			"ssh_private_key": schema.StringAttribute{
+				MarkdownDescription: "The SSH private key for accessing the compute cluster.",
+				Computed:            true,
+				Sensitive:           true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"region_id": schema.StringAttribute{
+				MarkdownDescription: "The identifier of the region where the compute cluster is provisioned.",
+				Required:            true,
+			},
+			"provisioning_status": schema.StringAttribute{
+				MarkdownDescription: "The provisioning status of the compute cluster.",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"creation_time": schema.StringAttribute{
+				MarkdownDescription: "The timestamp when the compute cluster was created.",
+				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 		},
