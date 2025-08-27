@@ -10,19 +10,20 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	nscale "github.com/nscaledev/terraform-provider-nscale/internal/client"
 	externalRef0 "github.com/unikorn-cloud/core/pkg/openapi"
 )
 
 type ComputeClusterModel struct {
-	ID                 types.String        `tfsdk:"id"`
-	Name               types.String        `tfsdk:"name"`
-	Description        types.String        `tfsdk:"description"`
-	WorkloadPools      []WorkloadPoolModel `tfsdk:"workload_pool"`
-	SSHPrivateKey      types.String        `tfsdk:"ssh_private_key"`
-	RegionID           types.String        `tfsdk:"region_id"`
-	ProvisioningStatus types.String        `tfsdk:"provisioning_status"`
-	CreationTime       types.String        `tfsdk:"creation_time"`
+	ID                 types.String `tfsdk:"id"`
+	Name               types.String `tfsdk:"name"`
+	Description        types.String `tfsdk:"description"`
+	WorkloadPools      types.List   `tfsdk:"workload_pools"`
+	SSHPrivateKey      types.String `tfsdk:"ssh_private_key"`
+	RegionID           types.String `tfsdk:"region_id"`
+	ProvisioningStatus types.String `tfsdk:"provisioning_status"`
+	CreationTime       types.String `tfsdk:"creation_time"`
 }
 
 func NewComputeClusterModel(source *nscale.ComputeClusterRead) ComputeClusterModel {
@@ -49,9 +50,14 @@ func NewComputeClusterModel(source *nscale.ComputeClusterRead) ComputeClusterMod
 }
 
 func (m *ComputeClusterModel) NscaleComputeCluster() (nscale.ComputeClusterWrite, diag.Diagnostics) {
-	workloadPools := make([]nscale.ComputeClusterWorkloadPool, 0, len(m.WorkloadPools))
-	for _, data := range m.WorkloadPools {
-		workloadPool, diagnostics := data.NscaleWorkloadPool()
+	var sourceWorkloadPools []WorkloadPoolModel
+	if diagnostics := m.WorkloadPools.ElementsAs(nil, &sourceWorkloadPools, false); diagnostics.HasError() {
+		return nscale.ComputeClusterWrite{}, diagnostics
+	}
+
+	workloadPools := make([]nscale.ComputeClusterWorkloadPool, 0, len(sourceWorkloadPools))
+	for _, source := range sourceWorkloadPools {
+		workloadPool, diagnostics := source.NscaleWorkloadPool()
 		if diagnostics.HasError() {
 			return nscale.ComputeClusterWrite{}, diagnostics
 		}
@@ -74,20 +80,38 @@ func (m *ComputeClusterModel) NscaleComputeCluster() (nscale.ComputeClusterWrite
 	return computeCluster, nil
 }
 
+var WorkloadPoolModelAttributeType = basetypes.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"name":      types.StringType,
+		"replicas":  types.Int64Type,
+		"image_id":  types.StringType,
+		"flavor_id": types.StringType,
+		//"disk_size":         types.Int64Type,
+		"user_data":        types.StringType,
+		"enable_public_ip": types.BoolType,
+		"firewall_rules": types.ListType{
+			ElemType: FirewallRuleModelAttributeType,
+		},
+		"machines": types.ListType{
+			ElemType: MachineModelAttributeType,
+		},
+	},
+}
+
 type WorkloadPoolModel struct {
 	Name     types.String `tfsdk:"name"`
 	Replicas types.Int64  `tfsdk:"replicas"`
 	// REVIEW_ME: Should we accept the image and flavor names instead of their IDs?
-	ImageID        types.String        `tfsdk:"image_id"`
-	FlavorID       types.String        `tfsdk:"flavor_id"`
-	DiskSize       types.Int64         `tfsdk:"disk_size"`
-	UserData       types.String        `tfsdk:"user_data"`
-	EnablePublicIP types.Bool          `tfsdk:"enable_public_ip"`
-	FirewallRules  []FirewallRuleModel `tfsdk:"firewall_rule"`
-	Machines       []MachineModel      `tfsdk:"machine"`
+	ImageID  types.String `tfsdk:"image_id"`
+	FlavorID types.String `tfsdk:"flavor_id"`
+	//DiskSize       types.Int64         `tfsdk:"disk_size"`
+	UserData       types.String `tfsdk:"user_data"`
+	EnablePublicIP types.Bool   `tfsdk:"enable_public_ip"`
+	FirewallRules  types.List   `tfsdk:"firewall_rules"`
+	Machines       types.List   `tfsdk:"machines"`
 }
 
-func NewWorkloadPoolModel(spec nscale.ComputeClusterWorkloadPool, status *nscale.ComputeClusterWorkloadPoolStatus) WorkloadPoolModel {
+func NewWorkloadPoolModel(spec nscale.ComputeClusterWorkloadPool, status *nscale.ComputeClusterWorkloadPoolStatus) attr.Value {
 	var userData types.String
 	if spec.Machine.UserData != nil {
 		userData = types.StringValue(string(*spec.Machine.UserData))
@@ -98,32 +122,35 @@ func NewWorkloadPoolModel(spec nscale.ComputeClusterWorkloadPool, status *nscale
 		enablePublicIP = types.BoolValue(spec.Machine.PublicIPAllocation.Enabled)
 	}
 
-	var firewallRules []FirewallRuleModel
+	firewallRules := basetypes.NewListNull(FirewallRuleModelAttributeType)
 	if spec.Machine.Firewall != nil {
 		firewallRules = NewFirewallRuleModels(*spec.Machine.Firewall)
 	}
 
-	var machines []MachineModel
+	machines := basetypes.NewListNull(MachineModelAttributeType)
 	if status != nil && status.Machines != nil {
 		machines = NewMachineModels(*status.Machines)
 	}
 
-	return WorkloadPoolModel{
-		Name:     types.StringValue(spec.Name),
-		Replicas: types.Int64Value(int64(spec.Machine.Replicas)),
-		// FIXME: Some machines may not have an image ID but have an image selector. We need to check whether we could populate the image ID from the selector.
-		ImageID:  types.StringPointerValue(spec.Machine.Image.Id),
-		FlavorID: types.StringValue(spec.Machine.FlavorId),
-		// FIXME: Some machines may not have a disk size specified as it's inherited from the flavor. We need to check whether we could populate the disk size from the flavor.
-		DiskSize:       types.Int64Value(int64(spec.Machine.Disk.Size)),
-		UserData:       userData,
-		EnablePublicIP: enablePublicIP,
-		FirewallRules:  firewallRules,
-		Machines:       machines,
-	}
+	return basetypes.NewObjectValueMust(
+		WorkloadPoolModelAttributeType.AttrTypes,
+		map[string]attr.Value{
+			"name":     types.StringValue(spec.Name),
+			"replicas": types.Int64Value(int64(spec.Machine.Replicas)),
+			// FIXME: Some machines may not have an image ID but have an image selector. We need to check whether we could populate the image ID from the selector.
+			"image_id":  types.StringPointerValue(spec.Machine.Image.Id),
+			"flavor_id": types.StringValue(spec.Machine.FlavorId),
+			//// FIXME: Some machines may not have a disk size specified as it's inherited from the flavor. We need to check whether we could populate the disk size from the flavor.
+			//"disk_size":        types.Int64Value(int64(spec.Machine.Disk.Size)),
+			"user_data":        userData,
+			"enable_public_ip": enablePublicIP,
+			"firewall_rules":   firewallRules,
+			"machines":         machines,
+		},
+	)
 }
 
-func NewWorkloadPoolModels(specs []nscale.ComputeClusterWorkloadPool, statuses *nscale.ComputeClusterWorkloadPoolsStatus) []WorkloadPoolModel {
+func NewWorkloadPoolModels(specs []nscale.ComputeClusterWorkloadPool, statuses *nscale.ComputeClusterWorkloadPoolsStatus) types.List {
 	statusMemo := make(map[string]*nscale.ComputeClusterWorkloadPoolStatus)
 	if statuses != nil {
 		workloadPools := *statuses
@@ -133,26 +160,31 @@ func NewWorkloadPoolModels(specs []nscale.ComputeClusterWorkloadPool, statuses *
 		}
 	}
 
-	pools := make([]WorkloadPoolModel, 0, len(specs))
+	pools := make([]attr.Value, 0, len(specs))
 	for _, spec := range specs {
 		status := statusMemo[spec.Name]
 		pools = append(pools, NewWorkloadPoolModel(spec, status))
 	}
 
-	return pools
+	return basetypes.NewListValueMust(WorkloadPoolModelAttributeType, pools)
 }
 
 func (m *WorkloadPoolModel) NscaleWorkloadPool() (nscale.ComputeClusterWorkloadPool, diag.Diagnostics) {
 	var disk *nscale.Volume
-	if !m.DiskSize.IsNull() && !m.DiskSize.IsUnknown() {
-		disk = &nscale.Volume{
-			Size: int(m.DiskSize.ValueInt64()),
-		}
+	//if !m.DiskSize.IsNull() && !m.DiskSize.IsUnknown() {
+	//	disk = &nscale.Volume{
+	//		Size: int(m.DiskSize.ValueInt64()),
+	//	}
+	//}
+
+	var sourceFirewallRules []FirewallRuleModel
+	if diagnostics := m.FirewallRules.ElementsAs(nil, &sourceFirewallRules, false); diagnostics.HasError() {
+		return nscale.ComputeClusterWorkloadPool{}, diagnostics
 	}
 
-	firewallRules := make([]nscale.FirewallRule, 0, len(m.FirewallRules))
-	for _, rule := range m.FirewallRules {
-		firewallRule, diagnostics := rule.NscaleFirewallRule()
+	firewallRules := make([]nscale.FirewallRule, 0, len(sourceFirewallRules))
+	for _, source := range sourceFirewallRules {
+		firewallRule, diagnostics := source.NscaleFirewallRule()
 		if diagnostics.HasError() {
 			return nscale.ComputeClusterWorkloadPool{}, diagnostics
 		}
@@ -187,6 +219,17 @@ func (m *WorkloadPoolModel) NscaleWorkloadPool() (nscale.ComputeClusterWorkloadP
 	return workloadPool, nil
 }
 
+var FirewallRuleModelAttributeType = basetypes.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"direction": types.StringType,
+		"protocol":  types.StringType,
+		"ports":     types.StringType,
+		"prefixes": types.SetType{
+			ElemType: types.StringType,
+		},
+	},
+}
+
 type FirewallRuleModel struct {
 	Direction types.String `tfsdk:"direction"`
 	Protocol  types.String `tfsdk:"protocol"`
@@ -194,7 +237,7 @@ type FirewallRuleModel struct {
 	Prefixes  types.Set    `tfsdk:"prefixes"`
 }
 
-func NewFirewallRuleModel(source nscale.FirewallRule) FirewallRuleModel {
+func NewFirewallRuleModel(source nscale.FirewallRule) attr.Value {
 	ports := strconv.Itoa(source.Port)
 	if source.PortMax != nil {
 		ports += "-" + strconv.Itoa(*source.PortMax)
@@ -205,20 +248,23 @@ func NewFirewallRuleModel(source nscale.FirewallRule) FirewallRuleModel {
 		prefixes = append(prefixes, types.StringValue(prefix))
 	}
 
-	return FirewallRuleModel{
-		Direction: types.StringValue(string(source.Direction)),
-		Protocol:  types.StringValue(string(source.Protocol)),
-		Ports:     types.StringValue(ports),
-		Prefixes:  types.SetValueMust(types.StringType, prefixes),
-	}
+	return basetypes.NewObjectValueMust(
+		FirewallRuleModelAttributeType.AttrTypes,
+		map[string]attr.Value{
+			"direction": types.StringValue(string(source.Direction)),
+			"protocol":  types.StringValue(string(source.Protocol)),
+			"ports":     types.StringValue(ports),
+			"prefixes":  basetypes.NewSetValueMust(types.StringType, prefixes),
+		},
+	)
 }
 
-func NewFirewallRuleModels(source []nscale.FirewallRule) []FirewallRuleModel {
-	rules := make([]FirewallRuleModel, 0, len(source))
+func NewFirewallRuleModels(source []nscale.FirewallRule) types.List {
+	rules := make([]attr.Value, 0, len(source))
 	for _, data := range source {
 		rules = append(rules, NewFirewallRuleModel(data))
 	}
-	return rules
+	return basetypes.NewListValueMust(FirewallRuleModelAttributeType, rules)
 }
 
 func (m *FirewallRuleModel) NscaleFirewallRule() (nscale.FirewallRule, diag.Diagnostics) {
@@ -265,26 +311,37 @@ func (m *FirewallRuleModel) NscaleFirewallRule() (nscale.FirewallRule, diag.Diag
 	return firewallRule, nil
 }
 
+var MachineModelAttributeType = basetypes.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"hostname":   types.StringType,
+		"private_ip": types.StringType,
+		"public_ip":  types.StringType,
+	},
+}
+
 type MachineModel struct {
 	Hostname  types.String `tfsdk:"hostname"`
 	PrivateIP types.String `tfsdk:"private_ip"`
 	PublicIP  types.String `tfsdk:"public_ip"`
 }
 
-func NewMachineModel(source nscale.ComputeClusterMachineStatus) MachineModel {
-	return MachineModel{
-		Hostname:  types.StringValue(source.Hostname),
-		PrivateIP: types.StringPointerValue(source.PrivateIP),
-		PublicIP:  types.StringPointerValue(source.PublicIP),
-	}
+func NewMachineModel(source nscale.ComputeClusterMachineStatus) attr.Value {
+	return basetypes.NewObjectValueMust(
+		MachineModelAttributeType.AttrTypes,
+		map[string]attr.Value{
+			"hostname":   types.StringValue(source.Hostname),
+			"private_ip": types.StringPointerValue(source.PrivateIP),
+			"public_ip":  types.StringPointerValue(source.PublicIP),
+		},
+	)
 }
 
-func NewMachineModels(source []nscale.ComputeClusterMachineStatus) []MachineModel {
-	machines := make([]MachineModel, 0, len(source))
+func NewMachineModels(source []nscale.ComputeClusterMachineStatus) types.List {
+	machines := make([]attr.Value, 0, len(source))
 	for _, data := range source {
 		machines = append(machines, NewMachineModel(data))
 	}
-	return machines
+	return basetypes.NewListValueMust(MachineModelAttributeType, machines)
 }
 
 func NewErrorDiagnostics(summary, detail string) diag.Diagnostics {
