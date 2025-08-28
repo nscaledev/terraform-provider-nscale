@@ -151,7 +151,7 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 										},
 									},
 									"protocol": schema.StringAttribute{
-										MarkdownDescription: "The IP protocol to which this firewall rule applies. Valid values are `tcp`, `udp`, `icmp`, or `all`.",
+										MarkdownDescription: "The IP protocol to which this firewall rule applies. Valid values are `tcp` or `udp`.",
 										Required:            true,
 										Validators: []validator.String{
 											ProtocolValidator{},

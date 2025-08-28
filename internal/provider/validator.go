@@ -46,16 +46,15 @@ func (v Base64Validator) ValidateString(ctx context.Context, request validator.S
 	}
 }
 
-// FIXME: Check whether the API supports any other IP protocols.
 type ProtocolValidator struct{}
 
 func (v ProtocolValidator) allowedProtocols() []string {
-	return []string{"tcp", "udp", "icmp", "esp", "ah", "sctp"}
+	return []string{"tcp", "udp"}
 }
 
 func (v ProtocolValidator) Description(ctx context.Context) string {
 	return fmt.Sprintf(
-		"Must be one of the following well known protocol strings (%s), or the IP protocol number",
+		"Must be one of the following well known protocol strings (%s)",
 		strings.Join(v.allowedProtocols(), ", "),
 	)
 }

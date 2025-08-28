@@ -19,11 +19,11 @@ Nscale Compute Cluster
 
 - `name` (String) The name of the compute cluster.
 - `region_id` (String) The identifier of the region where the compute cluster is provisioned.
+- `workload_pools` (Attributes List) A list of pools of workload nodes in the compute cluster. (see [below for nested schema](#nestedatt--workload_pools))
 
 ### Optional
 
 - `description` (String) The description of the compute cluster.
-- `workload_pool` (Block List) A pool of workload nodes in the compute cluster. (see [below for nested schema](#nestedblock--workload_pool))
 
 ### Read-Only
 
@@ -32,8 +32,8 @@ Nscale Compute Cluster
 - `provisioning_status` (String) The provisioning status of the compute cluster.
 - `ssh_private_key` (String, Sensitive) The SSH private key for accessing the compute cluster.
 
-<a id="nestedblock--workload_pool"></a>
-### Nested Schema for `workload_pool`
+<a id="nestedatt--workload_pools"></a>
+### Nested Schema for `workload_pools`
 
 Required:
 
@@ -44,31 +44,30 @@ Required:
 
 Optional:
 
-- `disk_size` (Number) The size of the boot disk for each VM in the workload pool, in GiB.
 - `enable_public_ip` (Boolean) Whether to assign a public IP address to each VM in this workload pool. Default is `true`.
-- `firewall_rule` (Block List) A firewall rule to apply to the VMs in this workload pool. (see [below for nested schema](#nestedblock--workload_pool--firewall_rule))
+- `firewall_rules` (Attributes List) A list of firewall rules to apply to the VMs in this workload pool. (see [below for nested schema](#nestedatt--workload_pools--firewall_rules))
 - `user_data` (String) The data to pass to the VMs at boot time.
 
 Read-Only:
 
-- `machine` (Block List) A machine in this workload pool. (see [below for nested schema](#nestedblock--workload_pool--machine))
+- `machines` (Attributes List) A list of machines in this workload pool. (see [below for nested schema](#nestedatt--workload_pools--machines))
 
-<a id="nestedblock--workload_pool--firewall_rule"></a>
-### Nested Schema for `workload_pool.firewall_rule`
+<a id="nestedatt--workload_pools--firewall_rules"></a>
+### Nested Schema for `workload_pools.firewall_rules`
 
 Required:
 
 - `ports` (String) The ports to which this firewall rule applies. This can be a single port, or a range of ports. For example: `22`, `80-443`.
 - `prefixes` (Set of String) A set of CIDR prefixes to which this firewall rule applies.
-- `protocol` (String) The IP protocol to which this firewall rule applies. Valid values are `tcp`, `udp`, `icmp`, or `all`.
+- `protocol` (String) The IP protocol to which this firewall rule applies. Valid values are `tcp` or `udp`.
 
 Optional:
 
 - `direction` (String) The direction of the traffic to which this firewall rule applies. Default is `ingress`.
 
 
-<a id="nestedblock--workload_pool--machine"></a>
-### Nested Schema for `workload_pool.machine`
+<a id="nestedatt--workload_pools--machines"></a>
+### Nested Schema for `workload_pools.machines`
 
 Read-Only:
 
