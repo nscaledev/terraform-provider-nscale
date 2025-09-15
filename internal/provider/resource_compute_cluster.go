@@ -18,6 +18,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -312,9 +313,13 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 
 	state, err := stateWatcher.WaitForStateContext(ctx)
 	if err != nil {
+		e := errors.Unwrap(err)
+		if e == nil {
+			e = err
+		}
 		response.Diagnostics.AddError(
 			"Failed to Wait for Compute Cluster to be Provisioned",
-			fmt.Sprintf("An error occurred while waiting for the compute cluster to be provisioned: %s", err),
+			fmt.Sprintf("An error occurred while waiting for the compute cluster to be provisioned: %s", e),
 		)
 		return
 	}
@@ -441,9 +446,13 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 
 	state, err := stateWatcher.WaitForStateContext(ctx)
 	if err != nil {
+		e := errors.Unwrap(err)
+		if e == nil {
+			e = err
+		}
 		response.Diagnostics.AddError(
 			"Failed to Wait for Compute Cluster to be Updated",
-			fmt.Sprintf("An error occurred while waiting for the compute cluster to be updated: %s", err),
+			fmt.Sprintf("An error occurred while waiting for the compute cluster to be updated: %s", e),
 		)
 		return
 	}
@@ -510,9 +519,13 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 	}
 
 	if _, err = stateWatcher.WaitForStateContext(ctx); err != nil {
+		e := errors.Unwrap(err)
+		if e == nil {
+			e = err
+		}
 		response.Diagnostics.AddError(
 			"Failed to Wait for Compute Cluster to be Deleted",
-			fmt.Sprintf("An error occurred while waiting for the compute cluster to be deleted: %s", err),
+			fmt.Sprintf("An error occurred while waiting for the compute cluster to be deleted: %s", e),
 		)
 		return
 	}
