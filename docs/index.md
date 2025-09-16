@@ -16,7 +16,7 @@ description: |-
 
 ### Optional
 
-- `endpoint` (String) The endpoint of the Nscale API server.
-- `organization_id` (String) The identifier of the organization for which resources are managed.
-- `project_id` (String) The identifier of the project for which resources are managed.
-- `service_token` (String, Sensitive) The service token for authenticating with the Nscale API server.
+- `endpoint` (String) The endpoint of the Nscale API server. This can be specified using the `NSCALE_API_ENDPOINT` environment variable, which takes precedence over this setting.
+- `organization_id` (String) The identifier of the organization for which resources are managed. Alternatively, this can be specified using the `NSCALE_ORGANIZATION_ID` environment variable, which takes precedence over this setting.
+- `project_id` (String) The identifier of the project for which resources are managed. Alternatively, this can be specified using the `NSCALE_PROJECT_ID` environment variable, which takes precedence over this setting.
+- `service_token` (String, Sensitive) The service token for authenticating with the Nscale API server. Alternatively, this can be specified using the `NSCALE_SERVICE_TOKEN` environment variable, which takes precedence over this setting.

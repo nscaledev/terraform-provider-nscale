@@ -171,9 +171,11 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
 							MarkdownDescription: "The name of the tag.",
+							Computed:            true,
 						},
 						"value": schema.StringAttribute{
 							MarkdownDescription: "The value of the tag.",
+							Computed:            true,
 						},
 					},
 				},

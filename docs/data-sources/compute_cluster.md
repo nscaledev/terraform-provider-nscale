@@ -27,7 +27,17 @@ Nscale Compute Cluster
 - `provisioning_status` (String) The provisioning status of the compute cluster.
 - `region_id` (String) The identifier of the region where the compute cluster is provisioned.
 - `ssh_private_key` (String, Sensitive) The SSH private key for accessing the compute cluster.
+- `tags` (Attributes List) A list of tags associated with the compute cluster. (see [below for nested schema](#nestedatt--tags))
 - `workload_pools` (Attributes List) A list of pools of workload nodes in the compute cluster. (see [below for nested schema](#nestedatt--workload_pools))
+
+<a id="nestedatt--tags"></a>
+### Nested Schema for `tags`
+
+Read-Only:
+
+- `name` (String) The name of the tag.
+- `value` (String) The value of the tag.
+
 
 <a id="nestedatt--workload_pools"></a>
 ### Nested Schema for `workload_pools`

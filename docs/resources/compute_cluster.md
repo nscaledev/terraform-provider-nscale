@@ -24,6 +24,7 @@ Nscale Compute Cluster
 ### Optional
 
 - `description` (String) The description of the compute cluster.
+- `tags` (Attributes List) A list of tags associated with the compute cluster. (see [below for nested schema](#nestedatt--tags))
 
 ### Read-Only
 
@@ -74,3 +75,13 @@ Read-Only:
 - `hostname` (String) The hostname of the machine.
 - `private_ip` (String) The private IP address of the machine.
 - `public_ip` (String) The public IP address of the machine, if assigned.
+
+
+
+<a id="nestedatt--tags"></a>
+### Nested Schema for `tags`
+
+Required:
+
+- `name` (String) The name of the tag.
+- `value` (String) The value of the tag.

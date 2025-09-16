@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,6 +42,8 @@ import (
 	nscale "github.com/nscaledev/terraform-provider-nscale/internal/client"
 	externalRef0 "github.com/unikorn-cloud/core/pkg/openapi"
 )
+
+const systemTagPrefix = "terraform.nscale.com"
 
 var (
 	_ resource.ResourceWithConfigure   = &ComputeClusterResource{}
@@ -230,6 +233,7 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 			"tags": schema.ListNestedAttribute{
 				MarkdownDescription: "A list of tags associated with the compute cluster.",
 				Optional:            true,
+				Computed:            true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
@@ -388,14 +392,36 @@ func (r *ComputeClusterResource) Read(ctx context.Context, request resource.Read
 	response.State.RemoveResource(ctx)
 }
 
-func (r *ComputeClusterResource) setUniqueOperationTag(cluster *nscale.ComputeClusterWrite) {
-	tagList := []externalRef0.Tag{
-		{
-			Name:  fmt.Sprintf("terraform.nscale.com/%s", uuid.New().String()),
-			Value: "0",
-		},
+func (r *ComputeClusterResource) addUpdateMarkerTag(cluster *nscale.ComputeClusterWrite) string {
+	tag := externalRef0.Tag{
+		Name:  fmt.Sprintf("%s%s", systemTagPrefix, uuid.NewString()),
+		Value: "0",
 	}
-	cluster.Metadata.Tags = &tagList
+
+	var tags []externalRef0.Tag
+	if cluster.Metadata.Tags != nil {
+		tags = *cluster.Metadata.Tags
+	}
+
+	tags = append(tags, tag)
+	cluster.Metadata.Tags = &tags
+
+	return tag.Name
+}
+
+func (r *ComputeClusterResource) removeSystemTags(cluster *nscale.ComputeClusterRead) {
+	if cluster.Metadata.Tags == nil {
+		return
+	}
+
+	var tags []externalRef0.Tag
+	for _, tag := range *cluster.Metadata.Tags {
+		if !strings.HasPrefix(tag.Name, systemTagPrefix) {
+			tags = append(tags, tag)
+		}
+	}
+
+	cluster.Metadata.Tags = &tags
 }
 
 func (r *ComputeClusterResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
@@ -412,8 +438,7 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 		return
 	}
 
-	r.setUniqueOperationTag(&requestData)
-	operationKey := (*requestData.Metadata.Tags)[0].Name
+	updateMarker := r.addUpdateMarkerTag(&requestData)
 
 	clusterUpdateResponse, err := r.client.PutApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterIDWithResponse(ctx, r.organizationID, r.projectID, data.ID.ValueString(), requestData)
 	if err != nil {
@@ -449,7 +474,7 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 				if cluster.Metadata.Id == data.ID.ValueString() && cluster.Metadata.Tags != nil {
 					tagList := *cluster.Metadata.Tags
 					for _, tag := range tagList {
-						if tag.Name == operationKey {
+						if tag.Name == updateMarker {
 							return &cluster, "completed", nil
 						}
 					}
@@ -482,6 +507,7 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 		return
 	}
 
+	r.removeSystemTags(computeCluster)
 	data = NewComputeClusterModel(computeCluster)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
