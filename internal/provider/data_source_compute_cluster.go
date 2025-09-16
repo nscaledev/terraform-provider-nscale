@@ -164,6 +164,20 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 				Computed:            true,
 				Sensitive:           true,
 			},
+			"tags": schema.ListNestedAttribute{
+				MarkdownDescription: "A list of tags associated with the compute cluster.",
+				Computed:            true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							MarkdownDescription: "The name of the tag.",
+						},
+						"value": schema.StringAttribute{
+							MarkdownDescription: "The value of the tag.",
+						},
+					},
+				},
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the compute cluster is provisioned.",
 				Computed:            true,

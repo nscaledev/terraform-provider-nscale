@@ -62,20 +62,20 @@ func (p NscaleProvider) Schema(ctx context.Context, request provider.SchemaReque
 	response.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "The endpoint of the Nscale API server.",
+				MarkdownDescription: "The endpoint of the Nscale API server. This can be specified using the `NSCALE_API_ENDPOINT` environment variable, which takes precedence over this setting.",
 				Optional:            true,
 			},
 			"service_token": schema.StringAttribute{
-				MarkdownDescription: "The service token for authenticating with the Nscale API server.",
+				MarkdownDescription: "The service token for authenticating with the Nscale API server. Alternatively, this can be specified using the `NSCALE_SERVICE_TOKEN` environment variable, which takes precedence over this setting.",
 				Optional:            true,
 				Sensitive:           true,
 			},
 			"organization_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the organization for which resources are managed.",
+				MarkdownDescription: "The identifier of the organization for which resources are managed. Alternatively, this can be specified using the `NSCALE_ORGANIZATION_ID` environment variable, which takes precedence over this setting.",
 				Optional:            true,
 			},
 			"project_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the project for which resources are managed.",
+				MarkdownDescription: "The identifier of the project for which resources are managed. Alternatively, this can be specified using the `NSCALE_PROJECT_ID` environment variable, which takes precedence over this setting.",
 				Optional:            true,
 			},
 		},

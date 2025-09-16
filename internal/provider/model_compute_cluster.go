@@ -37,6 +37,7 @@ type ComputeClusterModel struct {
 	Description        types.String `tfsdk:"description"`
 	WorkloadPools      types.List   `tfsdk:"workload_pools"`
 	SSHPrivateKey      types.String `tfsdk:"ssh_private_key"`
+	Tags               types.List   `tfsdk:"tags"`
 	RegionID           types.String `tfsdk:"region_id"`
 	ProvisioningStatus types.String `tfsdk:"provisioning_status"`
 	CreationTime       types.String `tfsdk:"creation_time"`
@@ -53,12 +54,18 @@ func NewComputeClusterModel(source *nscale.ComputeClusterRead) ComputeClusterMod
 		workloadPoolStatuses = source.Status.WorkloadPools
 	}
 
+	var tags types.List
+	if source.Metadata.Tags != nil {
+		tags = NewTagModels(*source.Metadata.Tags)
+	}
+
 	return ComputeClusterModel{
 		ID:                 types.StringValue(source.Metadata.Id),
 		Name:               types.StringValue(source.Metadata.Name),
 		Description:        types.StringPointerValue(source.Metadata.Description),
 		WorkloadPools:      NewWorkloadPoolModels(source.Spec.WorkloadPools, workloadPoolStatuses),
 		SSHPrivateKey:      sshPrivateKey,
+		Tags:               tags,
 		RegionID:           types.StringValue(source.Spec.RegionId),
 		ProvisioningStatus: types.StringValue(string(source.Metadata.ProvisioningStatus)),
 		CreationTime:       types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
@@ -80,12 +87,21 @@ func (m *ComputeClusterModel) NscaleComputeCluster() (nscale.ComputeClusterWrite
 		workloadPools = append(workloadPools, workloadPool)
 	}
 
+	var sourceTags []TagModel
+	if diagnostics := m.Tags.ElementsAs(context.TODO(), &sourceTags, false); diagnostics.HasError() {
+		return nscale.ComputeClusterWrite{}, diagnostics
+	}
+
+	tags := make([]externalRef0.Tag, 0, len(sourceTags))
+	for _, source := range sourceTags {
+		tags = append(tags, source.NscaleTag())
+	}
+
 	computeCluster := nscale.ComputeClusterWrite{
 		Metadata: externalRef0.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			// REVIEW_ME: Not sure what the tags are for. Even the UI doesn’t provide a way to set them, so leaving it as nil for now.
-			Tags: nil,
+			Tags:        &tags,
 		},
 		Spec: nscale.ComputeClusterSpec{
 			RegionId:      m.RegionID.ValueString(),
@@ -358,6 +374,43 @@ func NewMachineModels(source []nscale.ComputeClusterMachineStatus) types.List {
 		machines = append(machines, NewMachineModel(data))
 	}
 	return basetypes.NewListValueMust(MachineModelAttributeType, machines)
+}
+
+var TagModelAttributeType = basetypes.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"name":  types.StringType,
+		"value": types.StringType,
+	},
+}
+
+type TagModel struct {
+	Name  types.String `tfsdk:"name"`
+	Value types.String `tfsdk:"value"`
+}
+
+func NewTagModel(source externalRef0.Tag) attr.Value {
+	return basetypes.NewObjectValueMust(
+		TagModelAttributeType.AttrTypes,
+		map[string]attr.Value{
+			"name":  types.StringValue(source.Name),
+			"value": types.StringValue(source.Value),
+		},
+	)
+}
+
+func NewTagModels(source []externalRef0.Tag) types.List {
+	tags := make([]attr.Value, 0, len(source))
+	for _, data := range source {
+		tags = append(tags, NewTagModel(data))
+	}
+	return basetypes.NewListValueMust(TagModelAttributeType, tags)
+}
+
+func (m *TagModel) NscaleTag() externalRef0.Tag {
+	return externalRef0.Tag{
+		Name:  m.Name.ValueString(),
+		Value: m.Value.ValueString(),
+	}
 }
 
 func NewErrorDiagnostics(summary, detail string) diag.Diagnostics {

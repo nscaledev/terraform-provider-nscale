@@ -227,6 +227,22 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"tags": schema.ListNestedAttribute{
+				MarkdownDescription: "A list of tags associated with the compute cluster.",
+				Optional:            true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							MarkdownDescription: "The name of the tag.",
+							Required:            true,
+						},
+						"value": schema.StringAttribute{
+							MarkdownDescription: "The value of the tag.",
+							Required:            true,
+						},
+					},
+				},
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the compute cluster is provisioned.",
 				Required:            true,
