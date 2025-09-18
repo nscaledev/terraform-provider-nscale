@@ -30,7 +30,7 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/version"
 )
 
-const DefaultNscaleEndpoint = "https://compute.unikorn.nscale.com"
+const DefaultNscaleEndpoint = "https://compute.nks.europe-west4.nscale.com"
 
 var _ provider.Provider = NscaleProvider{}
 
