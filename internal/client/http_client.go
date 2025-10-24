@@ -38,6 +38,6 @@ func NewHTTPClient(userAgent, serviceToken string) *HTTPClient {
 
 func (c *HTTPClient) Do(r *http.Request) (*http.Response, error) {
 	r.Header.Set("User-Agent", c.userAgent)
-	r.Header.Set("Authorization", c.serviceToken)
+	r.Header.Set("Authorization", "Bearer "+c.serviceToken)
 	return c.internal.Do(r)
 }
