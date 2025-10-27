@@ -105,6 +105,9 @@ var WorkloadPoolModelAttributeType = basetypes.ObjectType{
 		//"disk_size":         types.Int64Type,
 		"user_data":        types.StringType,
 		"enable_public_ip": types.BoolType,
+		"allowed_address_pairs": types.SetType{
+			ElemType: types.StringType,
+		},
 		"firewall_rules": types.ListType{
 			ElemType: FirewallRuleModelAttributeType,
 		},
@@ -120,11 +123,12 @@ type WorkloadPoolModel struct {
 	// REVIEW_ME: Should we accept the image and flavor names instead of their IDs?
 	ImageID  types.String `tfsdk:"image_id"`
 	FlavorID types.String `tfsdk:"flavor_id"`
-	//DiskSize       types.Int64         `tfsdk:"disk_size"`
-	UserData       types.String `tfsdk:"user_data"`
-	EnablePublicIP types.Bool   `tfsdk:"enable_public_ip"`
-	FirewallRules  types.List   `tfsdk:"firewall_rules"`
-	Machines       types.List   `tfsdk:"machines"`
+	//DiskSize          types.Int64  `tfsdk:"disk_size"`
+	UserData            types.String `tfsdk:"user_data"`
+	EnablePublicIP      types.Bool   `tfsdk:"enable_public_ip"`
+	AllowedAddressPairs types.Set    `tfsdk:"allowed_address_pairs"`
+	FirewallRules       types.List   `tfsdk:"firewall_rules"`
+	Machines            types.List   `tfsdk:"machines"`
 }
 
 func NewWorkloadPoolModel(spec nscale.ComputeClusterWorkloadPool, status *nscale.ComputeClusterWorkloadPoolStatus) attr.Value {
@@ -143,6 +147,15 @@ func NewWorkloadPoolModel(spec nscale.ComputeClusterWorkloadPool, status *nscale
 		firewallRules = NewFirewallRuleModels(*spec.Machine.Firewall)
 	}
 
+	allowedAddressPairs := basetypes.NewSetNull(types.StringType)
+	if spec.Machine.AllowedAddressPairs != nil && len(*spec.Machine.AllowedAddressPairs) > 0 {
+		cidrList := make([]attr.Value, 0, len(*spec.Machine.AllowedAddressPairs))
+		for _, pair := range *spec.Machine.AllowedAddressPairs {
+			cidrList = append(cidrList, types.StringValue(pair.Cidr))
+		}
+		allowedAddressPairs = basetypes.NewSetValueMust(types.StringType, cidrList)
+	}
+
 	machines := basetypes.NewListNull(MachineModelAttributeType)
 	if status != nil && status.Machines != nil {
 		machines = NewMachineModels(*status.Machines)
@@ -157,11 +170,12 @@ func NewWorkloadPoolModel(spec nscale.ComputeClusterWorkloadPool, status *nscale
 			"image_id":  types.StringPointerValue(spec.Machine.Image.Id),
 			"flavor_id": types.StringValue(spec.Machine.FlavorId),
 			//// FIXME: Some machines may not have a disk size specified as it's inherited from the flavor. We need to check whether we could populate the disk size from the flavor.
-			//"disk_size":        types.Int64Value(int64(spec.Machine.Disk.Size)),
-			"user_data":        userData,
-			"enable_public_ip": enablePublicIP,
-			"firewall_rules":   firewallRules,
-			"machines":         machines,
+			//"disk_size":               types.Int64Value(int64(spec.Machine.Disk.Size)),
+			"user_data":             userData,
+			"enable_public_ip":      enablePublicIP,
+			"allowed_address_pairs": allowedAddressPairs,
+			"firewall_rules":        firewallRules,
+			"machines":              machines,
 		},
 	)
 }
@@ -213,10 +227,26 @@ func (m *WorkloadPoolModel) NscaleWorkloadPool() (nscale.ComputeClusterWorkloadP
 		userData = &temp
 	}
 
+	var allowedAddressPairs *nscale.AllowedAddressPairList
+	if !m.AllowedAddressPairs.IsNull() && !m.AllowedAddressPairs.IsUnknown() {
+		var cidrStrings []string
+		if diagnostics := m.AllowedAddressPairs.ElementsAs(context.TODO(), &cidrStrings, false); diagnostics.HasError() {
+			return nscale.ComputeClusterWorkloadPool{}, diagnostics
+		}
+		if len(cidrStrings) > 0 {
+			pairs := make(nscale.AllowedAddressPairList, 0, len(cidrStrings))
+			for _, cidr := range cidrStrings {
+				pairs = append(pairs, nscale.AllowedAddressPair{
+					Cidr: cidr,
+				})
+			}
+			allowedAddressPairs = &pairs
+		}
+	}
+
 	workloadPool := nscale.ComputeClusterWorkloadPool{
 		Machine: nscale.MachinePool{
-			// REVIEW_ME: Not sure what the allowed_address_pairs are for. Even the UI doesn’t provide a way to set them, so leaving it as nil for now.
-			AllowedAddressPairs: nil,
+			AllowedAddressPairs: allowedAddressPairs,
 			Disk:                disk,
 			Firewall:            &firewallRules,
 			FlavorId:            m.FlavorID.ValueString(),

@@ -153,6 +153,14 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 							Computed:            true,
 							Default:             booldefault.StaticBool(true),
 						},
+						"allowed_address_pairs": schema.SetAttribute{
+							MarkdownDescription: "A set of CIDR prefixes that are allowed to pass through this workload pool's network ports. Typically required when the machine is operating as a router.",
+							ElementType:         types.StringType,
+							Optional:            true,
+							Validators: []validator.Set{
+								setvalidator.ValueStringsAre(CIDRValidator{}),
+							},
+						},
 						"firewall_rules": schema.ListNestedAttribute{
 							MarkdownDescription: "A list of firewall rules to apply to the VMs in this workload pool.",
 							Optional:            true,
