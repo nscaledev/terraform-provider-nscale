@@ -44,6 +44,7 @@ Required:
 
 Optional:
 
+- `disk_size` (Number) The size of the boot (root) disk for each VM in the workload pool, in GiB.
 - `enable_public_ip` (Boolean) Whether to assign a public IP address to each VM in this workload pool. Default is `true`.
 - `firewall_rules` (Attributes List) A list of firewall rules to apply to the VMs in this workload pool. (see [below for nested schema](#nestedatt--workload_pools--firewall_rules))
 - `user_data` (String) The data to pass to the VMs at boot time.

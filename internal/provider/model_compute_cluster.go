@@ -98,11 +98,11 @@ func (m *ComputeClusterModel) NscaleComputeCluster() (nscale.ComputeClusterWrite
 
 var WorkloadPoolModelAttributeType = basetypes.ObjectType{
 	AttrTypes: map[string]attr.Type{
-		"name":      types.StringType,
-		"replicas":  types.Int64Type,
-		"image_id":  types.StringType,
-		"flavor_id": types.StringType,
-		//"disk_size":         types.Int64Type,
+		"name":             types.StringType,
+		"replicas":         types.Int64Type,
+		"image_id":         types.StringType,
+		"flavor_id":        types.StringType,
+		"disk_size":        types.Int64Type,
 		"user_data":        types.StringType,
 		"enable_public_ip": types.BoolType,
 		"firewall_rules": types.ListType{
@@ -118,9 +118,9 @@ type WorkloadPoolModel struct {
 	Name     types.String `tfsdk:"name"`
 	Replicas types.Int64  `tfsdk:"replicas"`
 	// REVIEW_ME: Should we accept the image and flavor names instead of their IDs?
-	ImageID  types.String `tfsdk:"image_id"`
-	FlavorID types.String `tfsdk:"flavor_id"`
-	//DiskSize       types.Int64         `tfsdk:"disk_size"`
+	ImageID        types.String `tfsdk:"image_id"`
+	FlavorID       types.String `tfsdk:"flavor_id"`
+	DiskSize       types.Int64  `tfsdk:"disk_size"`
 	UserData       types.String `tfsdk:"user_data"`
 	EnablePublicIP types.Bool   `tfsdk:"enable_public_ip"`
 	FirewallRules  types.List   `tfsdk:"firewall_rules"`
@@ -148,16 +148,20 @@ func NewWorkloadPoolModel(spec nscale.ComputeClusterWorkloadPool, status *nscale
 		machines = NewMachineModels(*status.Machines)
 	}
 
+	diskSize := types.Int64Null()
+	if spec.Machine.Disk != nil {
+		diskSize = types.Int64Value(int64(spec.Machine.Disk.Size))
+	}
+
 	return basetypes.NewObjectValueMust(
 		WorkloadPoolModelAttributeType.AttrTypes,
 		map[string]attr.Value{
 			"name":     types.StringValue(spec.Name),
 			"replicas": types.Int64Value(int64(spec.Machine.Replicas)),
 			// FIXME: Some machines may not have an image ID but have an image selector. We need to check whether we could populate the image ID from the selector.
-			"image_id":  types.StringPointerValue(spec.Machine.Image.Id),
-			"flavor_id": types.StringValue(spec.Machine.FlavorId),
-			//// FIXME: Some machines may not have a disk size specified as it's inherited from the flavor. We need to check whether we could populate the disk size from the flavor.
-			//"disk_size":        types.Int64Value(int64(spec.Machine.Disk.Size)),
+			"image_id":         types.StringPointerValue(spec.Machine.Image.Id),
+			"flavor_id":        types.StringValue(spec.Machine.FlavorId),
+			"disk_size":        diskSize,
 			"user_data":        userData,
 			"enable_public_ip": enablePublicIP,
 			"firewall_rules":   firewallRules,
@@ -187,11 +191,11 @@ func NewWorkloadPoolModels(specs []nscale.ComputeClusterWorkloadPool, statuses *
 
 func (m *WorkloadPoolModel) NscaleWorkloadPool() (nscale.ComputeClusterWorkloadPool, diag.Diagnostics) {
 	var disk *nscale.Volume
-	//if !m.DiskSize.IsNull() && !m.DiskSize.IsUnknown() {
-	//	disk = &nscale.Volume{
-	//		Size: int(m.DiskSize.ValueInt64()),
-	//	}
-	//}
+	if !m.DiskSize.IsNull() && !m.DiskSize.IsUnknown() {
+		disk = &nscale.Volume{
+			Size: int(m.DiskSize.ValueInt64()),
+		}
+	}
 
 	var sourceFirewallRules []FirewallRuleModel
 	if diagnostics := m.FirewallRules.ElementsAs(context.TODO(), &sourceFirewallRules, false); diagnostics.HasError() {

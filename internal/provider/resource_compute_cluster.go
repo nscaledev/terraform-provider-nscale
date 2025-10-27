@@ -133,13 +133,13 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 							MarkdownDescription: "The identifier of the flavor (machine type) used for the workload pool VMs.",
 							Required:            true,
 						},
-						//"disk_size": schema.Int64Attribute{
-						//	MarkdownDescription: "The size of the boot disk for each VM in the workload pool, in GiB.",
-						//	Optional:            true,
-						//	Validators: []validator.Int64{
-						//		int64validator.AtLeast(10),
-						//	},
-						//},
+						"disk_size": schema.Int64Attribute{
+							MarkdownDescription: "The size of the boot (root) disk for each VM in the workload pool, in GiB.",
+							Optional:            true,
+							Validators: []validator.Int64{
+								int64validator.AtLeast(10),
+							},
+						},
 						"user_data": schema.StringAttribute{
 							MarkdownDescription: "The data to pass to the VMs at boot time.",
 							Optional:            true,

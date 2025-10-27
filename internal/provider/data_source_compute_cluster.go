@@ -99,10 +99,10 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 							MarkdownDescription: "The identifier of the flavor (machine type) used for the workload pool VMs.",
 							Computed:            true,
 						},
-						//"disk_size": schema.Int64Attribute{
-						//	MarkdownDescription: "The size of the boot disk for each VM in the workload pool, in GiB.",
-						//	Computed:            true,
-						//},
+						"disk_size": schema.Int64Attribute{
+							MarkdownDescription: "The size of the boot disk for each VM in the workload pool, in GiB.",
+							Computed:            true,
+						},
 						"user_data": schema.StringAttribute{
 							MarkdownDescription: "The data to pass to the VMs at boot time.",
 							Computed:            true,

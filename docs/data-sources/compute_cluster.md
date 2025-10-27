@@ -34,6 +34,7 @@ Nscale Compute Cluster
 
 Read-Only:
 
+- `disk_size` (Number) The size of the boot disk for each VM in the workload pool, in GiB.
 - `enable_public_ip` (Boolean) Whether to assign a public IP address to each VM in this workload pool.
 - `firewall_rules` (Attributes List) A list of firewall rules applied to the VMs in this workload pool. (see [below for nested schema](#nestedatt--workload_pools--firewall_rules))
 - `flavor_id` (String) The identifier of the flavor (machine type) used for the workload pool VMs.
