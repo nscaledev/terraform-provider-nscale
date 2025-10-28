@@ -44,6 +44,7 @@ Required:
 
 Optional:
 
+- `allowed_address_pairs` (Attributes Set) Allowed addresses that can pass through this workload pool's network ports. Each pair specifies a CIDR prefix and optionally a MAC address. Typically required when the machine is operating as a router. (see [below for nested schema](#nestedatt--workload_pools--allowed_address_pairs))
 - `enable_public_ip` (Boolean) Whether to assign a public IP address to each VM in this workload pool. Default is `true`.
 - `firewall_rules` (Attributes List) A list of firewall rules to apply to the VMs in this workload pool. (see [below for nested schema](#nestedatt--workload_pools--firewall_rules))
 - `user_data` (String) The data to pass to the VMs at boot time.
@@ -51,6 +52,18 @@ Optional:
 Read-Only:
 
 - `machines` (Attributes List) A list of machines in this workload pool. (see [below for nested schema](#nestedatt--workload_pools--machines))
+
+<a id="nestedatt--workload_pools--allowed_address_pairs"></a>
+### Nested Schema for `workload_pools.allowed_address_pairs`
+
+Required:
+
+- `cidr` (String) The CIDR prefix to allow.
+
+Optional:
+
+- `mac_address` (String) The MAC address to allow. Optional.
+
 
 <a id="nestedatt--workload_pools--firewall_rules"></a>
 ### Nested Schema for `workload_pools.firewall_rules`
