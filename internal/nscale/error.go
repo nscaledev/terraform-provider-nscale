@@ -14,30 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package nscale
 
 import (
-	"net/http"
-
-	"github.com/hashicorp/go-retryablehttp"
+	"errors"
+	"fmt"
 )
 
-type HTTPClient struct {
-	internal     *http.Client
-	userAgent    string
-	serviceToken string
+var ErrEmptyResponse = errors.New("server returned an empty response")
+
+type StatusCodeError struct {
+	Code int
 }
 
-func NewHTTPClient(userAgent, serviceToken string) *HTTPClient {
-	return &HTTPClient{
-		internal:     retryablehttp.NewClient().StandardClient(),
-		userAgent:    userAgent,
-		serviceToken: serviceToken,
+func NewStatusCodeError(code int) StatusCodeError {
+	return StatusCodeError{Code: code}
+}
+
+func (e StatusCodeError) Error() string {
+	return fmt.Sprintf("server returned status code %d", e.Code)
+}
+
+func IsStatusCodeError(err error, code int) bool {
+	if e := (StatusCodeError{}); errors.As(err, &e) {
+		return e.Code == code
 	}
-}
-
-func (c *HTTPClient) Do(r *http.Request) (*http.Response, error) {
-	r.Header.Set("User-Agent", c.userAgent)
-	r.Header.Set("Authorization", "Bearer "+c.serviceToken)
-	return c.internal.Do(r)
+	return false
 }

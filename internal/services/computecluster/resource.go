@@ -14,17 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package provider
+package computecluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -38,8 +37,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
-	nscale "github.com/nscaledev/terraform-provider-nscale/internal/client"
-	externalRef0 "github.com/unikorn-cloud/core/pkg/openapi"
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
+	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
+	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 )
 
 var (
@@ -48,9 +49,7 @@ var (
 )
 
 type ComputeClusterResource struct {
-	client         *nscale.ClientWithResponses
-	organizationID string
-	projectID      string
+	client *nscale.Client
 }
 
 func NewComputeClusterResource() resource.Resource {
@@ -62,18 +61,16 @@ func (r *ComputeClusterResource) Configure(ctx context.Context, request resource
 		return
 	}
 
-	config, ok := request.ProviderData.(*NscaleProviderConfig)
+	client, ok := request.ProviderData.(*nscale.Client)
 	if !ok {
 		response.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *NscaleProviderConfig, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			"Unexpected Resource Configuration Type",
+			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
 		)
 		return
 	}
 
-	r.client = config.client
-	r.organizationID = config.organizationID
-	r.projectID = config.projectID
+	r.client = client
 }
 
 func (r *ComputeClusterResource) ImportState(ctx context.Context, request resource.ImportStateRequest, response *resource.ImportStateResponse) {
@@ -99,7 +96,7 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 				MarkdownDescription: "The name of the compute cluster.",
 				Required:            true,
 				Validators: []validator.String{
-					NameValidator(),
+					validators.NameValidator(),
 				},
 			},
 			"description": schema.StringAttribute{
@@ -115,7 +112,7 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 							MarkdownDescription: "The name of the workload pool.",
 							Required:            true,
 							Validators: []validator.String{
-								NameValidator(),
+								validators.NameValidator(),
 							},
 						},
 						"replicas": schema.Int64Attribute{
@@ -144,7 +141,7 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 							MarkdownDescription: "The data to pass to the VMs at boot time.",
 							Optional:            true,
 							Validators: []validator.String{
-								Base64Validator{},
+								validators.Base64Validator{},
 							},
 						},
 						"enable_public_ip": schema.BoolAttribute{
@@ -162,7 +159,7 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 										MarkdownDescription: "The CIDR prefix to allow.",
 										Required:            true,
 										Validators: []validator.String{
-											CIDRValidator{},
+											validators.CIDRValidator{},
 										},
 									},
 									"mac_address": schema.StringAttribute{
@@ -171,9 +168,12 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 									},
 								},
 							},
+							Validators: []validator.Set{
+								setvalidator.SizeAtLeast(1),
+							},
 						},
 						"firewall_rules": schema.ListNestedAttribute{
-							MarkdownDescription: "A list of firewall rules to apply to the VMs in this workload pool.",
+							MarkdownDescription: "A list of firewall rules for the VMs in this workload pool.",
 							Optional:            true,
 							NestedObject: schema.NestedAttributeObject{
 								Attributes: map[string]schema.Attribute{
@@ -190,7 +190,7 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 										MarkdownDescription: "The IP protocol to which this firewall rule applies. Valid values are `tcp` or `udp`.",
 										Required:            true,
 										Validators: []validator.String{
-											ProtocolValidator{},
+											stringvalidator.OneOf("tcp", "udp"),
 										},
 									},
 									"ports": schema.StringAttribute{
@@ -206,10 +206,13 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 										Required:            true,
 										Validators: []validator.Set{
 											setvalidator.SizeAtLeast(1),
-											setvalidator.ValueStringsAre(CIDRValidator{}),
+											setvalidator.ValueStringsAre(validators.CIDRValidator{}),
 										},
 									},
 								},
+							},
+							Validators: []validator.List{
+								listvalidator.SizeAtLeast(1),
 							},
 						},
 						"machines": schema.ListNestedAttribute{
@@ -283,7 +286,7 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 	}
 
 	// REVIEW_ME: Should we retrieve the organization ID and project ID using the service token, or is that even possible?
-	clusterCreateResponse, err := r.client.PostApiV1OrganizationsOrganizationIDProjectsProjectIDClustersWithResponse(ctx, r.organizationID, r.projectID, requestData)
+	clusterCreateResponse, err := r.client.Compute.PostApiV1OrganizationsOrganizationIDProjectsProjectIDClustersWithResponse(ctx, r.client.OrganizationID, r.client.ProjectID, requestData)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Compute Cluster",
@@ -291,10 +294,11 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 		)
 		return
 	}
+
 	if clusterCreateResponse.StatusCode() != http.StatusAccepted || clusterCreateResponse.JSON202 == nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Compute Cluster",
-			fmt.Sprintf("The compute cluster creation failed with status code %d.", clusterCreateResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while creating the compute cluster (status %d).", clusterCreateResponse.StatusCode()),
 		)
 		return
 	}
@@ -304,19 +308,20 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 	stateWatcher := retry.StateChangeConf{
 		Timeout: 30 * time.Minute,
 		Pending: []string{
-			string(externalRef0.ResourceProvisioningStatusProvisioning),
-			string(externalRef0.ResourceProvisioningStatusUnknown),
+			string(coreapi.ResourceProvisioningStatusProvisioning),
+			string(coreapi.ResourceProvisioningStatusUnknown),
 		},
 		Target: []string{
-			string(externalRef0.ResourceProvisioningStatusProvisioned),
+			string(coreapi.ResourceProvisioningStatusProvisioned),
 		},
-		Refresh: func() (interface{}, string, error) {
-			clusterListResponse, err := r.client.GetApiV1OrganizationsOrganizationIDClustersWithResponse(ctx, r.organizationID, nil)
+		Refresh: func() (any, string, error) {
+			clusterListResponse, err := r.client.Compute.GetApiV1OrganizationsOrganizationIDClustersWithResponse(ctx, r.client.OrganizationID, nil)
 			if err != nil {
 				return nil, "", err
 			}
+
 			if clusterListResponse.StatusCode() != http.StatusOK || clusterListResponse.JSON200 == nil {
-				err = fmt.Errorf("compute cluster read operation failed with status code %d", clusterListResponse.StatusCode())
+				err = fmt.Errorf("compute cluster list operation failed with status code %d", clusterListResponse.StatusCode())
 				return nil, "", err
 			}
 
@@ -326,28 +331,24 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 				}
 			}
 
-			return nil, string(externalRef0.ResourceProvisioningStatusUnknown), nil
+			return nil, string(coreapi.ResourceProvisioningStatusUnknown), nil
 		},
 	}
 
 	state, err := stateWatcher.WaitForStateContext(ctx)
 	if err != nil {
-		e := errors.Unwrap(err)
-		if e == nil {
-			e = err
-		}
 		response.Diagnostics.AddError(
-			"Failed to Wait for Compute Cluster to be Provisioned",
-			fmt.Sprintf("An error occurred while waiting for the compute cluster to be provisioned: %s", e),
+			"Failed to Wait for Compute Cluster to be Created",
+			fmt.Sprintf("An error occurred while waiting for the compute cluster to be created: %s", err),
 		)
 		return
 	}
 
-	computeCluster, ok := state.(*nscale.ComputeClusterRead)
+	computeCluster, ok := state.(*computeapi.ComputeClusterRead)
 	if !ok || computeCluster == nil {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Type",
-			fmt.Sprintf("Expected *nscale.ComputeClusterRead, got: %T. Please contact the Nscale team for support.", computeCluster),
+			fmt.Sprintf("Expected *computeapi.ComputeClusterRead, got: %T. Please contact the Nscale team for support.", computeCluster),
 		)
 		return
 	}
@@ -364,18 +365,19 @@ func (r *ComputeClusterResource) Read(ctx context.Context, request resource.Read
 		return
 	}
 
-	clusterListResponse, err := r.client.GetApiV1OrganizationsOrganizationIDClustersWithResponse(ctx, r.organizationID, nil)
+	clusterListResponse, err := r.client.Compute.GetApiV1OrganizationsOrganizationIDClustersWithResponse(ctx, r.client.OrganizationID, nil)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Compute Cluster",
-			fmt.Sprintf("An error occurred while reading the compute cluster: %s", err),
+			fmt.Sprintf("An error occurred while retriving the compute cluster: %s", err),
 		)
 		return
 	}
+
 	if clusterListResponse.StatusCode() != http.StatusOK || clusterListResponse.JSON200 == nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Compute Cluster",
-			fmt.Sprintf("The compute cluster read operation failed with status code %d.", clusterListResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while retriving the compute cluster (status %d).", clusterListResponse.StatusCode()),
 		)
 		return
 	}
@@ -389,16 +391,6 @@ func (r *ComputeClusterResource) Read(ctx context.Context, request resource.Read
 	}
 
 	response.State.RemoveResource(ctx)
-}
-
-func (r *ComputeClusterResource) setUniqueOperationTag(cluster *nscale.ComputeClusterWrite) {
-	tagList := []externalRef0.Tag{
-		{
-			Name:  fmt.Sprintf("terraform.nscale.com/%s", uuid.New().String()),
-			Value: "0",
-		},
-	}
-	cluster.Metadata.Tags = &tagList
 }
 
 func (r *ComputeClusterResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
@@ -415,10 +407,9 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 		return
 	}
 
-	r.setUniqueOperationTag(&requestData)
-	operationKey := (*requestData.Metadata.Tags)[0].Name
+	operationTagKey := nscale.WriteOperationTag(&requestData.Metadata)
 
-	clusterUpdateResponse, err := r.client.PutApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterIDWithResponse(ctx, r.organizationID, r.projectID, data.ID.ValueString(), requestData)
+	clusterUpdateResponse, err := r.client.Compute.PutApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterIDWithResponse(ctx, r.client.OrganizationID, r.client.ProjectID, data.ID.ValueString(), requestData)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Compute Cluster",
@@ -426,10 +417,11 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 		)
 		return
 	}
+
 	if clusterUpdateResponse.StatusCode() != http.StatusAccepted {
 		response.Diagnostics.AddError(
 			"Failed to Update Compute Cluster",
-			fmt.Sprintf("The compute cluster update operation failed with status code %d.", clusterUpdateResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while updating the compute cluster (status %d).", clusterUpdateResponse.StatusCode()),
 		)
 		return
 	}
@@ -438,13 +430,14 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 		Timeout: 30 * time.Minute,
 		Pending: []string{"updating"},
 		Target:  []string{"completed"},
-		Refresh: func() (interface{}, string, error) {
-			clusterListResponse, err := r.client.GetApiV1OrganizationsOrganizationIDClustersWithResponse(ctx, r.organizationID, nil)
+		Refresh: func() (any, string, error) {
+			clusterListResponse, err := r.client.Compute.GetApiV1OrganizationsOrganizationIDClustersWithResponse(ctx, r.client.OrganizationID, nil)
 			if err != nil {
 				return nil, "", err
 			}
+
 			if clusterListResponse.StatusCode() != http.StatusOK || clusterListResponse.JSON200 == nil {
-				err = fmt.Errorf("compute cluster read operation failed with status code %d", clusterListResponse.StatusCode())
+				err = fmt.Errorf("compute cluster list operation failed with status code %d", clusterListResponse.StatusCode())
 				return nil, "", err
 			}
 
@@ -452,7 +445,7 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 				if cluster.Metadata.Id == data.ID.ValueString() && cluster.Metadata.Tags != nil {
 					tagList := *cluster.Metadata.Tags
 					for _, tag := range tagList {
-						if tag.Name == operationKey {
+						if tag.Name == operationTagKey {
 							return &cluster, "completed", nil
 						}
 					}
@@ -465,22 +458,18 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 
 	state, err := stateWatcher.WaitForStateContext(ctx)
 	if err != nil {
-		e := errors.Unwrap(err)
-		if e == nil {
-			e = err
-		}
 		response.Diagnostics.AddError(
 			"Failed to Wait for Compute Cluster to be Updated",
-			fmt.Sprintf("An error occurred while waiting for the compute cluster to be updated: %s", e),
+			fmt.Sprintf("An error occurred while waiting for the compute cluster to be updated: %s", err),
 		)
 		return
 	}
 
-	computeCluster, ok := state.(*nscale.ComputeClusterRead)
+	computeCluster, ok := state.(*computeapi.ComputeClusterRead)
 	if !ok || computeCluster == nil {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Type",
-			fmt.Sprintf("Expected *nscale.ComputeClusterRead, got: %T. Please contact the Nscale team for support.", computeCluster),
+			fmt.Sprintf("Expected *computeapi.ComputeClusterRead, got: %T. Please contact the Nscale team for support.", computeCluster),
 		)
 		return
 	}
@@ -497,7 +486,7 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 		return
 	}
 
-	clusterDeleteResponse, err := r.client.DeleteApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterIDWithResponse(ctx, r.organizationID, r.projectID, data.ID.ValueString())
+	clusterDeleteResponse, err := r.client.Compute.DeleteApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterIDWithResponse(ctx, r.client.OrganizationID, r.client.ProjectID, data.ID.ValueString())
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Compute Cluster",
@@ -505,10 +494,11 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 		)
 		return
 	}
+
 	if clusterDeleteResponse.StatusCode() != http.StatusAccepted {
 		response.Diagnostics.AddError(
 			"Failed to Delete Compute Cluster",
-			fmt.Sprintf("The compute cluster deletion failed with status code %d.", clusterDeleteResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while deleting the compute cluster (status %d).", clusterDeleteResponse.StatusCode()),
 		)
 		return
 	}
@@ -517,13 +507,14 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 		Timeout: 30 * time.Minute,
 		Pending: []string{"deleting"},
 		Target:  []string{"completed"},
-		Refresh: func() (interface{}, string, error) {
-			clusterListResponse, err := r.client.GetApiV1OrganizationsOrganizationIDClustersWithResponse(ctx, r.organizationID, nil)
+		Refresh: func() (any, string, error) {
+			clusterListResponse, err := r.client.Compute.GetApiV1OrganizationsOrganizationIDClustersWithResponse(ctx, r.client.OrganizationID, nil)
 			if err != nil {
 				return nil, "", err
 			}
+
 			if clusterListResponse.StatusCode() != http.StatusOK || clusterListResponse.JSON200 == nil {
-				err = fmt.Errorf("compute cluster read operation failed with status code %d", clusterListResponse.StatusCode())
+				err = fmt.Errorf("compute cluster list operation failed with status code %d", clusterListResponse.StatusCode())
 				return nil, "", err
 			}
 
@@ -533,18 +524,14 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 				}
 			}
 
-			return &struct{}{}, "completed", nil
+			return struct{}{}, "completed", nil
 		},
 	}
 
 	if _, err = stateWatcher.WaitForStateContext(ctx); err != nil {
-		e := errors.Unwrap(err)
-		if e == nil {
-			e = err
-		}
 		response.Diagnostics.AddError(
 			"Failed to Wait for Compute Cluster to be Deleted",
-			fmt.Sprintf("An error occurred while waiting for the compute cluster to be deleted: %s", e),
+			fmt.Sprintf("An error occurred while waiting for the compute cluster to be deleted: %s", err),
 		)
 		return
 	}

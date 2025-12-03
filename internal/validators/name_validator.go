@@ -14,6 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package validators
 
-//go:generate go tool oapi-codegen -config config.yaml https://raw.githubusercontent.com/nscaledev/uni-compute/refs/tags/v1.4.0/pkg/openapi/server.spec.yaml
+import (
+	"regexp"
+
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+)
+
+func NameValidator() validator.String {
+	return stringvalidator.RegexMatches(
+		regexp.MustCompile(`^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$`),
+		"Must start with a lowercase letter, contain only lowercase letters, digits or hyphens, end with a letter or digit, and be at most 63 characters long",
+	)
+}
