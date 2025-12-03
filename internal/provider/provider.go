@@ -30,6 +30,7 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/computecluster"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/region"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/securitygroup"
 	"github.com/nscaledev/terraform-provider-nscale/version"
 )
 
@@ -177,6 +178,7 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 	return []func() datasource.DataSource{
 		region.NewRegionDataSource,
 		network.NewNetworkDataSource,
+		securitygroup.NewSecurityGroupDataSource,
 		computecluster.NewComputeClusterDataSource,
 	}
 }
@@ -184,6 +186,7 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		network.NewNetworkResource,
+		securitygroup.NewSecurityGroupResource,
 		computecluster.NewComputeClusterResource,
 	}
 }
