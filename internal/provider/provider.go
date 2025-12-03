@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/computecluster"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/instance"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/region"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/securitygroup"
@@ -179,6 +180,7 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		region.NewRegionDataSource,
 		network.NewNetworkDataSource,
 		securitygroup.NewSecurityGroupDataSource,
+		instance.NewInstanceFlavorDataSource,
 		computecluster.NewComputeClusterDataSource,
 	}
 }
