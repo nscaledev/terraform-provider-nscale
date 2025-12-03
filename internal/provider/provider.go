@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/computecluster"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/region"
 	"github.com/nscaledev/terraform-provider-nscale/version"
 )
@@ -175,12 +176,14 @@ func (p NscaleProvider) Configure(ctx context.Context, request provider.Configur
 func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		region.NewRegionDataSource,
+		network.NewNetworkDataSource,
 		computecluster.NewComputeClusterDataSource,
 	}
 }
 
 func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
+		network.NewNetworkResource,
 		computecluster.NewComputeClusterResource,
 	}
 }
