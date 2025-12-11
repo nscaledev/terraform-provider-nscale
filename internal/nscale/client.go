@@ -19,7 +19,6 @@ package nscale
 import (
 	"fmt"
 
-	"github.com/nscaledev/terraform-provider-nscale/version"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
@@ -31,9 +30,7 @@ type Client struct {
 	Compute        computeapi.ClientWithResponsesInterface
 }
 
-func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organizationID, projectID string) (*Client, error) {
-	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-nscale/%s", version.ProviderVersion, version.ProviderVersion)
-
+func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organizationID, projectID, userAgent string) (*Client, error) {
 	httpClient := NewHTTPClient(userAgent, serviceToken)
 
 	region, err := regionapi.NewClientWithResponses(regionServiceBaseURL, regionapi.WithHTTPClient(httpClient))

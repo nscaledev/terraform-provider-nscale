@@ -59,7 +59,7 @@ func (s *RegionDataSource) Metadata(ctx context.Context, request datasource.Meta
 
 func (s *RegionDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{
-		MarkdownDescription: "Nscale Network",
+		MarkdownDescription: "Nscale Region",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "An unique identifier for the region.",

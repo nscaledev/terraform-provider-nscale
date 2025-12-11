@@ -3,12 +3,12 @@
 page_title: "nscale_instance_flavor Data Source - nscale"
 subcategory: ""
 description: |-
-  Nscale Network
+  Nscale Instance Flavor
 ---
 
 # nscale_instance_flavor (Data Source)
 
-Nscale Network
+Nscale Instance Flavor
 
 
 

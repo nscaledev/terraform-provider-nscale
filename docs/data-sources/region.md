@@ -3,12 +3,12 @@
 page_title: "nscale_region Data Source - nscale"
 subcategory: ""
 description: |-
-  Nscale Network
+  Nscale Region
 ---
 
 # nscale_region (Data Source)
 
-Nscale Network
+Nscale Region
 
 
 

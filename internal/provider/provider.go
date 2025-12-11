@@ -162,7 +162,9 @@ func (p NscaleProvider) Configure(ctx context.Context, request provider.Configur
 		return
 	}
 
-	client, err := nscale.NewClient(regionServiceAPIEndpoint, computeServiceAPIEndpoint, serviceToken, organizationID, projectID)
+	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-nscale/%s", request.TerraformVersion, version.ProviderVersion)
+
+	client, err := nscale.NewClient(regionServiceAPIEndpoint, computeServiceAPIEndpoint, serviceToken, organizationID, projectID, userAgent)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Nscale Client",

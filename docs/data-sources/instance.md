@@ -39,6 +39,6 @@ Nscale Instance
 Read-Only:
 
 - `allowed_destinations` (List of String) A list of CIDR blocks that are allowed to egress from the instance without SNAT.
-- `enable_public_ip` (Boolean) Indicates wWhether the instance has a public IP.
+- `enable_public_ip` (Boolean) Indicates whether the instance has a public IP.
 - `network_id` (String) The identifier of the network to where the instance is provisioned.
 - `security_group_ids` (List of String) A list of security group IDs associated with the instance.

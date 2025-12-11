@@ -59,7 +59,7 @@ func (s *InstanceFlavorDataSource) Metadata(ctx context.Context, request datasou
 
 func (s *InstanceFlavorDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
 	response.Schema = schema.Schema{
-		MarkdownDescription: "Nscale Network",
+		MarkdownDescription: "Nscale Instance Flavor",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "An unique identifier for the region.",

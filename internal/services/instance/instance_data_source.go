@@ -115,7 +115,7 @@ func (s *InstanceDataSource) Schema(ctx context.Context, request datasource.Sche
 						Computed:            true,
 					},
 					"enable_public_ip": schema.BoolAttribute{
-						MarkdownDescription: "Indicates wWhether the instance has a public IP.",
+						MarkdownDescription: "Indicates whether the instance has a public IP.",
 						Computed:            true,
 					},
 					"security_group_ids": schema.ListAttribute{
