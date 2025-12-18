@@ -26,21 +26,26 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	nscale "github.com/nscaledev/terraform-provider-nscale/internal/client"
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/computecluster"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/instance"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/region"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/securitygroup"
 	"github.com/nscaledev/terraform-provider-nscale/version"
 )
 
-const DefaultNscaleEndpoint = "https://compute.unikorn.nscale.com"
+const (
+	DefaultNscaleRegionServiceAPIEndpoint  = "https://region.unikorn.nscale.com"
+	DefaultNscaleComputeServiceAPIEndpoint = "https://compute.unikorn.nscale.com"
+)
 
 var _ provider.Provider = NscaleProvider{}
 
-type NscaleProviderConfig struct {
-	client         *nscale.ClientWithResponses
-	organizationID string
-	projectID      string
-}
-
 type NscaleProviderModel struct {
+	RegionServiceAPIEndpoint  types.String `tfsdk:"region_service_api_endpoint"`
+	ComputeServiceAPIEndpoint types.String `tfsdk:"compute_service_api_endpoint"`
+	// Deprecated: use ComputeServiceAPIEndpoint instead
 	Endpoint       types.String `tfsdk:"endpoint"`
 	ServiceToken   types.String `tfsdk:"service_token"`
 	OrganizationID types.String `tfsdk:"organization_id"`
@@ -61,9 +66,18 @@ func (p NscaleProvider) Metadata(ctx context.Context, request provider.MetadataR
 func (p NscaleProvider) Schema(ctx context.Context, request provider.SchemaRequest, response *provider.SchemaResponse) {
 	response.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"region_service_api_endpoint": schema.StringAttribute{
+				MarkdownDescription: "The endpoint of the Nscale Region Service API server.",
+				Optional:            true,
+			},
+			"compute_service_api_endpoint": schema.StringAttribute{
+				MarkdownDescription: "The endpoint of the Nscale Compute Service API server.",
+				Optional:            true,
+			},
 			"endpoint": schema.StringAttribute{
 				MarkdownDescription: "The endpoint of the Nscale API server.",
 				Optional:            true,
+				DeprecationMessage:  "This attribute is deprecated. Use compute_service_api_endpoint instead.",
 			},
 			"service_token": schema.StringAttribute{
 				MarkdownDescription: "The service token for authenticating with the Nscale API server.",
@@ -90,12 +104,26 @@ func (p NscaleProvider) Configure(ctx context.Context, request provider.Configur
 		return
 	}
 
-	endpoint := data.Endpoint.ValueString()
-	if value, ok := os.LookupEnv("NSCALE_API_ENDPOINT"); ok {
-		endpoint = value
+	regionServiceAPIEndpoint := data.RegionServiceAPIEndpoint.ValueString()
+	if value, ok := os.LookupEnv("NSCALE_REGION_SERVICE_API_ENDPOINT"); ok {
+		regionServiceAPIEndpoint = value
 	}
-	if endpoint == "" {
-		endpoint = DefaultNscaleEndpoint
+	if regionServiceAPIEndpoint == "" {
+		regionServiceAPIEndpoint = DefaultNscaleRegionServiceAPIEndpoint
+	}
+
+	computeServiceAPIEndpoint := data.ComputeServiceAPIEndpoint.ValueString()
+	if value, ok := os.LookupEnv("NSCALE_COMPUTE_SERVICE_API_ENDPOINT"); ok {
+		computeServiceAPIEndpoint = value
+	}
+	if computeServiceAPIEndpoint == "" {
+		// Fallback to deprecated endpoint for backwards compatibility.
+		if value, ok := os.LookupEnv("NSCALE_API_ENDPOINT"); ok {
+			computeServiceAPIEndpoint = value
+		}
+	}
+	if computeServiceAPIEndpoint == "" {
+		computeServiceAPIEndpoint = DefaultNscaleComputeServiceAPIEndpoint
 	}
 
 	serviceToken := data.ServiceToken.ValueString()
@@ -134,37 +162,37 @@ func (p NscaleProvider) Configure(ctx context.Context, request provider.Configur
 		return
 	}
 
-	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-nscale/%s", version.ProviderVersion, version.ProviderVersion)
+	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-nscale/%s", request.TerraformVersion, version.ProviderVersion)
 
-	httpClient := nscale.NewHTTPClient(userAgent, serviceToken)
-
-	client, err := nscale.NewClientWithResponses(endpoint, nscale.WithHTTPClient(httpClient))
+	client, err := nscale.NewClient(regionServiceAPIEndpoint, computeServiceAPIEndpoint, serviceToken, organizationID, projectID, userAgent)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Nscale Client",
-			fmt.Sprintf("An error occurred while creating the Nscale client: %s.", err),
+			fmt.Sprintf("An error occurred while creating the Nscale client: %s", err),
 		)
 		return
 	}
 
-	config := &NscaleProviderConfig{
-		client:         client,
-		organizationID: organizationID,
-		projectID:      projectID,
-	}
-
-	response.DataSourceData = config
-	response.ResourceData = config
+	response.DataSourceData = client
+	response.ResourceData = client
 }
 
 func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
-		NewComputeClusterDataSource,
+		region.NewRegionDataSource,
+		network.NewNetworkDataSource,
+		securitygroup.NewSecurityGroupDataSource,
+		instance.NewInstanceFlavorDataSource,
+		instance.NewInstanceDataSource,
+		computecluster.NewComputeClusterDataSource,
 	}
 }
 
 func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		NewComputeClusterResource,
+		network.NewNetworkResource,
+		securitygroup.NewSecurityGroupResource,
+		instance.NewInstanceResource,
+		computecluster.NewComputeClusterResource,
 	}
 }

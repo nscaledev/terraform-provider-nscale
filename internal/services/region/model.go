@@ -14,30 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package region
 
 import (
-	"net/http"
-
-	"github.com/hashicorp/go-retryablehttp"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
 
-type HTTPClient struct {
-	internal     *http.Client
-	userAgent    string
-	serviceToken string
+type RegionModel struct {
+	ID          types.String `tfsdk:"id"`
+	Name        types.String `tfsdk:"name"`
+	Description types.String `tfsdk:"description"`
 }
 
-func NewHTTPClient(userAgent, serviceToken string) *HTTPClient {
-	return &HTTPClient{
-		internal:     retryablehttp.NewClient().StandardClient(),
-		userAgent:    userAgent,
-		serviceToken: serviceToken,
+func NewRegionModel(source *regionapi.RegionRead) RegionModel {
+	return RegionModel{
+		ID:          types.StringValue(source.Metadata.Id),
+		Name:        types.StringValue(source.Metadata.Name),
+		Description: types.StringPointerValue(source.Metadata.Description),
 	}
-}
-
-func (c *HTTPClient) Do(r *http.Request) (*http.Response, error) {
-	r.Header.Set("User-Agent", c.userAgent)
-	r.Header.Set("Authorization", "Bearer "+c.serviceToken)
-	return c.internal.Do(r)
 }

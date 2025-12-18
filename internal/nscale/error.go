@@ -14,6 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package nscale
 
-//go:generate go tool oapi-codegen -config config.yaml https://raw.githubusercontent.com/nscaledev/uni-compute/refs/tags/v1.4.0/pkg/openapi/server.spec.yaml
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrEmptyResponse = errors.New("server returned an empty response")
+
+type StatusCodeError struct {
+	Code int
+}
+
+func NewStatusCodeError(code int) StatusCodeError {
+	return StatusCodeError{Code: code}
+}
+
+func (e StatusCodeError) Error() string {
+	return fmt.Sprintf("server returned status code %d", e.Code)
+}
+
+func IsStatusCodeError(err error, code int) bool {
+	if e := (StatusCodeError{}); errors.As(err, &e) {
+		return e.Code == code
+	}
+	return false
+}

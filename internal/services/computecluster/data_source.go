@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package provider
+package computecluster
 
 import (
 	"context"
@@ -24,15 +24,13 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	nscale "github.com/nscaledev/terraform-provider-nscale/internal/client"
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &ComputeClusterDataSource{}
 
 type ComputeClusterDataSource struct {
-	client         *nscale.ClientWithResponses
-	organizationID string
-	projectID      string
+	client *nscale.Client
 }
 
 func NewComputeClusterDataSource() datasource.DataSource {
@@ -44,18 +42,16 @@ func (s *ComputeClusterDataSource) Configure(ctx context.Context, request dataso
 		return
 	}
 
-	config, ok := request.ProviderData.(*NscaleProviderConfig)
+	client, ok := request.ProviderData.(*nscale.Client)
 	if !ok {
 		response.Diagnostics.AddError(
-			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *NscaleProviderConfig, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			"Unexpected Resource Configuration Type",
+			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
 		)
 		return
 	}
 
-	s.client = config.client
-	s.organizationID = config.organizationID
-	s.projectID = config.projectID
+	s.client = client
 }
 
 func (s *ComputeClusterDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -188,18 +184,21 @@ func (s *ComputeClusterDataSource) Read(ctx context.Context, request datasource.
 		return
 	}
 
-	clusterListResponse, err := s.client.GetApiV1OrganizationsOrganizationIDClustersWithResponse(ctx, s.organizationID, nil)
+	clusterListResponse, err := s.client.Compute.GetApiV1OrganizationsOrganizationIDClustersWithResponse(ctx, s.client.OrganizationID, nil)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Compute Cluster",
-			fmt.Sprintf("An error occurred while reading the compute cluster: %s", err),
+			fmt.Sprintf("An error occurred while retriving the compute cluster: %s", err),
 		)
 		return
 	}
+
+	id := data.ID.ValueString()
+
 	if clusterListResponse.StatusCode() != http.StatusOK || clusterListResponse.JSON200 == nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Compute Cluster",
-			fmt.Sprintf("The compute cluster read operation failed with status code %d.", clusterListResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while retrieving the compute cluster (status %d).", clusterListResponse.StatusCode()),
 		)
 		return
 	}
@@ -211,4 +210,9 @@ func (s *ComputeClusterDataSource) Read(ctx context.Context, request datasource.
 			return
 		}
 	}
+
+	response.Diagnostics.AddError(
+		"Compute Cluster Not Found",
+		fmt.Sprintf("The compute cluster with ID %s was not found on the server.", id),
+	)
 }
