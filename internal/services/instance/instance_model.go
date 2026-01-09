@@ -177,7 +177,7 @@ func NewInstanceNetworkInterfaceModel(spec computeapi.InstanceSpec, status compu
 
 	var allowedDestinations []attr.Value
 	if allowedSourceAddresses := spec.Networking.AllowedSourceAddresses; allowedSourceAddresses != nil {
-		allowedDestinations = make([]attr.Value, 10, len(*allowedSourceAddresses))
+		allowedDestinations = make([]attr.Value, 0, len(*allowedSourceAddresses))
 		for _, allowedSourceAddress := range *allowedSourceAddresses {
 			allowedDestinations = append(allowedDestinations, types.StringValue(allowedSourceAddress))
 		}
