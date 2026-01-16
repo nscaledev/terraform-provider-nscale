@@ -63,6 +63,10 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, response *resource.Cre
 		Refresh: func() (any, string, error) {
 			result, metadata, err := w.GetFunc(ctx)
 			if err != nil {
+				if IsStatusCodeError(err, http.StatusNotFound) {
+					// FIXME: Temporary workaround for resources that might not yet be visible in the cache-backed client. Should be revisited once API consistency is guaranteed.
+					return nil, string(coreapi.ResourceProvisioningStatusUnknown), nil
+				}
 				return nil, "", err
 			}
 			return result, string(metadata.ProvisioningStatus), nil
