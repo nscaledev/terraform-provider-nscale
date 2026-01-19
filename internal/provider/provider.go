@@ -184,6 +184,7 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		network.NewNetworkDataSource,
 		securitygroup.NewSecurityGroupDataSource,
 		filestorage.NewFileStorageClassDataSource,
+		filestorage.NewFileStorageDataSource,
 		instance.NewInstanceFlavorDataSource,
 		instance.NewInstanceDataSource,
 		computecluster.NewComputeClusterDataSource,
@@ -194,6 +195,7 @@ func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resourc
 	return []func() resource.Resource{
 		network.NewNetworkResource,
 		securitygroup.NewSecurityGroupResource,
+		filestorage.NewFileStorageResource,
 		instance.NewInstanceResource,
 		computecluster.NewComputeClusterResource,
 	}
