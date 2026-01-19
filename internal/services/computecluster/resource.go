@@ -369,7 +369,7 @@ func (r *ComputeClusterResource) Read(ctx context.Context, request resource.Read
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Compute Cluster",
-			fmt.Sprintf("An error occurred while retriving the compute cluster: %s", err),
+			fmt.Sprintf("An error occurred while retrieving the compute cluster: %s", err),
 		)
 		return
 	}
@@ -377,7 +377,7 @@ func (r *ComputeClusterResource) Read(ctx context.Context, request resource.Read
 	if clusterListResponse.StatusCode() != http.StatusOK || clusterListResponse.JSON200 == nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Compute Cluster",
-			fmt.Sprintf("An error occurred while retriving the compute cluster (status %d).", clusterListResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while retrieving the compute cluster (status %d).", clusterListResponse.StatusCode()),
 		)
 		return
 	}

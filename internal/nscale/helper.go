@@ -109,7 +109,7 @@ func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resou
 
 		response.Diagnostics.AddError(
 			fmt.Sprintf("Failed to Read %s", r.ResourceTitle),
-			fmt.Sprintf("An error occurred while retriving the %s: %s", r.ResourceName, err),
+			fmt.Sprintf("An error occurred while retrieving the %s: %s", r.ResourceName, err),
 		)
 		return zero, false
 	}

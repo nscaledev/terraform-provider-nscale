@@ -62,15 +62,15 @@ func (s *InstanceFlavorDataSource) Schema(ctx context.Context, request datasourc
 		MarkdownDescription: "Nscale Instance Flavor",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "An unique identifier for the region.",
+				MarkdownDescription: "An unique identifier for the instance flavor.",
 				Required:            true,
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name of the region.",
+				MarkdownDescription: "The name of the instance flavor.",
 				Computed:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the region.",
+				MarkdownDescription: "The description of the instance flavor.",
 				Computed:            true,
 			},
 			"cpus": schema.Int64Attribute{
@@ -136,7 +136,7 @@ func (s *InstanceFlavorDataSource) Read(ctx context.Context, request datasource.
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Instance Flavor",
-			fmt.Sprintf("An error occurred while retriving the instance flavor: %s", err),
+			fmt.Sprintf("An error occurred while retrieving the instance flavor: %s", err),
 		)
 		return
 	}

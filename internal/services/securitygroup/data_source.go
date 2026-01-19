@@ -69,7 +69,7 @@ func (s *SecurityGroupDataSource) Schema(ctx context.Context, request datasource
 				Computed:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the security group.",
+				MarkdownDescription: "The description of the security group.",
 				Computed:            true,
 			},
 			"rules": schema.ListNestedAttribute{
@@ -128,7 +128,7 @@ func (s *SecurityGroupDataSource) Read(ctx context.Context, request datasource.R
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Security Group",
-			fmt.Sprintf("An error occurred while retreiving the security group: %s", err),
+			fmt.Sprintf("An error occurred while retrieving the security group: %s", err),
 		)
 		return
 	}

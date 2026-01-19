@@ -71,7 +71,7 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 				Computed:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the compute cluster.",
+				MarkdownDescription: "The description of the compute cluster.",
 				Computed:            true,
 			},
 			"workload_pools": schema.ListNestedAttribute{
@@ -188,7 +188,7 @@ func (s *ComputeClusterDataSource) Read(ctx context.Context, request datasource.
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Compute Cluster",
-			fmt.Sprintf("An error occurred while retriving the compute cluster: %s", err),
+			fmt.Sprintf("An error occurred while retrieving the compute cluster: %s", err),
 		)
 		return
 	}
