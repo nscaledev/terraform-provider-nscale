@@ -171,10 +171,16 @@ github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65E
 github.com/ugorji/go/codec v1.2.12/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
 github.com/unikorn-cloud/compute v1.11.1 h1:nlaEGkKjqhXpSptpVJIwiSd2xaXnMNSDallPg+/Z91U=
 github.com/unikorn-cloud/compute v1.11.1/go.mod h1:g6Vrn8AHkFavlF3b36KDURrvdi333hB3tzzI0j2Tb/s=
+github.com/unikorn-cloud/compute v1.13.0 h1:++373Q9+HzvlD11xbVUvJ7bbjiQZjKP9lAWsh0ZW76o=
+github.com/unikorn-cloud/compute v1.13.0/go.mod h1:wHJIuJ9TLZaFaa026GaJ7t0TvL4Cn2OjSOCQ2oZb8xg=
 github.com/unikorn-cloud/core v1.11.0 h1:WAb0ZHiN8Xw+oxTCp8XVloDAAimrAKZvcENRUFByZBQ=
 github.com/unikorn-cloud/core v1.11.0/go.mod h1:2fodtc/YDxLxT9cYnpMYD3ZHeMg/Ab98blZWbnUK6B8=
+github.com/unikorn-cloud/core v1.13.0 h1:xeb15t6VQkDW9x6dNIYg3oUR9mW6OjxhE6earvtnwJY=
+github.com/unikorn-cloud/core v1.13.0/go.mod h1:P6II1W5i4KwAz1xdcTKnA9qrq9kDRgoxWIqfW8iYQOE=
 github.com/unikorn-cloud/region v1.11.2 h1:sIDb75QONjSPi3DXadT0eCViq9M0oWZLzrFtYcj3kNw=
 github.com/unikorn-cloud/region v1.11.2/go.mod h1:naErWmyd+DvCI/l6fnLNUW+o51ek6DImfORXvdKbMQ8=
+github.com/unikorn-cloud/region v1.13.0 h1:zO3Iwvgj5OAoAqWWJmJiVnFONNe/c2jnvv3BLo6c0UE=
+github.com/unikorn-cloud/region v1.13.0/go.mod h1:Xv4G6TpYSA80cVvTDynUeh5FROvT+Jnw2/Gw5UpjfbU=
 github.com/vmihailenco/msgpack/v5 v5.4.1 h1:cQriyiUvjTwOHg8QZaPihLWeRAAVoCpE00IUPn0Bjt8=
 github.com/vmihailenco/msgpack/v5 v5.4.1/go.mod h1:GaZTsDaehaPpQVyxrf5mtQlH+pc21PIudVV/E3rRQok=
 github.com/vmihailenco/tagparser/v2 v2.0.0 h1:y09buUbR+b5aycVFQs/g70pqKVZNBmxwAhO7/IwNM9g=
