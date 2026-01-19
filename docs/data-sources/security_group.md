@@ -22,7 +22,7 @@ Nscale Security Group
 ### Read-Only
 
 - `creation_time` (String) The timestamp when the security group was created.
-- `description` (String) A description of the security group.
+- `description` (String) The description of the security group.
 - `name` (String) The name of the security group.
 - `network_id` (String) The identifier of the network to where the security group is attached.
 - `region_id` (String) The identifier of the region where the security group is provisioned.

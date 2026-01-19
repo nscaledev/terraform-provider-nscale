@@ -22,7 +22,7 @@ Nscale Instance
 ### Read-Only
 
 - `creation_time` (String) The timestamp when the instance was created.
-- `description` (String) A description of the instance.
+- `description` (String) The description of the instance.
 - `flavor_id` (String) The identifier of the flavor used for the instance.
 - `image_id` (String) The identifier of the image used for the instance.
 - `name` (String) The name of the instance.
@@ -41,4 +41,4 @@ Read-Only:
 - `allowed_destinations` (List of String) A list of CIDR blocks that are allowed to egress from the instance without SNAT.
 - `enable_public_ip` (Boolean) Indicates whether the instance has a public IP.
 - `network_id` (String) The identifier of the network to where the instance is provisioned.
-- `security_group_ids` (List of String) A list of security group IDs associated with the instance.
+- `security_group_ids` (List of String) A list of security group identifiers associated with the instance.

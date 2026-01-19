@@ -17,17 +17,17 @@ Nscale Instance Flavor
 
 ### Required
 
-- `id` (String) An unique identifier for the region.
+- `id` (String) An unique identifier for the instance flavor.
 - `region_id` (String) The identifier of the region where the instance flavor is available.
 
 ### Read-Only
 
 - `cpus` (Number) The number of CPUs allocated to the instance flavor.
-- `description` (String) A description of the region.
+- `description` (String) The description of the instance flavor.
 - `disk_size` (Number) The disk storage allocated to the instance flavor, in gigabytes.
 - `gpu` (Block, Read-only) The GPU configuration for the instance flavor, if available. (see [below for nested schema](#nestedblock--gpu))
 - `memory_size` (Number) The memory allocated to the instance flavor, in gibibytes.
-- `name` (String) The name of the region.
+- `name` (String) The name of the instance flavor.
 
 <a id="nestedblock--gpu"></a>
 ### Nested Schema for `gpu`

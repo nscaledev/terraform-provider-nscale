@@ -21,5 +21,5 @@ Nscale Region
 
 ### Read-Only
 
-- `description` (String) A description of the region.
+- `description` (String) The description of the region.
 - `name` (String) The name of the region.

@@ -22,7 +22,7 @@ Nscale Compute Cluster
 ### Read-Only
 
 - `creation_time` (String) The timestamp when the compute cluster was created.
-- `description` (String) A description of the compute cluster.
+- `description` (String) The description of the compute cluster.
 - `name` (String) The name of the compute cluster.
 - `provisioning_status` (String) The provisioning status of the compute cluster.
 - `region_id` (String) The identifier of the region where the compute cluster is provisioned.

@@ -23,7 +23,7 @@ Nscale Network
 
 - `cidr_block` (String) The CIDR block assigned to the network.
 - `creation_time` (String) The timestamp when the network was created.
-- `description` (String) A description of the network.
+- `description` (String) The description of the network.
 - `dns_nameservers` (List of String) A list of DNS nameservers associated with the network.
 - `name` (String) The name of the network.
 - `region_id` (String) The identifier of the region where the network is provisioned.

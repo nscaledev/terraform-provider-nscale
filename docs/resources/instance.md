@@ -47,4 +47,4 @@ Optional:
 
 - `allowed_destinations` (List of String) A list of CIDR blocks that are allowed to egress from the instance without SNAT.
 - `enable_public_ip` (Boolean) Whether the instance should have a public IP.
-- `security_group_ids` (List of String) A list of security group IDs to associate with the instance.
+- `security_group_ids` (List of String) A list of security group identifiers to associate with the instance.
