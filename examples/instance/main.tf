@@ -2,7 +2,7 @@ terraform {
   required_providers {
     nscale = {
       source  = "nscaledev/nscale"
-      version = "0.0.2"
+      version = "0.0.6"
     }
   }
 }
@@ -49,7 +49,7 @@ resource "nscale_instance" "example" {
     security_group_ids = [nscale_security_group.example.id]
   }
 
-  image_id  = "2ad391d1-4c7c-4963-b81a-a4fed53c2b00"
+  image_id  = "<image-id>"
   flavor_id = data.nscale_instance_flavor.g_4_standard_40s.id
   region_id = data.nscale_region.glo1.id
 }
