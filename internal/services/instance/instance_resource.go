@@ -130,6 +130,9 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 			"creation_time": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the instance was created.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 		Blocks: map[string]schema.Block{
