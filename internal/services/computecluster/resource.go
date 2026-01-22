@@ -30,7 +30,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -234,9 +233,6 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 									},
 								},
 							},
-							PlanModifiers: []planmodifier.List{
-								listplanmodifier.UseStateForUnknown(),
-							},
 						},
 					},
 				},
@@ -256,9 +252,6 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 			"provisioning_status": schema.StringAttribute{
 				MarkdownDescription: "The provisioning status of the compute cluster.",
 				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"creation_time": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the compute cluster was created.",
@@ -369,7 +362,7 @@ func (r *ComputeClusterResource) Read(ctx context.Context, request resource.Read
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Compute Cluster",
-			fmt.Sprintf("An error occurred while retriving the compute cluster: %s", err),
+			fmt.Sprintf("An error occurred while retrieving the compute cluster: %s", err),
 		)
 		return
 	}
@@ -377,7 +370,7 @@ func (r *ComputeClusterResource) Read(ctx context.Context, request resource.Read
 	if clusterListResponse.StatusCode() != http.StatusOK || clusterListResponse.JSON200 == nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Compute Cluster",
-			fmt.Sprintf("An error occurred while retriving the compute cluster (status %d).", clusterListResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while retrieving the compute cluster (status %d).", clusterListResponse.StatusCode()),
 		)
 		return
 	}

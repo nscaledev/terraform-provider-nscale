@@ -70,7 +70,7 @@ func (s *InstanceDataSource) Schema(ctx context.Context, request datasource.Sche
 				Computed:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the instance.",
+				MarkdownDescription: "The description of the instance.",
 				Computed:            true,
 			},
 			"user_data": schema.StringAttribute{
@@ -119,7 +119,7 @@ func (s *InstanceDataSource) Schema(ctx context.Context, request datasource.Sche
 						Computed:            true,
 					},
 					"security_group_ids": schema.ListAttribute{
-						MarkdownDescription: "A list of security group IDs associated with the instance.",
+						MarkdownDescription: "A list of security group identifiers associated with the instance.",
 						ElementType:         types.StringType,
 						Computed:            true,
 					},
@@ -146,7 +146,7 @@ func (s *InstanceDataSource) Read(ctx context.Context, request datasource.ReadRe
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Instance",
-			fmt.Sprintf("An error occurred while retreiving the instance: %s", err),
+			fmt.Sprintf("An error occurred while retrieving the instance: %s", err),
 		)
 		return
 	}

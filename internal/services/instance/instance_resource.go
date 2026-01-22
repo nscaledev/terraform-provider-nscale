@@ -130,6 +130,9 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 			"creation_time": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the instance was created.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -145,7 +148,7 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 						Optional:            true,
 					},
 					"security_group_ids": schema.ListAttribute{
-						MarkdownDescription: "A list of security group IDs to associate with the instance.",
+						MarkdownDescription: "A list of security group identifiers to associate with the instance.",
 						ElementType:         types.StringType,
 						Optional:            true,
 						Validators: []validator.List{

@@ -8,9 +8,9 @@ require (
 	github.com/hashicorp/terraform-plugin-framework v1.15.1
 	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.37.0
-	github.com/unikorn-cloud/compute v1.11.1
-	github.com/unikorn-cloud/core v1.11.0
-	github.com/unikorn-cloud/region v1.11.2
+	github.com/unikorn-cloud/compute v1.13.0
+	github.com/unikorn-cloud/core v1.13.0
+	github.com/unikorn-cloud/region v1.13.0
 )
 
 require (

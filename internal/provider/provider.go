@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/computecluster"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/filestorage"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/instance"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/region"
@@ -182,6 +183,8 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		region.NewRegionDataSource,
 		network.NewNetworkDataSource,
 		securitygroup.NewSecurityGroupDataSource,
+		filestorage.NewFileStorageClassDataSource,
+		filestorage.NewFileStorageDataSource,
 		instance.NewInstanceFlavorDataSource,
 		instance.NewInstanceDataSource,
 		computecluster.NewComputeClusterDataSource,
@@ -192,6 +195,7 @@ func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resourc
 	return []func() resource.Resource{
 		network.NewNetworkResource,
 		securitygroup.NewSecurityGroupResource,
+		filestorage.NewFileStorageResource,
 		instance.NewInstanceResource,
 		computecluster.NewComputeClusterResource,
 	}

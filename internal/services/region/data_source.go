@@ -70,7 +70,7 @@ func (s *RegionDataSource) Schema(ctx context.Context, request datasource.Schema
 				Computed:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the region.",
+				MarkdownDescription: "The description of the region.",
 				Computed:            true,
 			},
 		},
@@ -89,7 +89,7 @@ func (s *RegionDataSource) Read(ctx context.Context, request datasource.ReadRequ
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Region",
-			fmt.Sprintf("An error occurred while retriving the region: %s", err),
+			fmt.Sprintf("An error occurred while retrieving the region: %s", err),
 		)
 		return
 	}

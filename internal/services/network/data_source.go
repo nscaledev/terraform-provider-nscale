@@ -70,7 +70,7 @@ func (s *NetworkDataSource) Schema(ctx context.Context, request datasource.Schem
 				Computed:            true,
 			},
 			"description": schema.StringAttribute{
-				MarkdownDescription: "A description of the network.",
+				MarkdownDescription: "The description of the network.",
 				Computed:            true,
 			},
 			"dns_nameservers": schema.ListAttribute{
@@ -122,7 +122,7 @@ func (s *NetworkDataSource) Read(ctx context.Context, request datasource.ReadReq
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Network",
-			fmt.Sprintf("An error occurred while retreiving the network: %s", err),
+			fmt.Sprintf("An error occurred while retrieving the network: %s", err),
 		)
 		return
 	}
