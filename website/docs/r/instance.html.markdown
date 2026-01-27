@@ -69,12 +69,12 @@ resource "nscale_instance" "example" {
 - `flavor_id` (String) The identifier of the flavor used for the instance.
 - `image_id` (String) The identifier of the image used for the instance.
 - `name` (String) The name of the instance.
-- `region_id` (String) The identifier of the region where the instance is provisioned.
 
 ### Optional
 
 - `description` (String) The description of the instance.
 - `network_interface` (Block, Optional) The network interface configuration of the instance. (see [below for nested schema](#nestedblock--network_interface))
+- `region_id` (String) The identifier of the region where the instance is provisioned. If not specified, this defaults to the region ID configured in the provider.
 - `user_data` (String) The data to pass to the instance at boot time.
 
 ### Read-Only

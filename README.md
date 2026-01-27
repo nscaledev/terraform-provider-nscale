@@ -2,7 +2,7 @@
 
 The Nscale Terraform provider allows Terraform to manage Nscale resources, letting you define and provision them using standard Terraform workflows.
 
-**Note**: For now, the provider supports Nscale networks, security groups, compute instances and compute clusters, with more resources planned for future releases.
+**Note**: For now, the provider supports Nscale networks, security groups, file storages, compute instances and compute clusters, with more resources planned for future releases.
 
 ---
 
