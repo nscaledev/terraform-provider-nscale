@@ -33,12 +33,12 @@ resource "nscale_network" "example" {
 
 - `cidr_block` (String) The CIDR block assigned to the network.
 - `name` (String) The name of the network.
-- `region_id` (String) The identifier of the region where the network is provisioned.
 
 ### Optional
 
 - `description` (String) The description of the network.
 - `dns_nameservers` (List of String) A list of DNS nameservers to configure for the network.
+- `region_id` (String) The identifier of the region where the network is provisioned. If not specified, this defaults to the region ID configured in the provider.
 - `routes` (Attributes List) A list of routes for the network. (see [below for nested schema](#nestedatt--routes))
 
 ### Read-Only

@@ -23,7 +23,10 @@ data "nscale_instance_flavor" "example" {
 ### Required
 
 - `id` (String) An unique identifier for the instance flavor.
-- `region_id` (String) The identifier of the region where the instance flavor is available.
+
+### Optional
+
+- `region_id` (String) The identifier of the region where the instance flavor is available. If not specified, this defaults to the region ID configured in the provider.
 
 ### Read-Only
 

@@ -29,6 +29,22 @@ import (
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 )
 
+type StateReaderFunc func(ctx context.Context, target any) diag.Diagnostics
+
+func ReadTerraformState[T any](ctx context.Context, fn StateReaderFunc, mutates ...func(*T)) (T, diag.Diagnostics) {
+	var data T
+
+	if diagnostics := fn(ctx, &data); diagnostics.HasError() {
+		return data, diagnostics
+	}
+
+	for _, mutate := range mutates {
+		mutate(&data)
+	}
+
+	return data, nil
+}
+
 func assertState[T any](state any, diagnostics *diag.Diagnostics) (*T, bool) {
 	var zero *T
 
