@@ -124,8 +124,9 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 				Required:            true,
 			},
 			"region_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the region where the instance is provisioned.",
-				Required:            true,
+				MarkdownDescription: "The identifier of the region where the instance is provisioned. If not specified, this defaults to the region ID configured in the provider.",
+				Optional:            true,
+				Computed:            true,
 			},
 			"creation_time": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the instance was created.",
@@ -173,11 +174,16 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 	}
 }
 
-func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data InstanceModel
+func (r *InstanceResource) setDefaultRegionID(data *InstanceModel) {
+	if data.RegionID.ValueString() == "" {
+		data.RegionID = types.StringValue(r.client.RegionID)
+	}
+}
 
-	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+	data, diagnostics := nscale.ReadTerraformState[InstanceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -187,7 +193,7 @@ func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	instanceCreateResponse, err := r.client.Compute.PostApiV2InstancesWithResponse(ctx, params)
+	instanceCreateResponse, err := r.client.Compute.PostApiV2Instances(ctx, params)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Instance",
@@ -196,10 +202,11 @@ func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	if instanceCreateResponse.StatusCode() != http.StatusCreated || instanceCreateResponse.JSON201 == nil {
+	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceCreateResponse, http.StatusCreated)
+	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Instance",
-			fmt.Sprintf("An error occurred while creating the instance (status %d).", instanceCreateResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while creating the instance: %s", err),
 		)
 		return
 	}
@@ -208,7 +215,7 @@ func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRe
 		ResourceTitle: "Instance",
 		ResourceName:  "instance",
 		GetFunc: func(ctx context.Context) (*computeapi.InstanceRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			targetID := instanceCreateResponse.JSON201.Metadata.Id
+			targetID := instance.Metadata.Id
 			return getInstance(ctx, targetID, r.client)
 		},
 	}
@@ -223,10 +230,9 @@ func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRe
 }
 
 func (r *InstanceResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	var data InstanceModel
-
-	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[InstanceModel](ctx, request.State.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -248,10 +254,9 @@ func (r *InstanceResource) Read(ctx context.Context, request resource.ReadReques
 }
 
 func (r *InstanceResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	var data InstanceModel
-
-	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[InstanceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -264,7 +269,7 @@ func (r *InstanceResource) Update(ctx context.Context, request resource.UpdateRe
 	id := data.ID.ValueString()
 	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
 
-	instanceUpdateResponse, err := r.client.Compute.PutApiV2InstancesInstanceIDWithResponse(ctx, id, params)
+	instanceUpdateResponse, err := r.client.Compute.PutApiV2InstancesInstanceID(ctx, id, params)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Instance",
@@ -273,10 +278,11 @@ func (r *InstanceResource) Update(ctx context.Context, request resource.UpdateRe
 		return
 	}
 
-	if instanceUpdateResponse.StatusCode() != http.StatusAccepted {
+	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceUpdateResponse, http.StatusAccepted)
+	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Instance",
-			fmt.Sprintf("An error occurred while updating the instance (status %d).", instanceUpdateResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while updating the instance: %s", err),
 		)
 		return
 	}
@@ -299,16 +305,15 @@ func (r *InstanceResource) Update(ctx context.Context, request resource.UpdateRe
 }
 
 func (r *InstanceResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	var data InstanceModel
-
-	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[InstanceModel](ctx, request.State.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
 	id := data.ID.ValueString()
 
-	instanceDeleteResponse, err := r.client.Compute.DeleteApiV2InstancesInstanceIDWithResponse(ctx, id)
+	instanceDeleteResponse, err := r.client.Compute.DeleteApiV2InstancesInstanceID(ctx, id)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Instance",
@@ -317,10 +322,10 @@ func (r *InstanceResource) Delete(ctx context.Context, request resource.DeleteRe
 		return
 	}
 
-	if instanceDeleteResponse.StatusCode() != http.StatusAccepted {
+	if err = nscale.ReadErrorResponse(instanceDeleteResponse, http.StatusAccepted); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Instance",
-			fmt.Sprintf("An error occurred while deleting the instance (status %d)", instanceDeleteResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while deleting the instance: %s", err),
 		)
 		return
 	}

@@ -49,11 +49,11 @@ resource "nscale_security_group" "example" {
 
 - `name` (String) The name of the security group.
 - `network_id` (String) The identifier of the network to where the security group is attached.
-- `region_id` (String) The identifier of the region where the security group is provisioned.
 
 ### Optional
 
 - `description` (String) The description of the security group.
+- `region_id` (String) The identifier of the region where the security group is provisioned. If not specified, this defaults to the region ID configured in the provider.
 - `rules` (Attributes List) A list of rules for the security group. (see [below for nested schema](#nestedatt--rules))
 
 ### Read-Only

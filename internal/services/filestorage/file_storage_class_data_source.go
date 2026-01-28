@@ -81,18 +81,24 @@ func (s *FileStorageClassDataSource) Schema(ctx context.Context, request datasou
 				Computed:            true,
 			},
 			"region_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the region where the file storage class is available.",
-				Required:            true,
+				MarkdownDescription: "The identifier of the region where the file storage class is available. If not specified, this defaults to the region ID configured in the provider.",
+				Optional:            true,
+				Computed:            true,
 			},
 		},
 	}
 }
 
-func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
-	var data FileStorageClassModel
+func (r *FileStorageClassDataSource) setDefaultRegionID(data *FileStorageClassModel) {
+	if data.RegionID.ValueString() == "" {
+		data.RegionID = types.StringValue(r.client.RegionID)
+	}
+}
 
-	response.Diagnostics.Append(request.Config.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+	data, diagnostics := nscale.ReadTerraformState[FileStorageClassModel](ctx, request.Config.Get)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -104,7 +110,7 @@ func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasourc
 		},
 	}
 
-	storageClassListResponse, err := s.client.Region.GetApiV2FilestorageclassesWithResponse(ctx, params)
+	storageClassListResponse, err := s.client.Region.GetApiV2Filestorageclasses(ctx, params)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read File Storage Class",
@@ -113,17 +119,18 @@ func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasourc
 		return
 	}
 
-	if storageClassListResponse.StatusCode() != http.StatusOK || storageClassListResponse.JSON200 == nil {
+	storageClasses, err := nscale.ReadJSONResponseValue[[]regionapi.StorageClassV2Read](storageClassListResponse, http.StatusOK)
+	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read File Storage Class",
-			fmt.Sprintf("An error occurred while retrieving the file storage class (status %d).", storageClassListResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while retrieving the file storage class: %s", err),
 		)
 		return
 	}
 
 	id := data.ID.ValueString()
 
-	for _, storageClass := range *storageClassListResponse.JSON200 {
+	for _, storageClass := range storageClasses {
 		if storageClass.Metadata.Id == id {
 			data = NewFileStorageClassModel(&storageClass)
 			response.Diagnostics.Append(response.State.Set(ctx, data)...)

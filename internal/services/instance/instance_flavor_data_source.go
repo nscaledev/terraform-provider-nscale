@@ -23,7 +23,9 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
 
 var _ datasource.DataSourceWithConfigure = &InstanceFlavorDataSource{}
@@ -88,8 +90,9 @@ func (s *InstanceFlavorDataSource) Schema(ctx context.Context, request datasourc
 				Computed:            true,
 			},
 			"region_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the region where the instance flavor is available.",
-				Required:            true,
+				MarkdownDescription: "The identifier of the region where the instance flavor is available. If not specified, this defaults to the region ID configured in the provider.",
+				Optional:            true,
+				Computed:            true,
 			},
 		},
 		Blocks: map[string]schema.Block{
@@ -122,17 +125,22 @@ func (s *InstanceFlavorDataSource) Schema(ctx context.Context, request datasourc
 	}
 }
 
-func (s *InstanceFlavorDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
-	var data InstanceFlavorModel
+func (s *InstanceFlavorDataSource) setDefaultRegionID(data *InstanceFlavorModel) {
+	if data.RegionID.ValueString() == "" {
+		data.RegionID = types.StringValue(s.client.RegionID)
+	}
+}
 
-	response.Diagnostics.Append(request.Config.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+func (s *InstanceFlavorDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+	data, diagnostics := nscale.ReadTerraformState[InstanceFlavorModel](ctx, request.Config.Get, s.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
 	regionID := data.RegionID.ValueString()
 
-	flavorListResponse, err := s.client.Region.GetApiV1OrganizationsOrganizationIDRegionsRegionIDFlavorsWithResponse(ctx, s.client.OrganizationID, regionID)
+	flavorListResponse, err := s.client.Region.GetApiV1OrganizationsOrganizationIDRegionsRegionIDFlavors(ctx, s.client.OrganizationID, regionID)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Instance Flavor",
@@ -141,17 +149,18 @@ func (s *InstanceFlavorDataSource) Read(ctx context.Context, request datasource.
 		return
 	}
 
-	if flavorListResponse.StatusCode() != http.StatusOK || flavorListResponse.JSON200 == nil {
+	flavors, err := nscale.ReadJSONResponseValue[[]regionapi.Flavor](flavorListResponse, http.StatusOK)
+	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Instance Flavor",
-			fmt.Sprintf("An error occurred while retrieving the instance flavor (status %d).", flavorListResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while retrieving the instance flavor: %s", err),
 		)
 		return
 	}
 
 	id := data.ID.ValueString()
 
-	for _, region := range *flavorListResponse.JSON200 {
+	for _, region := range flavors {
 		if region.Metadata.Id == id {
 			data = NewInstanceFlavorModel(&region, regionID)
 			response.Diagnostics.Append(response.State.Set(ctx, data)...)

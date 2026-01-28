@@ -51,7 +51,6 @@ resource "nscale_file_storage" "example" {
 
 - `capacity` (Number) The total capacity requested for the file storage, in gibibytes.
 - `name` (String) The name of the file storage.
-- `region_id` (String) The identifier of the region where the file storage is provisioned.
 - `root_squash` (Boolean) Whether root squashing is applied to the file storage to restrict root access for clients.
 - `storage_class_id` (String) The identifier of the storage class used for the file storage.
 
@@ -59,6 +58,7 @@ resource "nscale_file_storage" "example" {
 
 - `description` (String) The description of the file storage.
 - `network` (Block List) The network to which the file storage is attached. (see [below for nested schema](#nestedblock--network))
+- `region_id` (String) The identifier of the region where the file storage is provisioned. If not specified, this defaults to the region ID configured in the provider.
 
 ### Read-Only
 

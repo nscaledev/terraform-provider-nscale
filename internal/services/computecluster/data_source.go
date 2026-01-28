@@ -19,7 +19,6 @@ package computecluster
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -177,14 +176,13 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 }
 
 func (s *ComputeClusterDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
-	var data ComputeClusterModel
-
-	response.Diagnostics.Append(request.Config.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterModel](ctx, request.Config.Get)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
-	clusterListResponse, err := s.client.Compute.GetApiV1OrganizationsOrganizationIDClustersWithResponse(ctx, s.client.OrganizationID, nil)
+	computeCluster, _, err := getComputeCluster(ctx, s.client.OrganizationID, data.ID.ValueString(), s.client)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Compute Cluster",
@@ -193,26 +191,6 @@ func (s *ComputeClusterDataSource) Read(ctx context.Context, request datasource.
 		return
 	}
 
-	id := data.ID.ValueString()
-
-	if clusterListResponse.StatusCode() != http.StatusOK || clusterListResponse.JSON200 == nil {
-		response.Diagnostics.AddError(
-			"Failed to Read Compute Cluster",
-			fmt.Sprintf("An error occurred while retrieving the compute cluster (status %d).", clusterListResponse.StatusCode()),
-		)
-		return
-	}
-
-	for _, cluster := range *clusterListResponse.JSON200 {
-		if cluster.Metadata.Id == data.ID.ValueString() {
-			data = NewComputeClusterModel(&cluster)
-			response.Diagnostics.Append(response.State.Set(ctx, data)...)
-			return
-		}
-	}
-
-	response.Diagnostics.AddError(
-		"Compute Cluster Not Found",
-		fmt.Sprintf("The compute cluster with ID %s was not found on the server.", id),
-	)
+	data = NewComputeClusterModel(computeCluster)
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

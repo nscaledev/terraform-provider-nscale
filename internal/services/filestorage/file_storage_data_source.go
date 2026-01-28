@@ -118,10 +118,9 @@ func (s *FileStorageDataSource) Schema(ctx context.Context, request datasource.S
 }
 
 func (s *FileStorageDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
-	var data FileStorageModel
-
-	response.Diagnostics.Append(request.Config.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[FileStorageModel](ctx, request.Config.Get)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 

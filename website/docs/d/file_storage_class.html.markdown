@@ -23,7 +23,10 @@ data "nscale_file_storage_class" "example" {
 ### Required
 
 - `id` (String) An unique identifier for the file storage class.
-- `region_id` (String) The identifier of the region where the file storage class is available.
+
+### Optional
+
+- `region_id` (String) The identifier of the region where the file storage class is available. If not specified, this defaults to the region ID configured in the provider.
 
 ### Read-Only
 

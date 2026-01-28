@@ -23,7 +23,9 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
 
 var _ datasource.DataSourceWithConfigure = &RegionDataSource{}
@@ -63,7 +65,8 @@ func (s *RegionDataSource) Schema(ctx context.Context, request datasource.Schema
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "An unique identifier for the region.",
-				Required:            true,
+				Optional:            true,
+				Computed:            true,
 			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The name of the region.",
@@ -77,15 +80,20 @@ func (s *RegionDataSource) Schema(ctx context.Context, request datasource.Schema
 	}
 }
 
-func (s *RegionDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
-	var data RegionModel
+func (s *RegionDataSource) setDefaultID(data *RegionModel) {
+	if data.ID.ValueString() == "" {
+		data.ID = types.StringValue(s.client.RegionID)
+	}
+}
 
-	response.Diagnostics.Append(request.Config.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+func (s *RegionDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+	data, diagnostics := nscale.ReadTerraformState[RegionModel](ctx, request.Config.Get, s.setDefaultID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
-	regionListResponse, err := s.client.Region.GetApiV1OrganizationsOrganizationIDRegionsWithResponse(ctx, s.client.OrganizationID)
+	regionListResponse, err := s.client.Region.GetApiV1OrganizationsOrganizationIDRegions(ctx, s.client.OrganizationID)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Region",
@@ -94,17 +102,18 @@ func (s *RegionDataSource) Read(ctx context.Context, request datasource.ReadRequ
 		return
 	}
 
-	if regionListResponse.StatusCode() != http.StatusOK || regionListResponse.JSON200 == nil {
+	regions, err := nscale.ReadJSONResponseValue[[]regionapi.RegionRead](regionListResponse, http.StatusOK)
+	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Region",
-			fmt.Sprintf("An error occurred while retrieving the region (status %d).", regionListResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while retrieving the region: %s", err),
 		)
 		return
 	}
 
 	id := data.ID.ValueString()
 
-	for _, region := range *regionListResponse.JSON200 {
+	for _, region := range regions {
 		if region.Metadata.Id == id {
 			data = NewRegionModel(&region)
 			response.Diagnostics.Append(response.State.Set(ctx, data)...)

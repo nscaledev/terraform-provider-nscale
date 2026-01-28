@@ -118,8 +118,9 @@ func (r *NetworkResource) Schema(ctx context.Context, request resource.SchemaReq
 				Required:            true,
 			},
 			"region_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the region where the network is provisioned.",
-				Required:            true,
+				MarkdownDescription: "The identifier of the region where the network is provisioned. If not specified, this defaults to the region ID configured in the provider.",
+				Optional:            true,
+				Computed:            true,
 			},
 			"creation_time": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the network was created.",
@@ -132,11 +133,16 @@ func (r *NetworkResource) Schema(ctx context.Context, request resource.SchemaReq
 	}
 }
 
-func (r *NetworkResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data NetworkModel
+func (r *NetworkResource) setDefaultRegionID(data *NetworkModel) {
+	if data.RegionID.ValueString() == "" {
+		data.RegionID = types.StringValue(r.client.RegionID)
+	}
+}
 
-	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+func (r *NetworkResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+	data, diagnostics := nscale.ReadTerraformState[NetworkModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -146,7 +152,7 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 		return
 	}
 
-	networkCreateResponse, err := r.client.Region.PostApiV2NetworksWithResponse(ctx, params)
+	networkCreateResponse, err := r.client.Region.PostApiV2Networks(ctx, params)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Network",
@@ -155,10 +161,11 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 		return
 	}
 
-	if networkCreateResponse.StatusCode() != http.StatusCreated || networkCreateResponse.JSON201 == nil {
+	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkCreateResponse, http.StatusCreated)
+	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Network",
-			fmt.Sprintf("An error occurred while creating the network (status %d).", networkCreateResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while creating the network: %s", err),
 		)
 		return
 	}
@@ -167,7 +174,7 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 		ResourceTitle: "Network",
 		ResourceName:  "network",
 		GetFunc: func(ctx context.Context) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			targetID := networkCreateResponse.JSON201.Metadata.Id
+			targetID := network.Metadata.Id
 			return getNetwork(ctx, targetID, r.client)
 		},
 	}
@@ -182,10 +189,9 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 }
 
 func (r *NetworkResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	var data NetworkModel
-
-	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[NetworkModel](ctx, request.State.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -207,10 +213,9 @@ func (r *NetworkResource) Read(ctx context.Context, request resource.ReadRequest
 }
 
 func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	var data NetworkModel
-
-	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[NetworkModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -223,7 +228,7 @@ func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateReq
 	id := data.ID.ValueString()
 	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
 
-	networkUpdateResponse, err := r.client.Region.PutApiV2NetworksNetworkIDWithResponse(ctx, id, params)
+	networkUpdateResponse, err := r.client.Region.PutApiV2NetworksNetworkID(ctx, id, params)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Network",
@@ -232,10 +237,11 @@ func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateReq
 		return
 	}
 
-	if networkUpdateResponse.StatusCode() != http.StatusAccepted {
+	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse, http.StatusAccepted)
+	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Network",
-			fmt.Sprintf("An error occurred while updating the network (status %d).", networkUpdateResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while updating the network: %s", err),
 		)
 		return
 	}
@@ -258,16 +264,15 @@ func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateReq
 }
 
 func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	var data NetworkModel
-
-	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[NetworkModel](ctx, request.State.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
 	id := data.ID.ValueString()
 
-	networkDeleteResponse, err := r.client.Region.DeleteApiV2NetworksNetworkIDWithResponse(ctx, id)
+	networkDeleteResponse, err := r.client.Region.DeleteApiV2NetworksNetworkID(ctx, id)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Network",
@@ -276,10 +281,10 @@ func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteReq
 		return
 	}
 
-	if networkDeleteResponse.StatusCode() != http.StatusAccepted {
+	if err = nscale.ReadErrorResponse(networkDeleteResponse, http.StatusAccepted); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Network",
-			fmt.Sprintf("An error occurred while deleting the network (status %d)", networkDeleteResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while deleting the network: %s", err),
 		)
 		return
 	}
