@@ -17,6 +17,7 @@ limitations under the License.
 package nscale
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -30,8 +31,11 @@ type HTTPClient struct {
 }
 
 func NewHTTPClient(userAgent, serviceToken string) *HTTPClient {
+	retryableHTTPClient := retryablehttp.NewClient()
+	retryableHTTPClient.CheckRetry = retryPolicy
+
 	return &HTTPClient{
-		internal:    retryablehttp.NewClient().StandardClient(),
+		internal:    retryableHTTPClient.StandardClient(),
 		userAgent:   userAgent,
 		accessToken: fmt.Sprintf("Bearer %s", serviceToken),
 	}
@@ -41,4 +45,12 @@ func (c *HTTPClient) Do(r *http.Request) (*http.Response, error) {
 	r.Header.Set("User-Agent", c.userAgent)
 	r.Header.Set("Authorization", c.accessToken)
 	return c.internal.Do(r)
+}
+
+// retryPolicy defines a custom retry policy to prevent recreating the same resource on 5XX errors.
+func retryPolicy(ctx context.Context, resp *http.Response, err error) (bool, error) {
+	if resp != nil && resp.StatusCode >= http.StatusInternalServerError {
+		return false, nil
+	}
+	return retryablehttp.DefaultRetryPolicy(ctx, resp, err)
 }
