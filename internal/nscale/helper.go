@@ -79,7 +79,7 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, response *resource.Cre
 		Refresh: func() (any, string, error) {
 			result, metadata, err := w.GetFunc(ctx)
 			if err != nil {
-				if IsStatusCodeError(err, http.StatusNotFound) {
+				if e, ok := AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 					// FIXME: Temporary workaround for resources that might not yet be visible in the cache-backed client. Should be revisited once API consistency is guaranteed.
 					return nil, string(coreapi.ResourceProvisioningStatusUnknown), nil
 				}
@@ -114,7 +114,7 @@ func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resou
 
 	result, _, err := r.GetFunc(ctx, id)
 	if err != nil {
-		if IsStatusCodeError(err, http.StatusNotFound) {
+		if e, ok := AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 			response.Diagnostics.AddWarning(
 				fmt.Sprintf("%s Not Found", r.ResourceTitle),
 				fmt.Sprintf("The %s with ID %s was not found on the server and will be removed from the state file.", r.ResourceName, id),
@@ -231,7 +231,7 @@ func (w *DeleteStateWatcher) Wait(ctx context.Context, response *resource.Delete
 				return struct{}{}, DeleteStateDeleting, nil
 			}
 
-			if IsStatusCodeError(err, http.StatusNotFound) {
+			if e, ok := AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 				return struct{}{}, DeleteStateDeleted, nil
 			}
 

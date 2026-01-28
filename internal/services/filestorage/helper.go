@@ -26,19 +26,14 @@ import (
 )
 
 func getFileStorage(ctx context.Context, id string, client *nscale.Client) (*regionapi.StorageV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	fileStorageResponse, err := client.Region.GetApiV2FilestorageFilestorageIDWithResponse(ctx, id)
+	fileStorageResponse, err := client.Region.GetApiV2FilestorageFilestorageID(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if fileStorageResponse.StatusCode() != http.StatusOK {
-		err = nscale.NewStatusCodeError(fileStorageResponse.StatusCode())
+	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageResponse, nscale.StatusCodeAny(http.StatusOK))
+	if err != nil {
 		return nil, nil, err
-	}
-
-	fileStorage := fileStorageResponse.JSON200
-	if fileStorage == nil {
-		return nil, nil, nscale.ErrEmptyResponse
 	}
 
 	return fileStorage, &fileStorage.Metadata, nil

@@ -26,19 +26,14 @@ import (
 )
 
 func getNetwork(ctx context.Context, id string, client *nscale.Client) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	networkResponse, err := client.Region.GetApiV2NetworksNetworkIDWithResponse(ctx, id)
+	networkResponse, err := client.Region.GetApiV2NetworksNetworkID(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if networkResponse.StatusCode() != http.StatusOK {
-		err = nscale.NewStatusCodeError(networkResponse.StatusCode())
+	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkResponse, nscale.StatusCodeAny(http.StatusOK))
+	if err != nil {
 		return nil, nil, err
-	}
-
-	network := networkResponse.JSON200
-	if network == nil {
-		return nil, nil, nscale.ErrEmptyResponse
 	}
 
 	return network, &network.Metadata, nil
