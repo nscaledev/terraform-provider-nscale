@@ -32,6 +32,7 @@ data "nscale_security_group" "example" {
 - `network_id` (String) The identifier of the network to where the security group is attached.
 - `region_id` (String) The identifier of the region where the security group is provisioned.
 - `rules` (Attributes List) A list of rules associated with the security group. (see [below for nested schema](#nestedatt--rules))
+- `tags` (Map of String) A map of tags assigned to the security group.
 
 <a id="nestedatt--rules"></a>
 ### Nested Schema for `rules`

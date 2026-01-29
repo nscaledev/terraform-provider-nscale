@@ -36,6 +36,7 @@ data "nscale_instance" "example" {
 - `private_ip` (String) The private IP address assigned to the instance.
 - `public_ip` (String) The public IP address assigned to the instance.
 - `region_id` (String) The identifier of the region where the instance is provisioned.
+- `tags` (Map of String) A map of tags assigned to the instance.
 - `user_data` (String) The data to pass to the instance at boot time.
 
 <a id="nestedblock--network_interface"></a>

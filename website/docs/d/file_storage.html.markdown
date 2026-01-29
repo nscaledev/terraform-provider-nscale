@@ -35,6 +35,7 @@ data "nscale_file_storage" "example" {
 - `root_squash` (Boolean) Indicates whether root squashing is enabled for the file storage.
 - `size` (Number) The amount of storage currently used, in gibibytes.
 - `storage_class_id` (String) The identifier of the storage class assigned to the file storage.
+- `tags` (Map of String) A map of tags assigned to the file storage.
 
 <a id="nestedblock--network"></a>
 ### Nested Schema for `network`
