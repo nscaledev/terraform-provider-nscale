@@ -17,8 +17,13 @@ limitations under the License.
 package tftypes
 
 import (
+	"context"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 )
 
 func NullableListValueMust(elementType attr.Type, elements []attr.Value) basetypes.ListValue {
@@ -33,4 +38,42 @@ func NullableSetValueMust(elementType attr.Type, elements []attr.Value) basetype
 		return basetypes.NewSetNull(elementType)
 	}
 	return basetypes.NewSetValueMust(elementType, elements)
+}
+
+func TagMapValueMust(tags *[]coreapi.Tag) basetypes.MapValue {
+	if tags == nil || len(*tags) == 0 {
+		return basetypes.NewMapNull(types.StringType)
+	}
+
+	elements := make(map[string]attr.Value, len(*tags))
+	for _, tag := range *tags {
+		elements[tag.Name] = types.StringValue(tag.Value)
+	}
+
+	return basetypes.NewMapValueMust(types.StringType, elements)
+}
+
+func ValueTagListPointer(tagMap basetypes.MapValue) (*[]coreapi.Tag, diag.Diagnostics) {
+	if tagMap.IsNull() || tagMap.IsUnknown() {
+		return nil, nil
+	}
+
+	var data map[string]string
+	if diagnostics := tagMap.ElementsAs(context.TODO(), &data, false); diagnostics.HasError() {
+		return nil, diagnostics
+	}
+
+	if len(data) == 0 {
+		return nil, nil
+	}
+
+	tags := make([]coreapi.Tag, 0, len(data))
+	for name, value := range data {
+		tags = append(tags, coreapi.Tag{
+			Name:  name,
+			Value: value,
+		})
+	}
+
+	return &tags, nil
 }

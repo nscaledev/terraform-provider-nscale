@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -122,6 +123,15 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 			"flavor_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the flavor used for the instance.",
 				Required:            true,
+			},
+			"tags": schema.MapAttribute{
+				MarkdownDescription: "A map of tags assigned to the instance.",
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Validators: []validator.Map{
+					mapvalidator.KeysAre(validators.NoReservedPrefix(nscale.TerraformOperationTagPrefix)),
+				},
 			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the instance is provisioned. If not specified, this defaults to the region ID configured in the provider.",

@@ -27,7 +27,7 @@ import (
 type Base64Validator struct{}
 
 func (v Base64Validator) Description(ctx context.Context) string {
-	return "Must be a valid base64 encoded string"
+	return "must be a valid base64 encoded string"
 }
 
 func (v Base64Validator) MarkdownDescription(ctx context.Context) string {

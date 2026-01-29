@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -109,6 +110,15 @@ func (r *FileStorageResource) Schema(ctx context.Context, request resource.Schem
 			"root_squash": schema.BoolAttribute{
 				MarkdownDescription: "Whether root squashing is applied to the file storage to restrict root access for clients.",
 				Required:            true,
+			},
+			"tags": schema.MapAttribute{
+				MarkdownDescription: "A map of tags assigned to the file storage.",
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Validators: []validator.Map{
+					mapvalidator.KeysAre(validators.NoReservedPrefix(nscale.TerraformOperationTagPrefix)),
+				},
 			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the file storage is provisioned. If not specified, this defaults to the region ID configured in the provider.",
