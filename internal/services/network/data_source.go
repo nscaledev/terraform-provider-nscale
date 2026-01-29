@@ -98,6 +98,11 @@ func (s *NetworkDataSource) Schema(ctx context.Context, request datasource.Schem
 				MarkdownDescription: "The CIDR block assigned to the network.",
 				Computed:            true,
 			},
+			"tags": schema.MapAttribute{
+				MarkdownDescription: "A map of tags assigned to the network.",
+				ElementType:         types.StringType,
+				Computed:            true,
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the network is provisioned.",
 				Computed:            true,

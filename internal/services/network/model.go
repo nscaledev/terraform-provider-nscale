@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
@@ -35,6 +36,7 @@ type NetworkModel struct {
 	DNSNameservers types.List   `tfsdk:"dns_nameservers"`
 	Routes         types.List   `tfsdk:"routes"`
 	CIDRBlock      types.String `tfsdk:"cidr_block"`
+	Tags           types.Map    `tfsdk:"tags"`
 	RegionID       types.String `tfsdk:"region_id"`
 	CreationTime   types.String `tfsdk:"creation_time"`
 }
@@ -50,6 +52,8 @@ func NewNetworkModel(source *regionapi.NetworkV2Read) NetworkModel {
 		routes = NewRouteModels(*source.Spec.Routes)
 	}
 
+	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
+
 	return NetworkModel{
 		ID:             types.StringValue(source.Metadata.Id),
 		Name:           types.StringValue(source.Metadata.Name),
@@ -57,19 +61,27 @@ func NewNetworkModel(source *regionapi.NetworkV2Read) NetworkModel {
 		DNSNameservers: tftypes.NullableListValueMust(types.StringType, dnsNameservers),
 		Routes:         routes,
 		CIDRBlock:      types.StringValue(source.Status.Prefix),
+		Tags:           tftypes.TagMapValueMust(tags),
 		RegionID:       types.StringValue(source.Status.RegionId),
 		CreationTime:   types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
 	}
 }
 
 func (m *NetworkModel) NscaleNetworkCreateParams(organizationID, projectID string) (regionapi.NetworkV2Create, diag.Diagnostics) {
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	if diagnostics.HasError() {
+		return regionapi.NetworkV2Create{}, diagnostics
+	}
+
+	tags = nscale.RemoveOperationTags(tags)
+
 	var dnsNameservers []string
-	if diagnostics := m.DNSNameservers.ElementsAs(context.TODO(), &dnsNameservers, false); diagnostics.HasError() {
+	if diagnostics = m.DNSNameservers.ElementsAs(context.TODO(), &dnsNameservers, false); diagnostics.HasError() {
 		return regionapi.NetworkV2Create{}, diagnostics
 	}
 
 	var sourceRoutes []RouteModel
-	if diagnostics := m.Routes.ElementsAs(context.TODO(), &sourceRoutes, false); diagnostics.HasError() {
+	if diagnostics = m.Routes.ElementsAs(context.TODO(), &sourceRoutes, false); diagnostics.HasError() {
 		return regionapi.NetworkV2Create{}, diagnostics
 	}
 
@@ -87,8 +99,7 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID, projectID strin
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			// REVIEW_ME: Not sure what the tags are for. Even the UI doesn’t provide a way to set them, so leaving it as nil for now.
-			Tags: nil,
+			Tags:        tags,
 		},
 		Spec: regionapi.NetworkV2CreateSpec{
 			DnsNameservers: dnsNameservers,
@@ -104,13 +115,20 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID, projectID strin
 }
 
 func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, diag.Diagnostics) {
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	if diagnostics.HasError() {
+		return regionapi.NetworkV2Update{}, diagnostics
+	}
+
+	tags = nscale.RemoveOperationTags(tags)
+
 	var dnsNameservers []string
-	if diagnostics := m.DNSNameservers.ElementsAs(context.TODO(), &dnsNameservers, false); diagnostics.HasError() {
+	if diagnostics = m.DNSNameservers.ElementsAs(context.TODO(), &dnsNameservers, false); diagnostics.HasError() {
 		return regionapi.NetworkV2Update{}, diagnostics
 	}
 
 	var sourceRoutes []RouteModel
-	if diagnostics := m.Routes.ElementsAs(context.TODO(), &sourceRoutes, false); diagnostics.HasError() {
+	if diagnostics = m.Routes.ElementsAs(context.TODO(), &sourceRoutes, false); diagnostics.HasError() {
 		return regionapi.NetworkV2Update{}, diagnostics
 	}
 
@@ -128,8 +146,7 @@ func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, d
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			// REVIEW_ME: Not sure what the tags are for. Even the UI doesn’t provide a way to set them, so leaving it as nil for now.
-			Tags: nil,
+			Tags:        tags,
 		},
 		Spec: regionapi.NetworkV2Spec{
 			DnsNameservers: dnsNameservers,

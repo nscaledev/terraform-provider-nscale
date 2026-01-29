@@ -97,6 +97,11 @@ func (s *InstanceDataSource) Schema(ctx context.Context, request datasource.Sche
 				MarkdownDescription: "The identifier of the flavor used for the instance.",
 				Computed:            true,
 			},
+			"tags": schema.MapAttribute{
+				MarkdownDescription: "A map of tags assigned to the instance.",
+				ElementType:         types.StringType,
+				Computed:            true,
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the instance is provisioned.",
 				Computed:            true,

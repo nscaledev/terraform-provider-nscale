@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,6 +29,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 )
+
+const TerraformOperationTagPrefix = "terraform.nscale.com/"
 
 type StateReaderFunc func(ctx context.Context, target any) diag.Diagnostics
 
@@ -134,7 +137,7 @@ func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resou
 }
 
 func WriteOperationTag(metadata *coreapi.ResourceWriteMetadata) string {
-	operationKey := fmt.Sprintf("terraform.nscale.com/%s", uuid.New().String())
+	operationKey := TerraformOperationTagPrefix + uuid.NewString()
 
 	if metadata.Tags == nil {
 		var tags []coreapi.Tag
@@ -161,6 +164,21 @@ func HasOperationTag(tags *[]coreapi.Tag, operationTag string) bool {
 	}
 
 	return false
+}
+
+func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
+	if tags == nil {
+		return nil
+	}
+
+	var filtered []coreapi.Tag
+	for _, tag := range *tags {
+		if !strings.HasPrefix(tag.Name, TerraformOperationTagPrefix) {
+			filtered = append(filtered, tag)
+		}
+	}
+
+	return &filtered
 }
 
 const (

@@ -27,7 +27,7 @@ import (
 type CIDRValidator struct{}
 
 func (v CIDRValidator) Description(ctx context.Context) string {
-	return "Must be a valid CIDR notation"
+	return "must be a valid CIDR notation"
 }
 
 func (v CIDRValidator) MarkdownDescription(ctx context.Context) string {
