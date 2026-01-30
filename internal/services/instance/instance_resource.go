@@ -19,6 +19,7 @@ package instance
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
@@ -220,6 +221,12 @@ func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
+	data = NewInstanceModel(instance)
+	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
 	stateWatcher := nscale.CreateStateWatcher[computeapi.InstanceRead]{
 		ResourceTitle: "Instance",
 		ResourceName:  "instance",
@@ -332,11 +339,13 @@ func (r *InstanceResource) Delete(ctx context.Context, request resource.DeleteRe
 	}
 
 	if err = nscale.ReadEmptyResponse(instanceDeleteResponse); err != nil {
-		response.Diagnostics.AddError(
-			"Failed to Delete Instance",
-			fmt.Sprintf("An error occurred while deleting the instance: %s", err),
-		)
-		return
+		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+			response.Diagnostics.AddError(
+				"Failed to Delete Instance",
+				fmt.Sprintf("An error occurred while deleting the instance: %s", err),
+			)
+			return
+		}
 	}
 
 	stateWatcher := nscale.DeleteStateWatcher{
