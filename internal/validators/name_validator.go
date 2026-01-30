@@ -26,6 +26,6 @@ import (
 func NameValidator() validator.String {
 	return stringvalidator.RegexMatches(
 		regexp.MustCompile(`^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$`),
-		"Must start with a lowercase letter, contain only lowercase letters, digits or hyphens, end with a letter or digit, and be at most 63 characters long",
+		"must start with a lowercase letter, contain only lowercase letters, digits or hyphens, end with a letter or digit, and be at most 63 characters long",
 	)
 }

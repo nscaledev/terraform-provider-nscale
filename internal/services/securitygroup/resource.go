@@ -22,6 +22,7 @@ import (
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -140,6 +141,15 @@ func (r *SecurityGroupResource) Schema(ctx context.Context, request resource.Sch
 				MarkdownDescription: "The identifier of the network to where the security group is attached.",
 				Required:            true,
 			},
+			"tags": schema.MapAttribute{
+				MarkdownDescription: "A map of tags assigned to the security group.",
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Validators: []validator.Map{
+					mapvalidator.KeysAre(validators.NoReservedPrefix(nscale.TerraformOperationTagPrefix)),
+				},
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the security group is provisioned. If not specified, this defaults to the region ID configured in the provider.",
 				Optional:            true,
@@ -175,7 +185,7 @@ func (r *SecurityGroupResource) Create(ctx context.Context, request resource.Cre
 		return
 	}
 
-	securityGroupCreateResponse, err := r.client.Region.PostApiV2SecuritygroupsWithResponse(ctx, params)
+	securityGroupCreateResponse, err := r.client.Region.PostApiV2Securitygroups(ctx, params)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Security Group",
@@ -184,10 +194,11 @@ func (r *SecurityGroupResource) Create(ctx context.Context, request resource.Cre
 		return
 	}
 
-	if securityGroupCreateResponse.StatusCode() != http.StatusCreated || securityGroupCreateResponse.JSON201 == nil {
+	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupCreateResponse, nscale.StatusCodeAny(http.StatusCreated))
+	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Security Group",
-			fmt.Sprintf("An error occurred while creating the security group (status %d).", securityGroupCreateResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while creating the security group: %s", err),
 		)
 		return
 	}
@@ -196,7 +207,7 @@ func (r *SecurityGroupResource) Create(ctx context.Context, request resource.Cre
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context) (*regionapi.SecurityGroupV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			targetID := securityGroupCreateResponse.JSON201.Metadata.Id
+			targetID := securityGroup.Metadata.Id
 			return getSecurityGroup(ctx, targetID, r.client)
 		},
 	}
@@ -250,7 +261,7 @@ func (r *SecurityGroupResource) Update(ctx context.Context, request resource.Upd
 	id := data.ID.ValueString()
 	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
 
-	securityGroupUpdateResponse, err := r.client.Region.PutApiV2SecuritygroupsSecurityGroupIDWithResponse(ctx, id, params)
+	securityGroupUpdateResponse, err := r.client.Region.PutApiV2SecuritygroupsSecurityGroupID(ctx, id, params)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Security Group",
@@ -259,10 +270,11 @@ func (r *SecurityGroupResource) Update(ctx context.Context, request resource.Upd
 		return
 	}
 
-	if securityGroupUpdateResponse.StatusCode() != http.StatusAccepted {
+	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupUpdateResponse, nscale.StatusCodeAny(http.StatusAccepted))
+	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Security Group",
-			fmt.Sprintf("An error occurred while updating the security group (status %d).", securityGroupUpdateResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while updating the security group: %s", err),
 		)
 		return
 	}
@@ -293,7 +305,7 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 
 	id := data.ID.ValueString()
 
-	securityGroupDeleteResponse, err := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupIDWithResponse(ctx, id)
+	securityGroupDeleteResponse, err := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, id)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Security Group",
@@ -302,10 +314,10 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 		return
 	}
 
-	if securityGroupDeleteResponse.StatusCode() != http.StatusAccepted {
+	if err = nscale.ReadErrorResponse(securityGroupDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted)); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Security Group",
-			fmt.Sprintf("An error occurred while deleting the security group (status %d)", securityGroupDeleteResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while deleting the security group: %s", err),
 		)
 		return
 	}

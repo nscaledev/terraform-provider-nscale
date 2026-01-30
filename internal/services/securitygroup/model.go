@@ -23,6 +23,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
@@ -33,17 +35,21 @@ type SecurityGroupModel struct {
 	Description  types.String `tfsdk:"description"`
 	Rules        types.List   `tfsdk:"rules"`
 	NetworkID    types.String `tfsdk:"network_id"`
+	Tags         types.Map    `tfsdk:"tags"`
 	RegionID     types.String `tfsdk:"region_id"`
 	CreationTime types.String `tfsdk:"creation_time"`
 }
 
 func NewSecurityGroupModel(source *regionapi.SecurityGroupV2Read) SecurityGroupModel {
+	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
+
 	return SecurityGroupModel{
 		ID:           types.StringValue(source.Metadata.Id),
 		Name:         types.StringValue(source.Metadata.Name),
 		Description:  types.StringPointerValue(source.Metadata.Description),
 		Rules:        NewSecurityGroupRuleModels(source.Spec.Rules),
 		NetworkID:    types.StringValue(source.Status.NetworkId),
+		Tags:         tftypes.TagMapValueMust(tags),
 		RegionID:     types.StringValue(source.Status.RegionId),
 		CreationTime: types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
 	}
@@ -96,8 +102,15 @@ func NewSecurityGroupRuleModel(source regionapi.SecurityGroupRuleV2) attr.Value 
 }
 
 func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.SecurityGroupV2Create, diag.Diagnostics) {
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	if diagnostics.HasError() {
+		return regionapi.SecurityGroupV2Create{}, diagnostics
+	}
+
+	tags = nscale.RemoveOperationTags(tags)
+
 	var sourceRules []SecurityGroupRuleModel
-	if diagnostics := m.Rules.ElementsAs(context.TODO(), &sourceRules, false); diagnostics.HasError() {
+	if diagnostics = m.Rules.ElementsAs(context.TODO(), &sourceRules, false); diagnostics.HasError() {
 		return regionapi.SecurityGroupV2Create{}, diagnostics
 	}
 
@@ -110,8 +123,7 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			// REVIEW_ME: Not sure what the tags are for. Even the UI doesn’t provide a way to set them, so leaving it as nil for now.
-			Tags: nil,
+			Tags:        tags,
 		},
 		Spec: regionapi.SecurityGroupV2CreateSpec{
 			NetworkId: m.NetworkID.ValueString(),
@@ -123,8 +135,15 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 }
 
 func (m *SecurityGroupModel) NscaleSecurityGroupUpdateParams() (regionapi.SecurityGroupV2Update, diag.Diagnostics) {
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	if diagnostics.HasError() {
+		return regionapi.SecurityGroupV2Update{}, diagnostics
+	}
+
+	tags = nscale.RemoveOperationTags(tags)
+
 	var sourceRules []SecurityGroupRuleModel
-	if diagnostics := m.Rules.ElementsAs(context.TODO(), &sourceRules, false); diagnostics.HasError() {
+	if diagnostics = m.Rules.ElementsAs(context.TODO(), &sourceRules, false); diagnostics.HasError() {
 		return regionapi.SecurityGroupV2Update{}, diagnostics
 	}
 
@@ -137,8 +156,7 @@ func (m *SecurityGroupModel) NscaleSecurityGroupUpdateParams() (regionapi.Securi
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			// REVIEW_ME: Not sure what the tags are for. Even the UI doesn’t provide a way to set them, so leaving it as nil for now.
-			Tags: nil,
+			Tags:        tags,
 		},
 		Spec: regionapi.SecurityGroupV2Spec{
 			Rules: rules,

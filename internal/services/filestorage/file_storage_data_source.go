@@ -22,6 +22,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
@@ -86,6 +87,11 @@ func (s *FileStorageDataSource) Schema(ctx context.Context, request datasource.S
 			},
 			"root_squash": schema.BoolAttribute{
 				MarkdownDescription: "Indicates whether root squashing is enabled for the file storage.",
+				Computed:            true,
+			},
+			"tags": schema.MapAttribute{
+				MarkdownDescription: "A map of tags assigned to the file storage.",
+				ElementType:         types.StringType,
 				Computed:            true,
 			},
 			"region_id": schema.StringAttribute{

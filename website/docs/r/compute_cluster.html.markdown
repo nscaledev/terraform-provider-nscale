@@ -62,6 +62,7 @@ resource "nscale_compute_cluster" "example" {
 
 - `description` (String) The description of the compute cluster.
 - `region_id` (String) The identifier of the region where the compute cluster is provisioned. If not specified, this defaults to the region ID configured in the provider.
+- `tags` (Map of String) A map of tags assigned to the compute cluster.
 
 ### Read-Only
 

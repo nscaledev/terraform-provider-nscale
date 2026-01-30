@@ -22,6 +22,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
@@ -102,6 +103,11 @@ func (s *SecurityGroupDataSource) Schema(ctx context.Context, request datasource
 			},
 			"network_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the network to where the security group is attached.",
+				Computed:            true,
+			},
+			"tags": schema.MapAttribute{
+				MarkdownDescription: "A map of tags assigned to the security group.",
+				ElementType:         types.StringType,
 				Computed:            true,
 			},
 			"region_id": schema.StringAttribute{
