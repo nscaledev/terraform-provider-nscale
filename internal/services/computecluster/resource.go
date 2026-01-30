@@ -246,8 +246,9 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 				},
 			},
 			"region_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the region where the compute cluster is provisioned.",
-				Required:            true,
+				MarkdownDescription: "The identifier of the region where the compute cluster is provisioned. If not specified, this defaults to the region ID configured in the provider.",
+				Optional:            true,
+				Computed:            true,
 			},
 			"provisioning_status": schema.StringAttribute{
 				MarkdownDescription: "The provisioning status of the compute cluster.",
@@ -264,11 +265,16 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 	}
 }
 
-func (r *ComputeClusterResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data ComputeClusterModel
+func (r *ComputeClusterResource) setDefaultRegionID(data *ComputeClusterModel) {
+	if data.RegionID.ValueString() == "" {
+		data.RegionID = types.StringValue(r.client.RegionID)
+	}
+}
 
-	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+func (r *ComputeClusterResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -351,10 +357,9 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 }
 
 func (r *ComputeClusterResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	var data ComputeClusterModel
-
-	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterModel](ctx, request.State.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -387,10 +392,9 @@ func (r *ComputeClusterResource) Read(ctx context.Context, request resource.Read
 }
 
 func (r *ComputeClusterResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	var data ComputeClusterModel
-
-	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -472,10 +476,9 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 }
 
 func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	var data ComputeClusterModel
-
-	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterModel](ctx, request.State.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 

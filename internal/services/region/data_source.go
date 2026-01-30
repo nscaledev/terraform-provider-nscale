@@ -23,6 +23,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
@@ -63,7 +64,8 @@ func (s *RegionDataSource) Schema(ctx context.Context, request datasource.Schema
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "An unique identifier for the region.",
-				Required:            true,
+				Optional:            true,
+				Computed:            true,
 			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The name of the region.",
@@ -77,11 +79,16 @@ func (s *RegionDataSource) Schema(ctx context.Context, request datasource.Schema
 	}
 }
 
-func (s *RegionDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
-	var data RegionModel
+func (s *RegionDataSource) setDefaultID(data *RegionModel) {
+	if data.ID.ValueString() == "" {
+		data.ID = types.StringValue(s.client.RegionID)
+	}
+}
 
-	response.Diagnostics.Append(request.Config.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+func (s *RegionDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+	data, diagnostics := nscale.ReadTerraformState[RegionModel](ctx, request.Config.Get, s.setDefaultID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 

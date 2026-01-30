@@ -46,11 +46,10 @@ var _ provider.Provider = NscaleProvider{}
 type NscaleProviderModel struct {
 	RegionServiceAPIEndpoint  types.String `tfsdk:"region_service_api_endpoint"`
 	ComputeServiceAPIEndpoint types.String `tfsdk:"compute_service_api_endpoint"`
-	// Deprecated: use ComputeServiceAPIEndpoint instead
-	Endpoint       types.String `tfsdk:"endpoint"`
-	ServiceToken   types.String `tfsdk:"service_token"`
-	OrganizationID types.String `tfsdk:"organization_id"`
-	ProjectID      types.String `tfsdk:"project_id"`
+	ServiceToken              types.String `tfsdk:"service_token"`
+	RegionID                  types.String `tfsdk:"region_id"`
+	OrganizationID            types.String `tfsdk:"organization_id"`
+	ProjectID                 types.String `tfsdk:"project_id"`
 }
 
 type NscaleProvider struct{}
@@ -75,15 +74,14 @@ func (p NscaleProvider) Schema(ctx context.Context, request provider.SchemaReque
 				MarkdownDescription: "The endpoint of the Nscale Compute Service API server.",
 				Optional:            true,
 			},
-			"endpoint": schema.StringAttribute{
-				MarkdownDescription: "The endpoint of the Nscale API server.",
-				Optional:            true,
-				DeprecationMessage:  "This attribute is deprecated. Use compute_service_api_endpoint instead.",
-			},
 			"service_token": schema.StringAttribute{
 				MarkdownDescription: "The service token for authenticating with the Nscale API server.",
 				Optional:            true,
 				Sensitive:           true,
+			},
+			"region_id": schema.StringAttribute{
+				MarkdownDescription: "The identifier of the region for which resources are managed. Regional resources include a top-level region_id field, allowing the region to be explicitly specified and to override the default region when provided.",
+				Optional:            true,
 			},
 			"organization_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the organization for which resources are managed.",
@@ -118,12 +116,6 @@ func (p NscaleProvider) Configure(ctx context.Context, request provider.Configur
 		computeServiceAPIEndpoint = value
 	}
 	if computeServiceAPIEndpoint == "" {
-		// Fallback to deprecated endpoint for backwards compatibility.
-		if value, ok := os.LookupEnv("NSCALE_API_ENDPOINT"); ok {
-			computeServiceAPIEndpoint = value
-		}
-	}
-	if computeServiceAPIEndpoint == "" {
 		computeServiceAPIEndpoint = DefaultNscaleComputeServiceAPIEndpoint
 	}
 
@@ -135,6 +127,18 @@ func (p NscaleProvider) Configure(ctx context.Context, request provider.Configur
 		response.Diagnostics.AddError(
 			"Missing Service Token",
 			"Please provide a service token either through the configuration or the NSCALE_SERVICE_TOKEN environment variable.",
+		)
+		return
+	}
+
+	regionID := data.RegionID.ValueString()
+	if value, ok := os.LookupEnv("NSCALE_REGION_ID"); ok {
+		regionID = value
+	}
+	if regionID == "" {
+		response.Diagnostics.AddWarning(
+			"Missing Region ID",
+			"Please provide a region ID either through the configuration or the NSCALE_REGION_ID environment variable.",
 		)
 		return
 	}
@@ -165,7 +169,7 @@ func (p NscaleProvider) Configure(ctx context.Context, request provider.Configur
 
 	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-nscale/%s", request.TerraformVersion, version.ProviderVersion)
 
-	client, err := nscale.NewClient(regionServiceAPIEndpoint, computeServiceAPIEndpoint, serviceToken, organizationID, projectID, userAgent)
+	client, err := nscale.NewClient(regionServiceAPIEndpoint, computeServiceAPIEndpoint, serviceToken, organizationID, projectID, regionID, userAgent)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Nscale Client",

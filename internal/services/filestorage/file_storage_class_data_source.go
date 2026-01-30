@@ -81,18 +81,24 @@ func (s *FileStorageClassDataSource) Schema(ctx context.Context, request datasou
 				Computed:            true,
 			},
 			"region_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the region where the file storage class is available.",
-				Required:            true,
+				MarkdownDescription: "The identifier of the region where the file storage class is available. If not specified, this defaults to the region ID configured in the provider.",
+				Optional:            true,
+				Computed:            true,
 			},
 		},
 	}
 }
 
-func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
-	var data FileStorageClassModel
+func (r *FileStorageClassDataSource) setDefaultRegionID(data *FileStorageClassModel) {
+	if data.RegionID.ValueString() == "" {
+		data.RegionID = types.StringValue(r.client.RegionID)
+	}
+}
 
-	response.Diagnostics.Append(request.Config.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+	data, diagnostics := nscale.ReadTerraformState[FileStorageClassModel](ctx, request.Config.Get)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 

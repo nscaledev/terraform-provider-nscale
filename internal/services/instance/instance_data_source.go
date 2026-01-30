@@ -135,10 +135,9 @@ func (s *InstanceDataSource) Schema(ctx context.Context, request datasource.Sche
 }
 
 func (s *InstanceDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
-	var data InstanceModel
-
-	response.Diagnostics.Append(request.Config.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[InstanceModel](ctx, request.Config.Get)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 

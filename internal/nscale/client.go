@@ -24,13 +24,14 @@ import (
 )
 
 type Client struct {
+	RegionID       string
 	OrganizationID string
 	ProjectID      string
 	Region         regionapi.ClientWithResponsesInterface
 	Compute        computeapi.ClientWithResponsesInterface
 }
 
-func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organizationID, projectID, userAgent string) (*Client, error) {
+func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string) (*Client, error) {
 	httpClient := NewHTTPClient(userAgent, serviceToken)
 
 	region, err := regionapi.NewClientWithResponses(regionServiceBaseURL, regionapi.WithHTTPClient(httpClient))
@@ -46,6 +47,7 @@ func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organi
 	}
 
 	client := &Client{
+		RegionID:       regionID,
 		OrganizationID: organizationID,
 		ProjectID:      projectID,
 		Region:         region,

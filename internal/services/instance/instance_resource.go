@@ -124,8 +124,9 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 				Required:            true,
 			},
 			"region_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the region where the instance is provisioned.",
-				Required:            true,
+				MarkdownDescription: "The identifier of the region where the instance is provisioned. If not specified, this defaults to the region ID configured in the provider.",
+				Optional:            true,
+				Computed:            true,
 			},
 			"creation_time": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the instance was created.",
@@ -173,11 +174,16 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 	}
 }
 
-func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data InstanceModel
+func (r *InstanceResource) setDefaultRegionID(data *InstanceModel) {
+	if data.RegionID.ValueString() == "" {
+		data.RegionID = types.StringValue(r.client.RegionID)
+	}
+}
 
-	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+	data, diagnostics := nscale.ReadTerraformState[InstanceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -223,10 +229,9 @@ func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRe
 }
 
 func (r *InstanceResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	var data InstanceModel
-
-	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[InstanceModel](ctx, request.State.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -248,10 +253,9 @@ func (r *InstanceResource) Read(ctx context.Context, request resource.ReadReques
 }
 
 func (r *InstanceResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	var data InstanceModel
-
-	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[InstanceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
@@ -299,10 +303,9 @@ func (r *InstanceResource) Update(ctx context.Context, request resource.UpdateRe
 }
 
 func (r *InstanceResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	var data InstanceModel
-
-	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
-	if response.Diagnostics.HasError() {
+	data, diagnostics := nscale.ReadTerraformState[InstanceModel](ctx, request.State.Get, r.setDefaultRegionID)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
