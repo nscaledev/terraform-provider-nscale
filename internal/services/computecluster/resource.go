@@ -311,6 +311,12 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 		return
 	}
 
+	data = NewComputeClusterModel(computeCluster)
+	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
 	stateWatcher := nscale.CreateStateWatcher[computeapi.ComputeClusterRead]{
 		ResourceTitle: "Compute Cluster",
 		ResourceName:  "compute cluster",
@@ -421,7 +427,7 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(computeClusterDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted)); err != nil {
+	if err = nscale.ReadErrorResponse(computeClusterDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted, http.StatusNotFound)); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Compute Cluster",
 			fmt.Sprintf("An error occurred while deleting the compute cluster: %s", err),

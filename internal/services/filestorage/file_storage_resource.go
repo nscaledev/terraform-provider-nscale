@@ -190,6 +190,12 @@ func (r *FileStorageResource) Create(ctx context.Context, request resource.Creat
 		return
 	}
 
+	data = NewFileStorageModel(fileStorage)
+	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
 	stateWatcher := nscale.CreateStateWatcher[regionapi.StorageV2Read]{
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
@@ -301,7 +307,7 @@ func (r *FileStorageResource) Delete(ctx context.Context, request resource.Delet
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(fileStorageDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted)); err != nil {
+	if err = nscale.ReadErrorResponse(fileStorageDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted, http.StatusNotFound)); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete File Storage",
 			fmt.Sprintf("An error occurred while deleting the file storage: %s", err),

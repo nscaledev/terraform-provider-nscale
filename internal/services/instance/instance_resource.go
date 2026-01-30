@@ -221,6 +221,12 @@ func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
+	data = NewInstanceModel(instance)
+	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
 	stateWatcher := nscale.CreateStateWatcher[computeapi.InstanceRead]{
 		ResourceTitle: "Instance",
 		ResourceName:  "instance",
@@ -332,7 +338,7 @@ func (r *InstanceResource) Delete(ctx context.Context, request resource.DeleteRe
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(instanceDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted)); err != nil {
+	if err = nscale.ReadErrorResponse(instanceDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted, http.StatusNotFound)); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Instance",
 			fmt.Sprintf("An error occurred while deleting the instance: %s", err),

@@ -180,6 +180,12 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 		return
 	}
 
+	data = NewNetworkModel(network)
+	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
 	stateWatcher := nscale.CreateStateWatcher[regionapi.NetworkV2Read]{
 		ResourceTitle: "Network",
 		ResourceName:  "network",
@@ -291,7 +297,7 @@ func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteReq
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(networkDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted)); err != nil {
+	if err = nscale.ReadErrorResponse(networkDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted, http.StatusNotFound)); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Network",
 			fmt.Sprintf("An error occurred while deleting the network: %s", err),
