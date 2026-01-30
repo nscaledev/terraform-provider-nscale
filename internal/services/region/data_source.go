@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
 
 var _ datasource.DataSourceWithConfigure = &RegionDataSource{}
@@ -92,7 +93,7 @@ func (s *RegionDataSource) Read(ctx context.Context, request datasource.ReadRequ
 		return
 	}
 
-	regionListResponse, err := s.client.Region.GetApiV1OrganizationsOrganizationIDRegionsWithResponse(ctx, s.client.OrganizationID)
+	regionListResponse, err := s.client.Region.GetApiV1OrganizationsOrganizationIDRegions(ctx, s.client.OrganizationID)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Region",
@@ -101,17 +102,18 @@ func (s *RegionDataSource) Read(ctx context.Context, request datasource.ReadRequ
 		return
 	}
 
-	if regionListResponse.StatusCode() != http.StatusOK || regionListResponse.JSON200 == nil {
+	regions, err := nscale.ReadJSONResponseValue[[]regionapi.RegionRead](regionListResponse, nscale.StatusCodeAny(http.StatusOK))
+	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Region",
-			fmt.Sprintf("An error occurred while retrieving the region (status %d).", regionListResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while retrieving the region: %s", err),
 		)
 		return
 	}
 
 	id := data.ID.ValueString()
 
-	for _, region := range *regionListResponse.JSON200 {
+	for _, region := range regions {
 		if region.Metadata.Id == id {
 			data = NewRegionModel(&region)
 			response.Diagnostics.Append(response.State.Set(ctx, data)...)
