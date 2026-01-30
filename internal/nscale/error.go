@@ -18,26 +18,38 @@ package nscale
 
 import (
 	"errors"
-	"fmt"
+	"strconv"
+	"strings"
 )
 
-var ErrEmptyResponse = errors.New("server returned an empty response")
-
-type StatusCodeError struct {
-	Code int
+type APIError struct {
+	StatusCode int
+	Code       string
+	Message    string
 }
 
-func NewStatusCodeError(code int) StatusCodeError {
-	return StatusCodeError{Code: code}
-}
+func (e *APIError) Error() string {
+	var builder strings.Builder
 
-func (e StatusCodeError) Error() string {
-	return fmt.Sprintf("server returned status code %d", e.Code)
-}
+	builder.WriteString("server returned status code ")
+	builder.WriteString(strconv.Itoa(e.StatusCode))
 
-func IsStatusCodeError(err error, code int) bool {
-	if e := (StatusCodeError{}); errors.As(err, &e) {
-		return e.Code == code
+	if e.Code != "" {
+		builder.WriteString(", code: ")
+		builder.WriteString(e.Code)
 	}
-	return false
+
+	if e.Message != "" {
+		builder.WriteString(", message: ")
+		builder.WriteString(e.Message)
+	}
+
+	return builder.String()
+}
+
+func AsAPIError(err error) (*APIError, bool) {
+	if e := (*APIError)(nil); errors.As(err, &e) {
+		return e, true
+	}
+	return nil, false
 }

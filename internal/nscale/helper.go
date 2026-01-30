@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,6 +29,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 )
+
+const TerraformOperationTagPrefix = "terraform.nscale.com/"
 
 type StateReaderFunc func(ctx context.Context, target any) diag.Diagnostics
 
@@ -79,7 +82,7 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, response *resource.Cre
 		Refresh: func() (any, string, error) {
 			result, metadata, err := w.GetFunc(ctx)
 			if err != nil {
-				if IsStatusCodeError(err, http.StatusNotFound) {
+				if e, ok := AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 					// FIXME: Temporary workaround for resources that might not yet be visible in the cache-backed client. Should be revisited once API consistency is guaranteed.
 					return nil, string(coreapi.ResourceProvisioningStatusUnknown), nil
 				}
@@ -114,7 +117,7 @@ func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resou
 
 	result, _, err := r.GetFunc(ctx, id)
 	if err != nil {
-		if IsStatusCodeError(err, http.StatusNotFound) {
+		if e, ok := AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 			response.Diagnostics.AddWarning(
 				fmt.Sprintf("%s Not Found", r.ResourceTitle),
 				fmt.Sprintf("The %s with ID %s was not found on the server and will be removed from the state file.", r.ResourceName, id),
@@ -134,7 +137,7 @@ func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resou
 }
 
 func WriteOperationTag(metadata *coreapi.ResourceWriteMetadata) string {
-	operationKey := fmt.Sprintf("terraform.nscale.com/%s", uuid.New().String())
+	operationKey := TerraformOperationTagPrefix + uuid.NewString()
 
 	if metadata.Tags == nil {
 		var tags []coreapi.Tag
@@ -161,6 +164,21 @@ func HasOperationTag(tags *[]coreapi.Tag, operationTag string) bool {
 	}
 
 	return false
+}
+
+func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
+	if tags == nil {
+		return nil
+	}
+
+	var filtered []coreapi.Tag
+	for _, tag := range *tags {
+		if !strings.HasPrefix(tag.Name, TerraformOperationTagPrefix) {
+			filtered = append(filtered, tag)
+		}
+	}
+
+	return &filtered
 }
 
 const (
@@ -231,7 +249,7 @@ func (w *DeleteStateWatcher) Wait(ctx context.Context, response *resource.Delete
 				return struct{}{}, DeleteStateDeleting, nil
 			}
 
-			if IsStatusCodeError(err, http.StatusNotFound) {
+			if e, ok := AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 				return struct{}{}, DeleteStateDeleted, nil
 			}
 

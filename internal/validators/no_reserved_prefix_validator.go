@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Nscale
+Copyright 2026 Nscale
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,32 +19,38 @@ package validators
 import (
 	"context"
 	"fmt"
-	"net"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
-type IPAddressValidator struct{}
-
-func (v IPAddressValidator) Description(ctx context.Context) string {
-	return "must be a valid IP address"
+type NoReservedPrefixValidator struct {
+	Prefix string
 }
 
-func (v IPAddressValidator) MarkdownDescription(ctx context.Context) string {
+func NoReservedPrefix(prefix string) validator.String {
+	return NoReservedPrefixValidator{Prefix: prefix}
+}
+
+func (v NoReservedPrefixValidator) Description(ctx context.Context) string {
+	return fmt.Sprintf("must not start with the reserved prefix %q", v.Prefix)
+}
+
+func (v NoReservedPrefixValidator) MarkdownDescription(ctx context.Context) string {
 	return v.Description(ctx)
 }
 
-func (v IPAddressValidator) ValidateString(ctx context.Context, request validator.StringRequest, response *validator.StringResponse) {
+func (v NoReservedPrefixValidator) ValidateString(ctx context.Context, request validator.StringRequest, response *validator.StringResponse) {
 	if request.ConfigValue.IsNull() || request.ConfigValue.IsUnknown() {
 		return
 	}
 
 	value := request.ConfigValue.ValueString()
 
-	if ipAddress := net.ParseIP(value); ipAddress == nil {
+	if strings.HasPrefix(value, v.Prefix) {
 		response.Diagnostics.AddAttributeError(
 			request.Path,
-			"Invalid IP Address",
+			"Reserved Prefix Not Allowed",
 			fmt.Sprintf("Attribute %s %s, got: %s", request.Path, v.Description(ctx), value),
 		)
 		return

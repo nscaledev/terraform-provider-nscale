@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
@@ -37,21 +38,24 @@ type ComputeClusterModel struct {
 	Description        types.String `tfsdk:"description"`
 	WorkloadPools      types.List   `tfsdk:"workload_pools"`
 	SSHPrivateKey      types.String `tfsdk:"ssh_private_key"`
+	Tags               types.Map    `tfsdk:"tags"`
 	RegionID           types.String `tfsdk:"region_id"`
 	ProvisioningStatus types.String `tfsdk:"provisioning_status"`
 	CreationTime       types.String `tfsdk:"creation_time"`
 }
 
 func NewComputeClusterModel(source *computeapi.ComputeClusterRead) ComputeClusterModel {
+	var workloadPoolStatuses *computeapi.ComputeClusterWorkloadPoolsStatus
+	if source.Status != nil {
+		workloadPoolStatuses = source.Status.WorkloadPools
+	}
+
 	var sshPrivateKey types.String
 	if source.Status != nil {
 		sshPrivateKey = types.StringPointerValue(source.Status.SshPrivateKey)
 	}
 
-	var workloadPoolStatuses *computeapi.ComputeClusterWorkloadPoolsStatus
-	if source.Status != nil {
-		workloadPoolStatuses = source.Status.WorkloadPools
-	}
+	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
 
 	return ComputeClusterModel{
 		ID:                 types.StringValue(source.Metadata.Id),
@@ -59,6 +63,7 @@ func NewComputeClusterModel(source *computeapi.ComputeClusterRead) ComputeCluste
 		Description:        types.StringPointerValue(source.Metadata.Description),
 		WorkloadPools:      NewWorkloadPoolModels(source.Spec.WorkloadPools, workloadPoolStatuses),
 		SSHPrivateKey:      sshPrivateKey,
+		Tags:               tftypes.TagMapValueMust(tags),
 		RegionID:           types.StringValue(source.Spec.RegionId),
 		ProvisioningStatus: types.StringValue(string(source.Metadata.ProvisioningStatus)),
 		CreationTime:       types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
@@ -66,8 +71,15 @@ func NewComputeClusterModel(source *computeapi.ComputeClusterRead) ComputeCluste
 }
 
 func (m *ComputeClusterModel) NscaleComputeCluster() (computeapi.ComputeClusterWrite, diag.Diagnostics) {
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	if diagnostics.HasError() {
+		return computeapi.ComputeClusterWrite{}, diagnostics
+	}
+
+	tags = nscale.RemoveOperationTags(tags)
+
 	var sourceWorkloadPools []WorkloadPoolModel
-	if diagnostics := m.WorkloadPools.ElementsAs(context.TODO(), &sourceWorkloadPools, false); diagnostics.HasError() {
+	if diagnostics = m.WorkloadPools.ElementsAs(context.TODO(), &sourceWorkloadPools, false); diagnostics.HasError() {
 		return computeapi.ComputeClusterWrite{}, diagnostics
 	}
 
@@ -84,8 +96,7 @@ func (m *ComputeClusterModel) NscaleComputeCluster() (computeapi.ComputeClusterW
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			// REVIEW_ME: Not sure what the tags are for. Even the UI doesn’t provide a way to set them, so leaving it as nil for now.
-			Tags: nil,
+			Tags:        tags,
 		},
 		Spec: computeapi.ComputeClusterSpec{
 			RegionId:      m.RegionID.ValueString(),
@@ -266,11 +277,6 @@ func (m *WorkloadPoolModel) NscaleWorkloadPool() (computeapi.ComputeClusterWorkl
 			pairs := make(computeapi.AllowedAddressPairList, 0, len(pairModels))
 			for _, pairModel := range pairModels {
 				pair := pairModel.NscaleAllowedAddressPair()
-				fmt.Printf("DEBUG: Converting allowed address pair - CIDR: %s, MAC: %v (IsNull: %v, IsUnknown: %v)\n",
-					pairModel.Cidr.ValueString(),
-					pair.MacAddress,
-					pairModel.MacAddress.IsNull(),
-					pairModel.MacAddress.IsUnknown())
 				pairs = append(pairs, pair)
 			}
 			allowedAddressPairs = &pairs

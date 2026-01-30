@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Nscale
+Copyright 2026 Nscale
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validators
+package instance
 
 import (
-	"regexp"
-
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
 
-func NameValidator() validator.String {
-	return stringvalidator.RegexMatches(
-		regexp.MustCompile(`^[a-z]([a-z0-9-]{0,61}[a-z0-9])?$`),
-		"must start with a lowercase letter, contain only lowercase letters, digits or hyphens, end with a letter or digit, and be at most 63 characters long",
-	)
+type InstanceSSHKeyModel struct {
+	InstanceID types.String `tfsdk:"instance_id"`
+	PrivateKey types.String `tfsdk:"private_key"`
+}
+
+func NewInstanceSSHKeyModel(instanceID string, source *regionapi.SshKey) InstanceSSHKeyModel {
+	return InstanceSSHKeyModel{
+		InstanceID: types.StringValue(instanceID),
+		PrivateKey: types.StringValue(source.PrivateKey),
+	}
 }

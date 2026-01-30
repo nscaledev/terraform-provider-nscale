@@ -23,6 +23,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
@@ -36,6 +38,7 @@ type FileStorageModel struct {
 	Capacity       types.Int64  `tfsdk:"capacity"`
 	RootSquash     types.Bool   `tfsdk:"root_squash"`
 	Network        types.List   `tfsdk:"network"`
+	Tags           types.Map    `tfsdk:"tags"`
 	RegionID       types.String `tfsdk:"region_id"`
 	CreationTime   types.String `tfsdk:"creation_time"`
 }
@@ -56,6 +59,8 @@ func NewFileStorageModel(source *regionapi.StorageV2Read) FileStorageModel {
 		networks = NewFileStorageNetworkModels(*source.Status.Attachments)
 	}
 
+	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
+
 	return FileStorageModel{
 		ID:             types.StringValue(source.Metadata.Id),
 		Name:           types.StringValue(source.Metadata.Name),
@@ -65,6 +70,7 @@ func NewFileStorageModel(source *regionapi.StorageV2Read) FileStorageModel {
 		Capacity:       types.Int64Value(source.Spec.SizeGiB),
 		RootSquash:     rootSquash,
 		Network:        networks,
+		Tags:           tftypes.TagMapValueMust(tags),
 		RegionID:       types.StringValue(source.Status.RegionId),
 		CreationTime:   types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
 	}
@@ -85,6 +91,13 @@ func (m *FileStorageModel) networkIDs() ([]string, diag.Diagnostics) {
 }
 
 func (m *FileStorageModel) NscaleFileStorageCreateParams(organizationID, projectID string) (regionapi.StorageV2Create, diag.Diagnostics) {
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	if diagnostics.HasError() {
+		return regionapi.StorageV2Create{}, diagnostics
+	}
+
+	tags = nscale.RemoveOperationTags(tags)
+
 	networkIDs, diagnostics := m.networkIDs()
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Create{}, diagnostics
@@ -94,8 +107,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(organizationID, project
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			// REVIEW_ME: Not sure what the tags are for. Even the UI doesn’t provide a way to set them, so leaving it as nil for now.
-			Tags: nil,
+			Tags:        tags,
 		},
 		Spec: struct {
 			Attachments    *regionapi.StorageAttachmentV2Spec `json:"attachments,omitempty"`
@@ -126,6 +138,13 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(organizationID, project
 }
 
 func (m *FileStorageModel) NscaleFileStorageUpdateParams() (regionapi.StorageV2Update, diag.Diagnostics) {
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	if diagnostics.HasError() {
+		return regionapi.StorageV2Update{}, diagnostics
+	}
+
+	tags = nscale.RemoveOperationTags(tags)
+
 	networkIDs, diagnostics := m.networkIDs()
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Update{}, diagnostics
@@ -135,8 +154,7 @@ func (m *FileStorageModel) NscaleFileStorageUpdateParams() (regionapi.StorageV2U
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			// REVIEW_ME: Not sure what the tags are for. Even the UI doesn’t provide a way to set them, so leaving it as nil for now.
-			Tags: nil,
+			Tags:        tags,
 		},
 		Spec: regionapi.StorageV2Spec{
 			Attachments: &regionapi.StorageAttachmentV2Spec{
