@@ -191,6 +191,7 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		filestorage.NewFileStorageDataSource,
 		instance.NewInstanceFlavorDataSource,
 		instance.NewInstanceDataSource,
+		instance.NewInstanceSSHKeyDataSource,
 		computecluster.NewComputeClusterDataSource,
 	}
 }
