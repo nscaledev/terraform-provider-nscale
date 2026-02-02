@@ -367,7 +367,7 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(computeClusterUpdateResponse); err != nil {
+	if err = nscale.ReadEmptyResponse(computeClusterUpdateResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Compute Cluster",
 			fmt.Sprintf("An error occurred while updating the compute cluster: %s", err),
@@ -410,7 +410,7 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(computeClusterDeleteResponse); err != nil {
+	if err = nscale.ReadEmptyResponse(computeClusterDeleteResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Compute Cluster",
 			fmt.Sprintf("An error occurred while deleting the compute cluster: %s", err),

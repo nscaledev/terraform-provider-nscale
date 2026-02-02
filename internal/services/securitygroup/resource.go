@@ -303,7 +303,7 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(securityGroupDeleteResponse); err != nil {
+	if err = nscale.ReadEmptyResponse(securityGroupDeleteResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Security Group",
 			fmt.Sprintf("An error occurred while deleting the security group: %s", err),

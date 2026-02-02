@@ -321,7 +321,7 @@ func (r *InstanceResource) Delete(ctx context.Context, request resource.DeleteRe
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(instanceDeleteResponse); err != nil {
+	if err = nscale.ReadEmptyResponse(instanceDeleteResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Instance",
 			fmt.Sprintf("An error occurred while deleting the instance: %s", err),

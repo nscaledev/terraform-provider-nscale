@@ -280,7 +280,7 @@ func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteReq
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(networkDeleteResponse); err != nil {
+	if err = nscale.ReadEmptyResponse(networkDeleteResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Network",
 			fmt.Sprintf("An error occurred while deleting the network: %s", err),

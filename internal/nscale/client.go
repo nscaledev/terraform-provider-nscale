@@ -88,7 +88,7 @@ func ReadJSONResponseValue[T any](response *http.Response) (T, error) {
 	return data, nil
 }
 
-func ReadErrorResponse(response *http.Response) error {
+func ReadEmptyResponse(response *http.Response) error {
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return readErrorResponse(response)
 	}
