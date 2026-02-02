@@ -31,7 +31,7 @@ func getFileStorage(ctx context.Context, id string, client *nscale.Client) (*reg
 		return nil, nil, err
 	}
 
-	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageResponse, nscale.StatusCodeAny(http.StatusOK))
+	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageResponse)
 	if err != nil {
 		return nil, nil, err
 	}

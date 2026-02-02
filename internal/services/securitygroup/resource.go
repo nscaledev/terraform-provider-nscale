@@ -184,7 +184,7 @@ func (r *SecurityGroupResource) Create(ctx context.Context, request resource.Cre
 		return
 	}
 
-	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupCreateResponse, nscale.StatusCodeAny(http.StatusCreated))
+	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupCreateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Security Group",
@@ -260,7 +260,7 @@ func (r *SecurityGroupResource) Update(ctx context.Context, request resource.Upd
 		return
 	}
 
-	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupUpdateResponse, nscale.StatusCodeAny(http.StatusAccepted))
+	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupUpdateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Security Group",
@@ -304,7 +304,7 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(securityGroupDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted)); err != nil {
+	if err = nscale.ReadErrorResponse(securityGroupDeleteResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Security Group",
 			fmt.Sprintf("An error occurred while deleting the security group: %s", err),

@@ -19,7 +19,6 @@ package instance
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
@@ -202,7 +201,7 @@ func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceCreateResponse, nscale.StatusCodeAny(http.StatusCreated))
+	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceCreateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Instance",
@@ -278,7 +277,7 @@ func (r *InstanceResource) Update(ctx context.Context, request resource.UpdateRe
 		return
 	}
 
-	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceUpdateResponse, nscale.StatusCodeAny(http.StatusAccepted))
+	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceUpdateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Instance",
@@ -322,7 +321,7 @@ func (r *InstanceResource) Delete(ctx context.Context, request resource.DeleteRe
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(instanceDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted)); err != nil {
+	if err = nscale.ReadErrorResponse(instanceDeleteResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Instance",
 			fmt.Sprintf("An error occurred while deleting the instance: %s", err),

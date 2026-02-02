@@ -119,7 +119,7 @@ func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasourc
 		return
 	}
 
-	storageClasses, err := nscale.ReadJSONResponseValue[[]regionapi.StorageClassV2Read](storageClassListResponse, nscale.StatusCodeAny(http.StatusOK))
+	storageClasses, err := nscale.ReadJSONResponseValue[[]regionapi.StorageClassV2Read](storageClassListResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read File Storage Class",

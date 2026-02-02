@@ -31,7 +31,7 @@ func getInstance(ctx context.Context, id string, client *nscale.Client) (*comput
 		return nil, nil, err
 	}
 
-	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceResponse, nscale.StatusCodeAny(http.StatusOK))
+	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceResponse)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -18,7 +18,6 @@ package network
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
@@ -31,7 +30,7 @@ func getNetwork(ctx context.Context, id string, client *nscale.Client) (*regiona
 		return nil, nil, err
 	}
 
-	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkResponse, nscale.StatusCodeAny(http.StatusOK))
+	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkResponse)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -171,7 +171,7 @@ func (r *FileStorageResource) Create(ctx context.Context, request resource.Creat
 		return
 	}
 
-	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageCreateResponse, nscale.StatusCodeAny(http.StatusCreated))
+	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageCreateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create File Storage",
@@ -247,7 +247,7 @@ func (r *FileStorageResource) Update(ctx context.Context, request resource.Updat
 		return
 	}
 
-	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageUpdateResponse, nscale.StatusCodeAny(http.StatusAccepted))
+	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageUpdateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update File Storage",
@@ -291,7 +291,7 @@ func (r *FileStorageResource) Delete(ctx context.Context, request resource.Delet
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(fileStorageDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted)); err != nil {
+	if err = nscale.ReadErrorResponse(fileStorageDeleteResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete File Storage",
 			fmt.Sprintf("An error occurred while deleting the file storage: %s", err),
