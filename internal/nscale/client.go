@@ -63,12 +63,7 @@ type StatusCodeMatcher func(statusCode int) bool
 
 func StatusCodeAny(statusCodes ...int) StatusCodeMatcher {
 	return func(statusCode int) bool {
-		for _, code := range statusCodes {
-			if statusCode == code {
-				return true
-			}
-		}
-		return false
+        return slices.Contains(statusCodes, statusCode)
 	}
 }
 
