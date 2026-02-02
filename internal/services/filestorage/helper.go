@@ -18,7 +18,6 @@ package filestorage
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
@@ -31,7 +30,7 @@ func getFileStorage(ctx context.Context, id string, client *nscale.Client) (*reg
 		return nil, nil, err
 	}
 
-	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageResponse, nscale.StatusCodeAny(http.StatusOK))
+	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageResponse)
 	if err != nil {
 		return nil, nil, err
 	}

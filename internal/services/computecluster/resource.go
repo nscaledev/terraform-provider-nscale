@@ -19,7 +19,6 @@ package computecluster
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -292,7 +291,7 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 		return
 	}
 
-	computeCluster, err := nscale.ReadJSONResponsePointer[computeapi.ComputeClusterRead](computeClusterCreateResponse, nscale.StatusCodeAny(http.StatusAccepted))
+	computeCluster, err := nscale.ReadJSONResponsePointer[computeapi.ComputeClusterRead](computeClusterCreateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Compute Cluster",
@@ -368,7 +367,7 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(computeClusterUpdateResponse, nscale.StatusCodeAny(http.StatusAccepted)); err != nil {
+	if err = nscale.ReadErrorResponse(computeClusterUpdateResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Compute Cluster",
 			fmt.Sprintf("An error occurred while updating the compute cluster: %s", err),
@@ -411,7 +410,7 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(computeClusterDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted)); err != nil {
+	if err = nscale.ReadErrorResponse(computeClusterDeleteResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Compute Cluster",
 			fmt.Sprintf("An error occurred while deleting the compute cluster: %s", err),

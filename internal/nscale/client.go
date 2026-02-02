@@ -59,31 +59,23 @@ func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organi
 	return client, nil
 }
 
-type StatusCodeMatcher func(statusCode int) bool
-
-func StatusCodeAny(statusCodes ...int) StatusCodeMatcher {
-	return func(statusCode int) bool {
-        return slices.Contains(statusCodes, statusCode)
-	}
-}
-
 type errorResponse struct {
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description"`
 }
 
-func ReadJSONResponsePointer[T any](response *http.Response, statusCodeMatcher StatusCodeMatcher) (*T, error) {
-	data, err := ReadJSONResponseValue[T](response, statusCodeMatcher)
+func ReadJSONResponsePointer[T any](response *http.Response) (*T, error) {
+	data, err := ReadJSONResponseValue[T](response)
 	if err != nil {
 		return nil, err
 	}
 	return &data, nil
 }
 
-func ReadJSONResponseValue[T any](response *http.Response, statusCodeMatcher StatusCodeMatcher) (T, error) {
+func ReadJSONResponseValue[T any](response *http.Response) (T, error) {
 	var data T
 
-	if !statusCodeMatcher(response.StatusCode) {
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		err := readErrorResponse(response)
 		return data, err
 	}
@@ -96,8 +88,8 @@ func ReadJSONResponseValue[T any](response *http.Response, statusCodeMatcher Sta
 	return data, nil
 }
 
-func ReadErrorResponse(response *http.Response, statusCodeMatcher StatusCodeMatcher) error {
-	if !statusCodeMatcher(response.StatusCode) {
+func ReadErrorResponse(response *http.Response) error {
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return readErrorResponse(response)
 	}
 	return nil

@@ -18,7 +18,6 @@ package securitygroup
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
@@ -31,7 +30,7 @@ func getSecurityGroup(ctx context.Context, id string, client *nscale.Client) (*r
 		return nil, nil, err
 	}
 
-	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupResponse, nscale.StatusCodeAny(http.StatusOK))
+	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupResponse)
 	if err != nil {
 		return nil, nil, err
 	}

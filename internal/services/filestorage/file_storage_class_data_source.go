@@ -19,7 +19,6 @@ package filestorage
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -119,7 +118,7 @@ func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasourc
 		return
 	}
 
-	storageClasses, err := nscale.ReadJSONResponseValue[[]regionapi.StorageClassV2Read](storageClassListResponse, nscale.StatusCodeAny(http.StatusOK))
+	storageClasses, err := nscale.ReadJSONResponseValue[[]regionapi.StorageClassV2Read](storageClassListResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read File Storage Class",

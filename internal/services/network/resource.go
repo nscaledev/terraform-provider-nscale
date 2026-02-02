@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -161,7 +160,7 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 		return
 	}
 
-	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkCreateResponse, nscale.StatusCodeAny(http.StatusCreated))
+	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkCreateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Network",
@@ -237,7 +236,7 @@ func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateReq
 		return
 	}
 
-	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse, nscale.StatusCodeAny(http.StatusAccepted))
+	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Network",
@@ -281,7 +280,7 @@ func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteReq
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(networkDeleteResponse, nscale.StatusCodeAny(http.StatusAccepted)); err != nil {
+	if err = nscale.ReadErrorResponse(networkDeleteResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Network",
 			fmt.Sprintf("An error occurred while deleting the network: %s", err),
