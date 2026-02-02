@@ -291,7 +291,7 @@ func (r *FileStorageResource) Delete(ctx context.Context, request resource.Delet
 		return
 	}
 
-	if err = nscale.ReadErrorResponse(fileStorageDeleteResponse); err != nil {
+	if err = nscale.ReadEmptyResponse(fileStorageDeleteResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete File Storage",
 			fmt.Sprintf("An error occurred while deleting the file storage: %s", err),
