@@ -110,7 +110,7 @@ func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasourc
 		},
 	}
 
-	storageClassListResponse, err := s.client.Region.GetApiV2FilestorageclassesWithResponse(ctx, params)
+	storageClassListResponse, err := s.client.Region.GetApiV2Filestorageclasses(ctx, params)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read File Storage Class",
@@ -119,17 +119,18 @@ func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasourc
 		return
 	}
 
-	if storageClassListResponse.StatusCode() != http.StatusOK || storageClassListResponse.JSON200 == nil {
+	storageClasses, err := nscale.ReadJSONResponseValue[[]regionapi.StorageClassV2Read](storageClassListResponse)
+	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read File Storage Class",
-			fmt.Sprintf("An error occurred while retrieving the file storage class (status %d).", storageClassListResponse.StatusCode()),
+			fmt.Sprintf("An error occurred while retrieving the file storage class: %s", err),
 		)
 		return
 	}
 
 	id := data.ID.ValueString()
 
-	for _, storageClass := range *storageClassListResponse.JSON200 {
+	for _, storageClass := range storageClasses {
 		if storageClass.Metadata.Id == id {
 			data = NewFileStorageClassModel(&storageClass)
 			response.Diagnostics.Append(response.State.Set(ctx, data)...)

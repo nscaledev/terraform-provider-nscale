@@ -17,7 +17,9 @@ limitations under the License.
 package nscale
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
@@ -27,20 +29,20 @@ type Client struct {
 	RegionID       string
 	OrganizationID string
 	ProjectID      string
-	Region         regionapi.ClientWithResponsesInterface
-	Compute        computeapi.ClientWithResponsesInterface
+	Region         regionapi.ClientInterface
+	Compute        computeapi.ClientInterface
 }
 
 func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string) (*Client, error) {
 	httpClient := NewHTTPClient(userAgent, serviceToken)
 
-	region, err := regionapi.NewClientWithResponses(regionServiceBaseURL, regionapi.WithHTTPClient(httpClient))
+	region, err := regionapi.NewClient(regionServiceBaseURL, regionapi.WithHTTPClient(httpClient))
 	if err != nil {
 		err = fmt.Errorf("failed to create Nscale region API client: %w", err)
 		return nil, err
 	}
 
-	compute, err := computeapi.NewClientWithResponses(computeServiceBaseURL, computeapi.WithHTTPClient(httpClient))
+	compute, err := computeapi.NewClient(computeServiceBaseURL, computeapi.WithHTTPClient(httpClient))
 	if err != nil {
 		err = fmt.Errorf("failed to create Nscale compute API client: %w", err)
 		return nil, err
@@ -55,4 +57,60 @@ func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organi
 	}
 
 	return client, nil
+}
+
+type errorResponse struct {
+	Error            string `json:"error"`
+	ErrorDescription string `json:"error_description"`
+}
+
+func ReadJSONResponsePointer[T any](response *http.Response) (*T, error) {
+	data, err := ReadJSONResponseValue[T](response)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func ReadJSONResponseValue[T any](response *http.Response) (T, error) {
+	var data T
+
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		err := readErrorResponse(response)
+		return data, err
+	}
+
+	if err := json.NewDecoder(response.Body).Decode(&data); err != nil {
+		err = responseDecodeError(response, err)
+		return data, err
+	}
+
+	return data, nil
+}
+
+func ReadEmptyResponse(response *http.Response) error {
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return readErrorResponse(response)
+	}
+	return nil
+}
+
+func readErrorResponse(response *http.Response) error {
+	var data errorResponse
+	if err := json.NewDecoder(response.Body).Decode(&data); err != nil {
+		return responseDecodeError(response, err)
+	}
+
+	return &APIError{
+		StatusCode: response.StatusCode,
+		Code:       data.Error,
+		Message:    data.ErrorDescription,
+	}
+}
+
+func responseDecodeError(response *http.Response, err error) error {
+	return &APIError{
+		StatusCode: response.StatusCode,
+		Message:    fmt.Sprintf("failed to decode response: %s", err),
+	}
 }

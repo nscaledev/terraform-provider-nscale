@@ -26,19 +26,14 @@ import (
 )
 
 func getSecurityGroup(ctx context.Context, id string, client *nscale.Client) (*regionapi.SecurityGroupV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	securityGroupResponse, err := client.Region.GetApiV2SecuritygroupsSecurityGroupIDWithResponse(ctx, id)
+	securityGroupResponse, err := client.Region.GetApiV2SecuritygroupsSecurityGroupID(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if securityGroupResponse.StatusCode() != http.StatusOK {
-		err = nscale.NewStatusCodeError(securityGroupResponse.StatusCode())
+	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupResponse)
+	if err != nil {
 		return nil, nil, err
-	}
-
-	securityGroup := securityGroupResponse.JSON200
-	if securityGroup == nil {
-		return nil, nil, nscale.ErrEmptyResponse
 	}
 
 	return securityGroup, &securityGroup.Metadata, nil

@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Nscale
+Copyright 2026 Nscale
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package instance
+package computecluster
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -25,16 +26,27 @@ import (
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 )
 
-func getInstance(ctx context.Context, id string, client *nscale.Client) (*computeapi.InstanceRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	instanceResponse, err := client.Compute.GetApiV2InstancesInstanceID(ctx, id)
+func getComputeCluster(ctx context.Context, organizationID, id string, client *nscale.Client) (*computeapi.ComputeClusterRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
+	computeClusterListResponse, err := client.Compute.GetApiV1OrganizationsOrganizationIDClusters(ctx, organizationID, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceResponse)
+	computeClusters, err := nscale.ReadJSONResponseValue[[]computeapi.ComputeClusterRead](computeClusterListResponse)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return instance, &instance.Metadata, nil
+	for _, computeCluster := range computeClusters {
+		if computeCluster.Metadata.Id == id {
+			return &computeCluster, &computeCluster.Metadata, nil
+		}
+	}
+
+	err = &nscale.APIError{
+		StatusCode: http.StatusNotFound,
+		Message:    fmt.Sprintf("failed to find compute cluster '%s' in the list response", id),
+	}
+
+	return nil, nil, err
 }
