@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,6 +28,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
+)
+
+const (
+	TerraformOperationTagPrefix = "terraform.nscale.com/"
+	defaultOperationTagMaxAge   = 12 * time.Hour
 )
 
 type StateReaderFunc func(ctx context.Context, target any) diag.Diagnostics
@@ -134,7 +140,7 @@ func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resou
 }
 
 func WriteOperationTag(metadata *coreapi.ResourceWriteMetadata) string {
-	operationKey := fmt.Sprintf("terraform.nscale.com/%s", uuid.New().String())
+	operationKey := TerraformOperationTagPrefix + uuid.NewString()
 
 	if metadata.Tags == nil {
 		var tags []coreapi.Tag
@@ -143,7 +149,7 @@ func WriteOperationTag(metadata *coreapi.ResourceWriteMetadata) string {
 
 	*metadata.Tags = append(*metadata.Tags, coreapi.Tag{
 		Name:  operationKey,
-		Value: "0",
+		Value: time.Now().Format(time.RFC3339),
 	})
 
 	return operationKey
@@ -161,6 +167,25 @@ func HasOperationTag(tags *[]coreapi.Tag, operationTag string) bool {
 	}
 
 	return false
+}
+
+func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
+	if tags == nil {
+		return nil
+	}
+
+	var filtered []coreapi.Tag
+	for _, tag := range *tags {
+		if strings.HasPrefix(tag.Name, TerraformOperationTagPrefix) {
+			writtenAt, err := time.Parse(time.RFC3339, tag.Value)
+			if err != nil || time.Since(writtenAt) > defaultOperationTagMaxAge {
+				continue
+			}
+		}
+		filtered = append(filtered, tag)
+	}
+
+	return &filtered
 }
 
 const (

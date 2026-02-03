@@ -33,6 +33,7 @@ data "nscale_network" "example" {
 - `name` (String) The name of the network.
 - `region_id` (String) The identifier of the region where the network is provisioned.
 - `routes` (Attributes List) A list of routes associated with the network. (see [below for nested schema](#nestedatt--routes))
+- `tags` (Map of String) A map of tags assigned to the network.
 
 <a id="nestedatt--routes"></a>
 ### Nested Schema for `routes`

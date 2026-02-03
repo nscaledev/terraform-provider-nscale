@@ -55,6 +55,7 @@ resource "nscale_security_group" "example" {
 - `description` (String) The description of the security group.
 - `region_id` (String) The identifier of the region where the security group is provisioned. If not specified, this defaults to the region ID configured in the provider.
 - `rules` (Attributes List) A list of rules for the security group. (see [below for nested schema](#nestedatt--rules))
+- `tags` (Map of String) A map of tags assigned to the security group.
 
 ### Read-Only
 

@@ -159,6 +159,11 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 				Computed:            true,
 				Sensitive:           true,
 			},
+			"tags": schema.MapAttribute{
+				MarkdownDescription: "A map of tags assigned to the compute cluster.",
+				ElementType:         types.StringType,
+				Computed:            true,
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the compute cluster is provisioned.",
 				Computed:            true,

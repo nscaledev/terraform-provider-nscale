@@ -32,6 +32,7 @@ data "nscale_file_storage" "example" {
 - `provisioning_status` (String) The provisioning status of the compute cluster.
 - `region_id` (String) The identifier of the region where the compute cluster is provisioned.
 - `ssh_private_key` (String, Sensitive) The SSH private key for accessing the compute cluster.
+- `tags` (Map of String) A map of tags assigned to the compute cluster.
 - `workload_pools` (Attributes List) A list of pools of workload nodes in the compute cluster. (see [below for nested schema](#nestedatt--workload_pools))
 
 <a id="nestedatt--workload_pools"></a>
