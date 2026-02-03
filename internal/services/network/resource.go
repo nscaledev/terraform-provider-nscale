@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
@@ -179,6 +180,12 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 		return
 	}
 
+	data = NewNetworkModel(network)
+	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
 	stateWatcher := nscale.CreateStateWatcher[regionapi.NetworkV2Read]{
 		ResourceTitle: "Network",
 		ResourceName:  "network",
@@ -291,11 +298,13 @@ func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteReq
 	}
 
 	if err = nscale.ReadEmptyResponse(networkDeleteResponse); err != nil {
-		response.Diagnostics.AddError(
-			"Failed to Delete Network",
-			fmt.Sprintf("An error occurred while deleting the network: %s", err),
-		)
-		return
+		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+			response.Diagnostics.AddError(
+				"Failed to Delete Network",
+				fmt.Sprintf("An error occurred while deleting the network: %s", err),
+			)
+			return
+		}
 	}
 
 	stateWatcher := nscale.DeleteStateWatcher{

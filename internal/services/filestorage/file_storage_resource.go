@@ -19,6 +19,7 @@ package filestorage
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -189,6 +190,12 @@ func (r *FileStorageResource) Create(ctx context.Context, request resource.Creat
 		return
 	}
 
+	data = NewFileStorageModel(fileStorage)
+	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
 	stateWatcher := nscale.CreateStateWatcher[regionapi.StorageV2Read]{
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
@@ -301,11 +308,13 @@ func (r *FileStorageResource) Delete(ctx context.Context, request resource.Delet
 	}
 
 	if err = nscale.ReadEmptyResponse(fileStorageDeleteResponse); err != nil {
-		response.Diagnostics.AddError(
-			"Failed to Delete File Storage",
-			fmt.Sprintf("An error occurred while deleting the file storage: %s", err),
-		)
-		return
+		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+			response.Diagnostics.AddError(
+				"Failed to Delete File Storage",
+				fmt.Sprintf("An error occurred while deleting the file storage: %s", err),
+			)
+			return
+		}
 	}
 
 	stateWatcher := nscale.DeleteStateWatcher{
