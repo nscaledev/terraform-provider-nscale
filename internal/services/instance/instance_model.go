@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/pointer"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
@@ -41,6 +42,7 @@ type InstanceModel struct {
 	PowerState       types.String `tfsdk:"power_state"`
 	ImageID          types.String `tfsdk:"image_id"`
 	FlavorID         types.String `tfsdk:"flavor_id"`
+	Tags             types.Map    `tfsdk:"tags"`
 	RegionID         types.String `tfsdk:"region_id"`
 	CreationTime     types.String `tfsdk:"creation_time"`
 }
@@ -56,6 +58,8 @@ func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
 		powerState = types.StringValue(string(*source.Status.PowerState))
 	}
 
+	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
+
 	return InstanceModel{
 		ID:               types.StringValue(source.Metadata.Id),
 		Name:             types.StringValue(source.Metadata.Name),
@@ -67,16 +71,25 @@ func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
 		PowerState:       powerState,
 		ImageID:          types.StringValue(source.Spec.ImageId),
 		FlavorID:         types.StringValue(source.Spec.FlavorId),
+		Tags:             tftypes.TagMapValueMust(tags),
 		RegionID:         types.StringValue(source.Status.RegionId),
 		CreationTime:     types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
 	}
 }
 
 func (m *InstanceModel) NscaleInstanceCreateParams(organizationID, projectID string) (computeapi.InstanceCreate, diag.Diagnostics) {
-	var sourceNetworkInterface InstanceNetworkInterfaceModel
-	if diagnostics := m.NetworkInterface.As(context.TODO(), &sourceNetworkInterface, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	if diagnostics.HasError() {
 		return computeapi.InstanceCreate{}, diagnostics
 	}
+
+	tags = nscale.RemoveOperationTags(tags)
+
+	var sourceNetworkInterface InstanceNetworkInterfaceModel
+	if diagnostics = m.NetworkInterface.As(context.TODO(), &sourceNetworkInterface, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
+		return computeapi.InstanceCreate{}, diagnostics
+	}
+
 	networking, diagnostics := sourceNetworkInterface.NscaleInstanceNetworking()
 	if diagnostics.HasError() {
 		return computeapi.InstanceCreate{}, diagnostics
@@ -92,8 +105,7 @@ func (m *InstanceModel) NscaleInstanceCreateParams(organizationID, projectID str
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			// REVIEW_ME: Not sure what the tags are for. Even the UI doesn’t provide a way to set them, so leaving it as nil for now.
-			Tags: nil,
+			Tags:        tags,
 		},
 		Spec: computeapi.InstanceCreateSpec{
 			FlavorId:       m.FlavorID.ValueString(),
@@ -110,8 +122,15 @@ func (m *InstanceModel) NscaleInstanceCreateParams(organizationID, projectID str
 }
 
 func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate, diag.Diagnostics) {
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	if diagnostics.HasError() {
+		return computeapi.InstanceUpdate{}, diagnostics
+	}
+
+	tags = nscale.RemoveOperationTags(tags)
+
 	var sourceNetworkInterface InstanceNetworkInterfaceModel
-	if diagnostics := m.NetworkInterface.As(context.TODO(), &sourceNetworkInterface, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
+	if diagnostics = m.NetworkInterface.As(context.TODO(), &sourceNetworkInterface, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
 		return computeapi.InstanceUpdate{}, diagnostics
 	}
 
@@ -130,8 +149,7 @@ func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate,
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			// REVIEW_ME: Not sure what the tags are for. Even the UI doesn’t provide a way to set them, so leaving it as nil for now.
-			Tags: nil,
+			Tags:        tags,
 		},
 		Spec: computeapi.InstanceSpec{
 			FlavorId:   m.FlavorID.ValueString(),

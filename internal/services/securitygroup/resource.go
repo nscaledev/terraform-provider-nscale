@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -138,6 +139,15 @@ func (r *SecurityGroupResource) Schema(ctx context.Context, request resource.Sch
 			"network_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the network to where the security group is attached.",
 				Required:            true,
+			},
+			"tags": schema.MapAttribute{
+				MarkdownDescription: "A map of tags assigned to the security group.",
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Validators: []validator.Map{
+					mapvalidator.KeysAre(validators.NoReservedPrefix(nscale.TerraformOperationTagPrefix)),
+				},
 			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the security group is provisioned. If not specified, this defaults to the region ID configured in the provider.",

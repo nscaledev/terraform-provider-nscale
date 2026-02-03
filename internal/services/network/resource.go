@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -115,6 +116,15 @@ func (r *NetworkResource) Schema(ctx context.Context, request resource.SchemaReq
 			"cidr_block": schema.StringAttribute{
 				MarkdownDescription: "The CIDR block assigned to the network.",
 				Required:            true,
+			},
+			"tags": schema.MapAttribute{
+				MarkdownDescription: "A map of tags assigned to the network.",
+				ElementType:         types.StringType,
+				Optional:            true,
+				Computed:            true,
+				Validators: []validator.Map{
+					mapvalidator.KeysAre(validators.NoReservedPrefix(nscale.TerraformOperationTagPrefix)),
+				},
 			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the network is provisioned. If not specified, this defaults to the region ID configured in the provider.",
