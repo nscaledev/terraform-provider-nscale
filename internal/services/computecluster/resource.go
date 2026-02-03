@@ -19,6 +19,7 @@ package computecluster
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -310,6 +311,12 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 		return
 	}
 
+	data = NewComputeClusterModel(computeCluster)
+	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
 	stateWatcher := nscale.CreateStateWatcher[computeapi.ComputeClusterRead]{
 		ResourceTitle: "Compute Cluster",
 		ResourceName:  "compute cluster",
@@ -421,11 +428,13 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 	}
 
 	if err = nscale.ReadEmptyResponse(computeClusterDeleteResponse); err != nil {
-		response.Diagnostics.AddError(
-			"Failed to Delete Compute Cluster",
-			fmt.Sprintf("An error occurred while deleting the compute cluster: %s", err),
-		)
-		return
+		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+			response.Diagnostics.AddError(
+				"Failed to Delete Compute Cluster",
+				fmt.Sprintf("An error occurred while deleting the compute cluster: %s", err),
+			)
+			return
+		}
 	}
 
 	stateWatcher := nscale.DeleteStateWatcher{

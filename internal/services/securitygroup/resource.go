@@ -203,6 +203,12 @@ func (r *SecurityGroupResource) Create(ctx context.Context, request resource.Cre
 		return
 	}
 
+	data = NewSecurityGroupModel(securityGroup)
+	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
 	stateWatcher := nscale.CreateStateWatcher[regionapi.SecurityGroupV2Read]{
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
@@ -315,11 +321,13 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 	}
 
 	if err = nscale.ReadEmptyResponse(securityGroupDeleteResponse); err != nil {
-		response.Diagnostics.AddError(
-			"Failed to Delete Security Group",
-			fmt.Sprintf("An error occurred while deleting the security group: %s", err),
-		)
-		return
+		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+			response.Diagnostics.AddError(
+				"Failed to Delete Security Group",
+				fmt.Sprintf("An error occurred while deleting the security group: %s", err),
+			)
+			return
+		}
 	}
 
 	stateWatcher := nscale.DeleteStateWatcher{
