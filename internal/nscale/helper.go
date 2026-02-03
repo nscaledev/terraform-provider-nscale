@@ -30,7 +30,10 @@ import (
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 )
 
-const TerraformOperationTagPrefix = "terraform.nscale.com/"
+const (
+	TerraformOperationTagPrefix = "terraform.nscale.com/"
+	defaultOperationTagMaxAge   = 12 * time.Hour
+)
 
 type StateReaderFunc func(ctx context.Context, target any) diag.Diagnostics
 
@@ -146,7 +149,7 @@ func WriteOperationTag(metadata *coreapi.ResourceWriteMetadata) string {
 
 	*metadata.Tags = append(*metadata.Tags, coreapi.Tag{
 		Name:  operationKey,
-		Value: "0",
+		Value: time.Now().Format(time.RFC3339),
 	})
 
 	return operationKey
@@ -173,9 +176,13 @@ func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
 
 	var filtered []coreapi.Tag
 	for _, tag := range *tags {
-		if !strings.HasPrefix(tag.Name, TerraformOperationTagPrefix) {
-			filtered = append(filtered, tag)
+		if strings.HasPrefix(tag.Name, TerraformOperationTagPrefix) {
+			writtenAt, err := time.Parse(time.RFC3339, tag.Value)
+			if err != nil || time.Since(writtenAt) > defaultOperationTagMaxAge {
+				continue
+			}
 		}
+		filtered = append(filtered, tag)
 	}
 
 	return &filtered
