@@ -30,7 +30,7 @@ func getInstance(ctx context.Context, id string, client *nscale.Client) (*comput
 		return nil, nil, err
 	}
 
-	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceResponse)
+	instance, err := nscale.ReadJSONResponsePointerWithContext[computeapi.InstanceRead](ctx, instanceResponse)
 	if err != nil {
 		return nil, nil, err
 	}

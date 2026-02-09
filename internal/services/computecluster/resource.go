@@ -302,7 +302,7 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 		return
 	}
 
-	computeCluster, err := nscale.ReadJSONResponsePointer[computeapi.ComputeClusterRead](computeClusterCreateResponse)
+	computeCluster, err := nscale.ReadJSONResponsePointerWithContext[computeapi.ComputeClusterRead](ctx, computeClusterCreateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Compute Cluster",
@@ -384,7 +384,7 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 		return
 	}
 
-	if err = nscale.ReadEmptyResponse(computeClusterUpdateResponse); err != nil {
+	if err = nscale.ReadEmptyResponseWithContext(ctx, computeClusterUpdateResponse); err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Compute Cluster",
 			fmt.Sprintf("An error occurred while updating the compute cluster: %s", err),
@@ -427,7 +427,7 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 		return
 	}
 
-	if err = nscale.ReadEmptyResponse(computeClusterDeleteResponse); err != nil {
+	if err = nscale.ReadEmptyResponseWithContext(ctx, computeClusterDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
 			response.Diagnostics.AddError(
 				"Failed to Delete Compute Cluster",

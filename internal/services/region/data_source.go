@@ -101,7 +101,7 @@ func (s *RegionDataSource) Read(ctx context.Context, request datasource.ReadRequ
 		return
 	}
 
-	regions, err := nscale.ReadJSONResponseValue[[]regionapi.RegionRead](regionListResponse)
+	regions, err := nscale.ReadJSONResponseValueWithContext[[]regionapi.RegionRead](ctx, regionListResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Region",

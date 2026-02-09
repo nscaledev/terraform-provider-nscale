@@ -26,6 +26,7 @@ type APIError struct {
 	StatusCode int
 	Code       string
 	Message    string
+	RawBody    string
 }
 
 func (e *APIError) Error() string {

@@ -30,7 +30,7 @@ func getNetwork(ctx context.Context, id string, client *nscale.Client) (*regiona
 		return nil, nil, err
 	}
 
-	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkResponse)
+	network, err := nscale.ReadJSONResponsePointerWithContext[regionapi.NetworkV2Read](ctx, networkResponse)
 	if err != nil {
 		return nil, nil, err
 	}

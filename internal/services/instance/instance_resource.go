@@ -212,7 +212,7 @@ func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceCreateResponse)
+	instance, err := nscale.ReadJSONResponsePointerWithContext[computeapi.InstanceRead](ctx, instanceCreateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Instance",
@@ -294,7 +294,7 @@ func (r *InstanceResource) Update(ctx context.Context, request resource.UpdateRe
 		return
 	}
 
-	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceUpdateResponse)
+	instance, err := nscale.ReadJSONResponsePointerWithContext[computeapi.InstanceRead](ctx, instanceUpdateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Instance",
@@ -338,7 +338,7 @@ func (r *InstanceResource) Delete(ctx context.Context, request resource.DeleteRe
 		return
 	}
 
-	if err = nscale.ReadEmptyResponse(instanceDeleteResponse); err != nil {
+	if err = nscale.ReadEmptyResponseWithContext(ctx, instanceDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
 			response.Diagnostics.AddError(
 				"Failed to Delete Instance",

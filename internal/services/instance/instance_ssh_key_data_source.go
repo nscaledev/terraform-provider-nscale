@@ -92,7 +92,7 @@ func (s *InstanceSSHKeyDataSource) Read(ctx context.Context, request datasource.
 		return
 	}
 
-	sshKey, err := nscale.ReadJSONResponsePointer[regionapi.SshKey](sshKeyResponse)
+	sshKey, err := nscale.ReadJSONResponsePointerWithContext[regionapi.SshKey](ctx, sshKeyResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Instance SSH Key",

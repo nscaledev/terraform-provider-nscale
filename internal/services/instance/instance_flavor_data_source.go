@@ -148,7 +148,7 @@ func (s *InstanceFlavorDataSource) Read(ctx context.Context, request datasource.
 		return
 	}
 
-	flavors, err := nscale.ReadJSONResponseValue[[]regionapi.Flavor](flavorListResponse)
+	flavors, err := nscale.ReadJSONResponseValueWithContext[[]regionapi.Flavor](ctx, flavorListResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Instance Flavor",

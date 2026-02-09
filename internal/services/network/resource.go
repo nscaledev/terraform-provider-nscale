@@ -171,7 +171,7 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 		return
 	}
 
-	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkCreateResponse)
+	network, err := nscale.ReadJSONResponsePointerWithContext[regionapi.NetworkV2Read](ctx, networkCreateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Network",
@@ -253,7 +253,7 @@ func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateReq
 		return
 	}
 
-	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse)
+	network, err := nscale.ReadJSONResponsePointerWithContext[regionapi.NetworkV2Read](ctx, networkUpdateResponse)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Network",
@@ -297,7 +297,7 @@ func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteReq
 		return
 	}
 
-	if err = nscale.ReadEmptyResponse(networkDeleteResponse); err != nil {
+	if err = nscale.ReadEmptyResponseWithContext(ctx, networkDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
 			response.Diagnostics.AddError(
 				"Failed to Delete Network",

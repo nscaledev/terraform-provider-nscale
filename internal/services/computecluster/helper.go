@@ -32,7 +32,7 @@ func getComputeCluster(ctx context.Context, organizationID, id string, client *n
 		return nil, nil, err
 	}
 
-	computeClusters, err := nscale.ReadJSONResponseValue[[]computeapi.ComputeClusterRead](computeClusterListResponse)
+	computeClusters, err := nscale.ReadJSONResponseValueWithContext[[]computeapi.ComputeClusterRead](ctx, computeClusterListResponse)
 	if err != nil {
 		return nil, nil, err
 	}

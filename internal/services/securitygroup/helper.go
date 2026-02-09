@@ -30,7 +30,7 @@ func getSecurityGroup(ctx context.Context, id string, client *nscale.Client) (*r
 		return nil, nil, err
 	}
 
-	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupResponse)
+	securityGroup, err := nscale.ReadJSONResponsePointerWithContext[regionapi.SecurityGroupV2Read](ctx, securityGroupResponse)
 	if err != nil {
 		return nil, nil, err
 	}

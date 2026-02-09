@@ -17,10 +17,13 @@ limitations under the License.
 package nscale
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
@@ -59,9 +62,14 @@ func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organi
 	return client, nil
 }
 
+// errorResponse represents possible error response formats from the API.
+// Different endpoints may use different field names.
 type errorResponse struct {
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description"`
+	Message          string `json:"message"`
+	Detail           string `json:"detail"`
+	Reason           string `json:"reason"`
 }
 
 func ReadJSONResponsePointer[T any](response *http.Response) (*T, error) {
@@ -73,10 +81,22 @@ func ReadJSONResponsePointer[T any](response *http.Response) (*T, error) {
 }
 
 func ReadJSONResponseValue[T any](response *http.Response) (T, error) {
+	return ReadJSONResponseValueWithContext[T](context.Background(), response)
+}
+
+func ReadJSONResponsePointerWithContext[T any](ctx context.Context, response *http.Response) (*T, error) {
+	data, err := ReadJSONResponseValueWithContext[T](ctx, response)
+	if err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func ReadJSONResponseValueWithContext[T any](ctx context.Context, response *http.Response) (T, error) {
 	var data T
 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		err := readErrorResponse(response)
+		err := readErrorResponse(ctx, response)
 		return data, err
 	}
 
@@ -89,23 +109,65 @@ func ReadJSONResponseValue[T any](response *http.Response) (T, error) {
 }
 
 func ReadEmptyResponse(response *http.Response) error {
+	return ReadEmptyResponseWithContext(context.Background(), response)
+}
+
+func ReadEmptyResponseWithContext(ctx context.Context, response *http.Response) error {
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return readErrorResponse(response)
+		return readErrorResponse(ctx, response)
 	}
 	return nil
 }
 
-func readErrorResponse(response *http.Response) error {
-	var data errorResponse
-	if err := json.NewDecoder(response.Body).Decode(&data); err != nil {
-		return responseDecodeError(response, err)
+func readErrorResponse(ctx context.Context, response *http.Response) error {
+	// Read the raw body first so we can include it if parsing fails
+	bodyBytes, readErr := io.ReadAll(response.Body)
+	if readErr != nil {
+		return &APIError{
+			StatusCode: response.StatusCode,
+			Message:    fmt.Sprintf("failed to read error response body: %s", readErr),
+		}
 	}
 
-	return &APIError{
+	var data errorResponse
+	if err := json.Unmarshal(bodyBytes, &data); err != nil {
+		return &APIError{
+			StatusCode: response.StatusCode,
+			Message:    fmt.Sprintf("failed to decode error response: %s", err),
+			RawBody:    string(bodyBytes),
+		}
+	}
+
+	// Try to extract the error message from various possible fields
+	message := data.ErrorDescription
+	if message == "" {
+		message = data.Message
+	}
+	if message == "" {
+		message = data.Detail
+	}
+	if message == "" {
+		message = data.Reason
+	}
+	if message == "" {
+		message = "request failed (error response did not include a message)"
+	}
+
+	apiErr := &APIError{
 		StatusCode: response.StatusCode,
 		Code:       data.Error,
-		Message:    data.ErrorDescription,
+		Message:    message,
+		RawBody:    string(bodyBytes),
 	}
+
+	tflog.Debug(ctx, "nscale API returned an error response", map[string]any{
+		"status_code": response.StatusCode,
+		"code":        apiErr.Code,
+		"message":     apiErr.Message,
+		"raw_body":    fmt.Sprintf("%q", apiErr.RawBody),
+	})
+
+	return apiErr
 }
 
 func responseDecodeError(response *http.Response, err error) error {
