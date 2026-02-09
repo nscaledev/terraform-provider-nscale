@@ -36,6 +36,7 @@ A typical provider configuration looks like this:
 provider "nscale" {
   # Recommended: supply these values via environment variables, not hard-coded here.
 
+  # region_id       = "<your-region-id>"
   # organization_id = "<your-organization-id>"
   # project_id      = "<your-project-id>"
   # service_token   = "<your-service-token>"
