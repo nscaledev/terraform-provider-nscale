@@ -183,6 +183,7 @@ func (r *FileStorageResource) Create(ctx context.Context, request resource.Creat
 
 	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageCreateResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Create File Storage",
 			fmt.Sprintf("An error occurred while creating the file storage: %s", err),
@@ -265,6 +266,7 @@ func (r *FileStorageResource) Update(ctx context.Context, request resource.Updat
 
 	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageUpdateResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Update File Storage",
 			fmt.Sprintf("An error occurred while updating the file storage: %s", err),
@@ -309,6 +311,7 @@ func (r *FileStorageResource) Delete(ctx context.Context, request resource.Delet
 
 	if err = nscale.ReadEmptyResponse(fileStorageDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 			response.Diagnostics.AddError(
 				"Failed to Delete File Storage",
 				fmt.Sprintf("An error occurred while deleting the file storage: %s", err),

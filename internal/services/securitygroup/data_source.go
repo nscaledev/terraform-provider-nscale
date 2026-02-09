@@ -131,6 +131,7 @@ func (s *SecurityGroupDataSource) Read(ctx context.Context, request datasource.R
 
 	securityGroup, _, err := getSecurityGroup(ctx, data.ID.ValueString(), s.client)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Read Security Group",
 			fmt.Sprintf("An error occurred while retrieving the security group: %s", err),

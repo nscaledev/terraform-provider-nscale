@@ -173,6 +173,7 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 
 	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkCreateResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Create Network",
 			fmt.Sprintf("An error occurred while creating the network: %s", err),
@@ -255,6 +256,7 @@ func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateReq
 
 	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Update Network",
 			fmt.Sprintf("An error occurred while updating the network: %s", err),
@@ -299,6 +301,7 @@ func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteReq
 
 	if err = nscale.ReadEmptyResponse(networkDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 			response.Diagnostics.AddError(
 				"Failed to Delete Network",
 				fmt.Sprintf("An error occurred while deleting the network: %s", err),

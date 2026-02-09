@@ -120,6 +120,7 @@ func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasourc
 
 	storageClasses, err := nscale.ReadJSONResponseValue[[]regionapi.StorageClassV2Read](storageClassListResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Read File Storage Class",
 			fmt.Sprintf("An error occurred while retrieving the file storage class: %s", err),

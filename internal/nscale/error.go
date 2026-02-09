@@ -17,9 +17,13 @@ limitations under the License.
 package nscale
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 type APIError struct {
@@ -27,6 +31,10 @@ type APIError struct {
 	Code       string
 	Message    string
 	TraceID    *string
+
+	// The following fields are set only when the error is created while parsing an API response body.
+	Endpoint  string
+	BodyBytes []byte
 }
 
 func (e *APIError) Error() string {
@@ -58,4 +66,17 @@ func AsAPIError(err error) (*APIError, bool) {
 		return e, true
 	}
 	return nil, false
+}
+
+func TerraformDebugLogAPIResponseBody(ctx context.Context, err error) {
+	if e, ok := AsAPIError(err); ok && len(e.BodyBytes) > 0 {
+		message := "API response could not be parsed"
+		if e.Endpoint != "" {
+			message = fmt.Sprintf("%s response could not be parsed", e.Endpoint)
+		}
+
+		tflog.Debug(ctx, message, map[string]any{
+			"response_body": string(e.BodyBytes),
+		})
+	}
 }

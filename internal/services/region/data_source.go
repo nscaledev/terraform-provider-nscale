@@ -103,6 +103,7 @@ func (s *RegionDataSource) Read(ctx context.Context, request datasource.ReadRequ
 
 	regions, err := nscale.ReadJSONResponseValue[[]regionapi.RegionRead](regionListResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Read Region",
 			fmt.Sprintf("An error occurred while retrieving the region: %s", err),

@@ -99,6 +99,7 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, response *resource.Cre
 
 	state, err := stateWatcher.WaitForStateContext(ctx)
 	if err != nil {
+		TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			fmt.Sprintf("Failed to Wait for %s to be Created", w.ResourceTitle),
 			fmt.Sprintf("An error occurred while waiting for the %s to be created: %s", w.ResourceName, err),
@@ -129,10 +130,13 @@ func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resou
 			return zero, false
 		}
 
+		TerraformDebugLogAPIResponseBody(ctx, err)
+
 		response.Diagnostics.AddError(
 			fmt.Sprintf("Failed to Read %s", r.ResourceTitle),
 			fmt.Sprintf("An error occurred while retrieving the %s: %s", r.ResourceName, err),
 		)
+
 		return zero, false
 	}
 
@@ -223,6 +227,7 @@ func (w *UpdateStateWatcher[T]) Wait(ctx context.Context, operationTagKey string
 
 	state, err := stateWatcher.WaitForStateContext(ctx)
 	if err != nil {
+		TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			fmt.Sprintf("Failed to Wait for %s to be Updated", w.ResourceTitle),
 			fmt.Sprintf("An error occurred while waiting for the %s to be updated: %s", w.ResourceName, err),
@@ -265,6 +270,7 @@ func (w *DeleteStateWatcher) Wait(ctx context.Context, response *resource.Delete
 	}
 
 	if _, err := stateWatcher.WaitForStateContext(ctx); err != nil {
+		TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			fmt.Sprintf("Failed to Wait for %s to be Deleted", w.ResourceTitle),
 			fmt.Sprintf("An error occurred while waiting for the %s to be deleted: %s", w.ResourceName, err),

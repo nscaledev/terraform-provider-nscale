@@ -214,6 +214,7 @@ func (r *InstanceResource) Create(ctx context.Context, request resource.CreateRe
 
 	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceCreateResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Create Instance",
 			fmt.Sprintf("An error occurred while creating the instance: %s", err),
@@ -296,6 +297,7 @@ func (r *InstanceResource) Update(ctx context.Context, request resource.UpdateRe
 
 	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceUpdateResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Update Instance",
 			fmt.Sprintf("An error occurred while updating the instance: %s", err),
@@ -340,6 +342,7 @@ func (r *InstanceResource) Delete(ctx context.Context, request resource.DeleteRe
 
 	if err = nscale.ReadEmptyResponse(instanceDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 			response.Diagnostics.AddError(
 				"Failed to Delete Instance",
 				fmt.Sprintf("An error occurred while deleting the instance: %s", err),

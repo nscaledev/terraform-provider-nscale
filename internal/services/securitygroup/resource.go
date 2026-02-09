@@ -196,6 +196,7 @@ func (r *SecurityGroupResource) Create(ctx context.Context, request resource.Cre
 
 	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupCreateResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Create Security Group",
 			fmt.Sprintf("An error occurred while creating the security group: %s", err),
@@ -278,6 +279,7 @@ func (r *SecurityGroupResource) Update(ctx context.Context, request resource.Upd
 
 	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupUpdateResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Update Security Group",
 			fmt.Sprintf("An error occurred while updating the security group: %s", err),
@@ -322,6 +324,7 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 
 	if err = nscale.ReadEmptyResponse(securityGroupDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 			response.Diagnostics.AddError(
 				"Failed to Delete Security Group",
 				fmt.Sprintf("An error occurred while deleting the security group: %s", err),
