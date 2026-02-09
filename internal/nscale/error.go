@@ -26,6 +26,7 @@ type APIError struct {
 	StatusCode int
 	Code       string
 	Message    string
+	TraceID    *string
 }
 
 func (e *APIError) Error() string {
@@ -42,6 +43,11 @@ func (e *APIError) Error() string {
 	if e.Message != "" {
 		builder.WriteString(", message: ")
 		builder.WriteString(e.Message)
+	}
+
+	if e.TraceID != nil && *e.TraceID != "" {
+		builder.WriteString(", trace_id: ")
+		builder.WriteString(*e.TraceID)
 	}
 
 	return builder.String()

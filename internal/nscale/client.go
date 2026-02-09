@@ -60,8 +60,9 @@ func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organi
 }
 
 type errorResponse struct {
-	Error            string `json:"error"`
-	ErrorDescription string `json:"error_description"`
+	Error            string  `json:"error"`
+	ErrorDescription string  `json:"error_description"`
+	TraceID          *string `json:"trace_id"`
 }
 
 func ReadJSONResponsePointer[T any](response *http.Response) (*T, error) {
@@ -105,6 +106,7 @@ func readErrorResponse(response *http.Response) error {
 		StatusCode: response.StatusCode,
 		Code:       data.Error,
 		Message:    data.ErrorDescription,
+		TraceID:    data.TraceID,
 	}
 }
 
