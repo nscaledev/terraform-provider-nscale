@@ -189,6 +189,7 @@ func (s *ComputeClusterDataSource) Read(ctx context.Context, request datasource.
 
 	computeCluster, _, err := getComputeCluster(ctx, s.client.OrganizationID, data.ID.ValueString(), s.client)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Read Compute Cluster",
 			fmt.Sprintf("An error occurred while retrieving the compute cluster: %s", err),

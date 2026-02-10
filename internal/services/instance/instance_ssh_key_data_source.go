@@ -94,6 +94,7 @@ func (s *InstanceSSHKeyDataSource) Read(ctx context.Context, request datasource.
 
 	sshKey, err := nscale.ReadJSONResponsePointer[regionapi.SshKey](sshKeyResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Read Instance SSH Key",
 			fmt.Sprintf("An error occurred while retrieving the instance SSH key: %s", err),

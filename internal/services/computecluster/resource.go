@@ -304,6 +304,7 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 
 	computeCluster, err := nscale.ReadJSONResponsePointer[computeapi.ComputeClusterRead](computeClusterCreateResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Create Compute Cluster",
 			fmt.Sprintf("An error occurred while creating the compute cluster: %s", err),
@@ -385,6 +386,7 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 	}
 
 	if err = nscale.ReadEmptyResponse(computeClusterUpdateResponse); err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Update Compute Cluster",
 			fmt.Sprintf("An error occurred while updating the compute cluster: %s", err),
@@ -429,6 +431,7 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 
 	if err = nscale.ReadEmptyResponse(computeClusterDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 			response.Diagnostics.AddError(
 				"Failed to Delete Compute Cluster",
 				fmt.Sprintf("An error occurred while deleting the compute cluster: %s", err),

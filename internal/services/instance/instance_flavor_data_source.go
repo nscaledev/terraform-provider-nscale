@@ -150,6 +150,7 @@ func (s *InstanceFlavorDataSource) Read(ctx context.Context, request datasource.
 
 	flavors, err := nscale.ReadJSONResponseValue[[]regionapi.Flavor](flavorListResponse)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Read Instance Flavor",
 			fmt.Sprintf("An error occurred while retrieving the instance flavor: %s", err),

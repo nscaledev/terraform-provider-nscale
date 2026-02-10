@@ -132,6 +132,7 @@ func (s *FileStorageDataSource) Read(ctx context.Context, request datasource.Rea
 
 	fileStorage, _, err := getFileStorage(ctx, data.ID.ValueString(), s.client)
 	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Read File Storage",
 			fmt.Sprintf("An error occurred while retrieving the file storage: %s", err),

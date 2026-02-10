@@ -19,6 +19,7 @@ package nscale
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
@@ -81,8 +82,14 @@ func ReadJSONResponseValue[T any](response *http.Response) (T, error) {
 		return data, err
 	}
 
-	if err := json.NewDecoder(response.Body).Decode(&data); err != nil {
-		err = responseDecodeError(response, err)
+	bodyBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		err = responseReadError(response, err)
+		return data, err
+	}
+
+	if err = json.Unmarshal(bodyBytes, &data); err != nil {
+		err = responseDecodeError(response, bodyBytes, err)
 		return data, err
 	}
 
@@ -97,9 +104,14 @@ func ReadEmptyResponse(response *http.Response) error {
 }
 
 func readErrorResponse(response *http.Response) error {
+	bodyBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		return responseReadError(response, err)
+	}
+
 	var data errorResponse
-	if err := json.NewDecoder(response.Body).Decode(&data); err != nil {
-		return responseDecodeError(response, err)
+	if err = json.Unmarshal(bodyBytes, &data); err != nil {
+		return responseDecodeError(response, bodyBytes, err)
 	}
 
 	return &APIError{
@@ -110,9 +122,23 @@ func readErrorResponse(response *http.Response) error {
 	}
 }
 
-func responseDecodeError(response *http.Response, err error) error {
+func responseReadError(response *http.Response, err error) error {
+	return &APIError{
+		StatusCode: response.StatusCode,
+		Message:    fmt.Sprintf("failed to read response body: %s", err),
+	}
+}
+
+func responseDecodeError(response *http.Response, bodyBytes []byte, err error) error {
+	var endpoint string
+	if response.Request != nil {
+		endpoint = fmt.Sprintf("%s %s", response.Request.Method, response.Request.URL.Path)
+	}
+
 	return &APIError{
 		StatusCode: response.StatusCode,
 		Message:    fmt.Sprintf("failed to decode response: %s", err),
+		Endpoint:   endpoint,
+		BodyBytes:  bodyBytes,
 	}
 }
