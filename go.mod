@@ -7,9 +7,10 @@ require (
 	github.com/hashicorp/go-retryablehttp v0.7.8
 	github.com/hashicorp/terraform-plugin-framework v1.15.1
 	github.com/hashicorp/terraform-plugin-framework-validators v0.18.0
+	github.com/hashicorp/terraform-plugin-log v0.9.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.37.0
 	github.com/unikorn-cloud/compute v1.13.0
-	github.com/unikorn-cloud/core v1.13.0
+	github.com/unikorn-cloud/core v1.14.0-rc1
 	github.com/unikorn-cloud/region v1.13.0
 )
 
@@ -18,18 +19,15 @@ require (
 	github.com/dprotaso/go-yit v0.0.0-20220510233725-9ba8df137936 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/getkin/kin-openapi v0.132.0 // indirect
-	github.com/go-chi/chi/v5 v5.2.2 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-chi/chi/v5 v5.2.4 // indirect
 	github.com/go-openapi/jsonpointer v0.21.1 // indirect
 	github.com/go-openapi/swag v0.23.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/go-plugin v1.6.3 // indirect
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/hashicorp/terraform-plugin-go v0.28.0 // indirect
-	github.com/hashicorp/terraform-plugin-log v0.9.0 // indirect
 	github.com/hashicorp/terraform-registry-address v0.2.5 // indirect
 	github.com/hashicorp/terraform-svchost v0.1.1 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
@@ -59,11 +57,12 @@ require (
 	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/tools v0.38.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250512202823-5a2f75b736a9 // indirect
-	google.golang.org/grpc v1.72.1 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/grpc v1.73.0 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	sigs.k8s.io/controller-runtime v0.20.4 // indirect
 )
 
 tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
+
+replace github.com/unikorn-cloud/region => ../../unikorn-cloud/region
