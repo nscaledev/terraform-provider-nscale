@@ -98,6 +98,14 @@ func (s *NetworkDataSource) Schema(ctx context.Context, request datasource.Schem
 				MarkdownDescription: "The CIDR block assigned to the network.",
 				Computed:            true,
 			},
+			"storage_prefix_length": schema.Int32Attribute{
+				MarkdownDescription: "The prefix length to reserve for storage starting at.",
+				Computed:            true,
+			},
+			"non_storage_prefix_length": schema.Int32Attribute{
+				MarkdownDescription: "Non-storage prefix length to reserve from the storage reservation, for virtual IPs etc.",
+				Computed:            true,
+			},
 			"tags": schema.MapAttribute{
 				MarkdownDescription: "A map of tags assigned to the network.",
 				ElementType:         types.StringType,

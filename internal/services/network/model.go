@@ -30,15 +30,17 @@ import (
 )
 
 type NetworkModel struct {
-	ID             types.String `tfsdk:"id"`
-	Name           types.String `tfsdk:"name"`
-	Description    types.String `tfsdk:"description"`
-	DNSNameservers types.List   `tfsdk:"dns_nameservers"`
-	Routes         types.List   `tfsdk:"routes"`
-	CIDRBlock      types.String `tfsdk:"cidr_block"`
-	Tags           types.Map    `tfsdk:"tags"`
-	RegionID       types.String `tfsdk:"region_id"`
-	CreationTime   types.String `tfsdk:"creation_time"`
+	ID                     types.String `tfsdk:"id"`
+	Name                   types.String `tfsdk:"name"`
+	Description            types.String `tfsdk:"description"`
+	DNSNameservers         types.List   `tfsdk:"dns_nameservers"`
+	Routes                 types.List   `tfsdk:"routes"`
+	CIDRBlock              types.String `tfsdk:"cidr_block"`
+	StoragePrefixLength    types.Int32  `tfsdk:"storage_prefix_length"`
+	NonStoragePrefixLength types.Int32  `tfsdk:"non_storage_prefix_length"`
+	Tags                   types.Map    `tfsdk:"tags"`
+	RegionID               types.String `tfsdk:"region_id"`
+	CreationTime           types.String `tfsdk:"creation_time"`
 }
 
 func NewNetworkModel(source *regionapi.NetworkV2Read) NetworkModel {
@@ -95,6 +97,18 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID, projectID strin
 		nonEmptyRoutes = &routes
 	}
 
+	var reservations *regionapi.NetworkReservations
+	if !m.StoragePrefixLength.IsNull() {
+		reservations = &regionapi.NetworkReservations{
+			PrefixLength: int(m.StoragePrefixLength.ValueInt32()),
+		}
+
+		if !m.NonStoragePrefixLength.IsNull() {
+			value := int(m.NonStoragePrefixLength.ValueInt32())
+			reservations.NonStoragePrefixLength = &value
+		}
+	}
+
 	network := regionapi.NetworkV2Create{
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
@@ -105,6 +119,7 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID, projectID strin
 			DnsNameservers: dnsNameservers,
 			OrganizationId: organizationID,
 			Prefix:         m.CIDRBlock.ValueString(),
+			Reservations:   reservations,
 			ProjectId:      projectID,
 			RegionId:       m.RegionID.ValueString(),
 			Routes:         nonEmptyRoutes,
@@ -142,6 +157,18 @@ func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, d
 		nonEmptyRoutes = &routes
 	}
 
+	var reservations *regionapi.NetworkReservations
+	if !m.StoragePrefixLength.IsNull() {
+		reservations = &regionapi.NetworkReservations{
+			PrefixLength: int(m.StoragePrefixLength.ValueInt32()),
+		}
+
+		if !m.NonStoragePrefixLength.IsNull() {
+			value := int(m.NonStoragePrefixLength.ValueInt32())
+			reservations.NonStoragePrefixLength = &value
+		}
+	}
+
 	network := regionapi.NetworkV2Update{
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
@@ -151,6 +178,7 @@ func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, d
 		Spec: regionapi.NetworkV2Spec{
 			DnsNameservers: dnsNameservers,
 			Routes:         nonEmptyRoutes,
+			Reservations:   reservations,
 		},
 	}
 
