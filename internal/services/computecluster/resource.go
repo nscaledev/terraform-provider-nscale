@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
@@ -45,6 +46,11 @@ var (
 	_ resource.ResourceWithConfigure   = &ComputeClusterResource{}
 	_ resource.ResourceWithImportState = &ComputeClusterResource{}
 )
+
+type ComputeClusterResourceModel struct {
+	ComputeClusterModel
+	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
+}
 
 type ComputeClusterResource struct {
 	client *nscale.Client
@@ -270,17 +276,24 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 				},
 			},
 		},
+		Blocks: map[string]schema.Block{
+			"timeouts": tftimeouts.Block(ctx, tftimeouts.Opts{
+				Create: true,
+				Update: true,
+				Delete: true,
+			}),
+		},
 	}
 }
 
-func (r *ComputeClusterResource) setDefaultRegionID(data *ComputeClusterModel) {
+func (r *ComputeClusterResource) setDefaultRegionID(data *ComputeClusterResourceModel) {
 	if data.RegionID.ValueString() == "" {
 		data.RegionID = types.StringValue(r.client.RegionID)
 	}
 }
 
 func (r *ComputeClusterResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[ComputeClusterModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -312,7 +325,7 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 		return
 	}
 
-	data = NewComputeClusterModel(computeCluster)
+	data.ComputeClusterModel = NewComputeClusterModel(computeCluster)
 	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -327,17 +340,17 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 		},
 	}
 
-	computeCluster, ok := stateWatcher.Wait(ctx, response)
+	computeCluster, ok := stateWatcher.Wait(ctx, data.Timeouts, response)
 	if !ok {
 		return
 	}
 
-	data = NewComputeClusterModel(computeCluster)
+	data.ComputeClusterModel = NewComputeClusterModel(computeCluster)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *ComputeClusterResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[ComputeClusterModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -356,12 +369,12 @@ func (r *ComputeClusterResource) Read(ctx context.Context, request resource.Read
 		return
 	}
 
-	data = NewComputeClusterModel(computeCluster)
+	data.ComputeClusterModel = NewComputeClusterModel(computeCluster)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *ComputeClusterResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[ComputeClusterModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -402,17 +415,17 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 		},
 	}
 
-	computeCluster, ok := stateWatcher.Wait(ctx, operationTagKey, response)
+	computeCluster, ok := stateWatcher.Wait(ctx, operationTagKey, data.Timeouts, response)
 	if !ok {
 		return
 	}
 
-	data = NewComputeClusterModel(computeCluster)
+	data.ComputeClusterModel = NewComputeClusterModel(computeCluster)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	data, diagnostics := nscale.ReadTerraformState[ComputeClusterModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -448,5 +461,5 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 		},
 	}
 
-	stateWatcher.Wait(ctx, response)
+	stateWatcher.Wait(ctx, data.Timeouts, response)
 }

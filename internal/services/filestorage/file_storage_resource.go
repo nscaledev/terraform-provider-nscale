@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -39,6 +40,11 @@ var (
 	_ resource.ResourceWithConfigure   = &FileStorageResource{}
 	_ resource.ResourceWithImportState = &FileStorageResource{}
 )
+
+type FileStorageResourceModel struct {
+	FileStorageModel
+	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
+}
 
 type FileStorageResource struct {
 	client *nscale.Client
@@ -149,18 +155,23 @@ func (r *FileStorageResource) Schema(ctx context.Context, request resource.Schem
 					},
 				},
 			},
+			"timeouts": tftimeouts.Block(ctx, tftimeouts.Opts{
+				Create: true,
+				Update: true,
+				Delete: true,
+			}),
 		},
 	}
 }
 
-func (r *FileStorageResource) setDefaultRegionID(data *FileStorageModel) {
+func (r *FileStorageResource) setDefaultRegionID(data *FileStorageResourceModel) {
 	if data.RegionID.ValueString() == "" {
 		data.RegionID = types.StringValue(r.client.RegionID)
 	}
 }
 
 func (r *FileStorageResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[FileStorageModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -191,7 +202,7 @@ func (r *FileStorageResource) Create(ctx context.Context, request resource.Creat
 		return
 	}
 
-	data = NewFileStorageModel(fileStorage)
+	data.FileStorageModel = NewFileStorageModel(fileStorage)
 	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -206,17 +217,17 @@ func (r *FileStorageResource) Create(ctx context.Context, request resource.Creat
 		},
 	}
 
-	fileStorage, ok := stateWatcher.Wait(ctx, response)
+	fileStorage, ok := stateWatcher.Wait(ctx, data.Timeouts, response)
 	if !ok {
 		return
 	}
 
-	data = NewFileStorageModel(fileStorage)
+	data.FileStorageModel = NewFileStorageModel(fileStorage)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *FileStorageResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[FileStorageModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -235,12 +246,12 @@ func (r *FileStorageResource) Read(ctx context.Context, request resource.ReadReq
 		return
 	}
 
-	data = NewFileStorageModel(fileStorage)
+	data.FileStorageModel = NewFileStorageModel(fileStorage)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *FileStorageResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[FileStorageModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -282,17 +293,17 @@ func (r *FileStorageResource) Update(ctx context.Context, request resource.Updat
 		},
 	}
 
-	fileStorage, ok := stateWatcher.Wait(ctx, operationTagKey, response)
+	fileStorage, ok := stateWatcher.Wait(ctx, operationTagKey, data.Timeouts, response)
 	if !ok {
 		return
 	}
 
-	data = NewFileStorageModel(fileStorage)
+	data.FileStorageModel = NewFileStorageModel(fileStorage)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *FileStorageResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	data, diagnostics := nscale.ReadTerraformState[FileStorageModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -328,5 +339,5 @@ func (r *FileStorageResource) Delete(ctx context.Context, request resource.Delet
 		},
 	}
 
-	stateWatcher.Wait(ctx, response)
+	stateWatcher.Wait(ctx, data.Timeouts, response)
 }

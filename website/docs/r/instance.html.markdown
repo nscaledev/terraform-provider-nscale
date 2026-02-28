@@ -76,6 +76,7 @@ resource "nscale_instance" "example" {
 - `network_interface` (Block, Optional) The network interface configuration of the instance. (see [below for nested schema](#nestedblock--network_interface))
 - `region_id` (String) The identifier of the region where the instance is provisioned. If not specified, this defaults to the region ID configured in the provider.
 - `tags` (Map of String) A map of tags assigned to the instance.
+- `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 - `user_data` (String) The data to pass to the instance at boot time.
 
 ### Read-Only
@@ -98,3 +99,13 @@ Optional:
 - `allowed_destinations` (List of String) A list of CIDR blocks that are allowed to egress from the instance without SNAT.
 - `enable_public_ip` (Boolean) Whether the instance should have a public IP.
 - `security_group_ids` (List of String) A list of security group identifiers to associate with the instance.
+
+
+<a id="nestedblock--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+- `delete` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.
+- `update` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).

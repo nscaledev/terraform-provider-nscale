@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -24,6 +25,11 @@ var (
 	_ resource.ResourceWithConfigure   = &NetworkResource{}
 	_ resource.ResourceWithImportState = &NetworkResource{}
 )
+
+type NetworkResourceModel struct {
+	NetworkModel
+	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
+}
 
 type NetworkResource struct {
 	client *nscale.Client
@@ -140,17 +146,24 @@ func (r *NetworkResource) Schema(ctx context.Context, request resource.SchemaReq
 				},
 			},
 		},
+		Blocks: map[string]schema.Block{
+			"timeouts": tftimeouts.Block(ctx, tftimeouts.Opts{
+				Create: true,
+				Update: true,
+				Delete: true,
+			}),
+		},
 	}
 }
 
-func (r *NetworkResource) setDefaultRegionID(data *NetworkModel) {
+func (r *NetworkResource) setDefaultRegionID(data *NetworkResourceModel) {
 	if data.RegionID.ValueString() == "" {
 		data.RegionID = types.StringValue(r.client.RegionID)
 	}
 }
 
 func (r *NetworkResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -181,7 +194,7 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 		return
 	}
 
-	data = NewNetworkModel(network)
+	data.NetworkModel = NewNetworkModel(network)
 	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -196,17 +209,17 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 		},
 	}
 
-	network, ok := stateWatcher.Wait(ctx, response)
+	network, ok := stateWatcher.Wait(ctx, data.Timeouts, response)
 	if !ok {
 		return
 	}
 
-	data = NewNetworkModel(network)
+	data.NetworkModel = NewNetworkModel(network)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *NetworkResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -225,12 +238,12 @@ func (r *NetworkResource) Read(ctx context.Context, request resource.ReadRequest
 		return
 	}
 
-	data = NewNetworkModel(network)
+	data.NetworkModel = NewNetworkModel(network)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -272,17 +285,17 @@ func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateReq
 		},
 	}
 
-	network, ok := stateWatcher.Wait(ctx, operationTagKey, response)
+	network, ok := stateWatcher.Wait(ctx, operationTagKey, data.Timeouts, response)
 	if !ok {
 		return
 	}
 
-	data = NewNetworkModel(network)
+	data.NetworkModel = NewNetworkModel(network)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -318,5 +331,5 @@ func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteReq
 		},
 	}
 
-	stateWatcher.Wait(ctx, response)
+	stateWatcher.Wait(ctx, data.Timeouts, response)
 }
