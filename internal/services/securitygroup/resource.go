@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -41,6 +42,11 @@ var (
 	_ resource.ResourceWithConfigure   = &SecurityGroupResource{}
 	_ resource.ResourceWithImportState = &SecurityGroupResource{}
 )
+
+type SecurityGroupResourceModel struct {
+	SecurityGroupModel
+	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
+}
 
 type SecurityGroupResource struct {
 	client *nscale.Client
@@ -163,17 +169,24 @@ func (r *SecurityGroupResource) Schema(ctx context.Context, request resource.Sch
 				},
 			},
 		},
+		Blocks: map[string]schema.Block{
+			"timeouts": tftimeouts.Block(ctx, tftimeouts.Opts{
+				Create: true,
+				Update: true,
+				Delete: true,
+			}),
+		},
 	}
 }
 
-func (r *SecurityGroupResource) setDefaultRegionID(data *SecurityGroupModel) {
+func (r *SecurityGroupResource) setDefaultRegionID(data *SecurityGroupResourceModel) {
 	if data.RegionID.ValueString() == "" {
 		data.RegionID = types.StringValue(r.client.RegionID)
 	}
 }
 
 func (r *SecurityGroupResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[SecurityGroupModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -204,7 +217,7 @@ func (r *SecurityGroupResource) Create(ctx context.Context, request resource.Cre
 		return
 	}
 
-	data = NewSecurityGroupModel(securityGroup)
+	data.SecurityGroupModel = NewSecurityGroupModel(securityGroup)
 	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -219,17 +232,17 @@ func (r *SecurityGroupResource) Create(ctx context.Context, request resource.Cre
 		},
 	}
 
-	securityGroup, ok := stateWatcher.Wait(ctx, response)
+	securityGroup, ok := stateWatcher.Wait(ctx, data.Timeouts, response)
 	if !ok {
 		return
 	}
 
-	data = NewSecurityGroupModel(securityGroup)
+	data.SecurityGroupModel = NewSecurityGroupModel(securityGroup)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *SecurityGroupResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[SecurityGroupModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -248,12 +261,12 @@ func (r *SecurityGroupResource) Read(ctx context.Context, request resource.ReadR
 		return
 	}
 
-	data = NewSecurityGroupModel(securityGroup)
+	data.SecurityGroupModel = NewSecurityGroupModel(securityGroup)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *SecurityGroupResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[SecurityGroupModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -295,17 +308,17 @@ func (r *SecurityGroupResource) Update(ctx context.Context, request resource.Upd
 		},
 	}
 
-	securityGroup, ok := stateWatcher.Wait(ctx, operationTagKey, response)
+	securityGroup, ok := stateWatcher.Wait(ctx, operationTagKey, data.Timeouts, response)
 	if !ok {
 		return
 	}
 
-	data = NewSecurityGroupModel(securityGroup)
+	data.SecurityGroupModel = NewSecurityGroupModel(securityGroup)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	data, diagnostics := nscale.ReadTerraformState[SecurityGroupModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -341,5 +354,5 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 		},
 	}
 
-	stateWatcher.Wait(ctx, response)
+	stateWatcher.Wait(ctx, data.Timeouts, response)
 }

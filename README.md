@@ -22,7 +22,7 @@ terraform {
     nscale = {
       source = "nscaledev/nscale"
       # Check the Terraform Registry or GitHub Releases for the latest version.
-      # version = "~> 0.0.2"
+      # version = "~> 0.0.8"
     }
   }
 }
