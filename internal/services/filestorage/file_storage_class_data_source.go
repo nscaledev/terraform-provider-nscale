@@ -95,7 +95,7 @@ func (r *FileStorageClassDataSource) setDefaultRegionID(data *FileStorageClassMo
 }
 
 func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[FileStorageClassModel](ctx, request.Config.Get)
+	data, diagnostics := nscale.ReadTerraformState[FileStorageClassModel](ctx, request.Config.Get, s.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
