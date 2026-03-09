@@ -77,6 +77,7 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, response *resource.Cre
 		Timeout: 30 * time.Minute,
 		Pending: []string{
 			string(coreapi.ResourceProvisioningStatusProvisioning),
+			string(coreapi.ResourceProvisioningStatusPending),
 			string(coreapi.ResourceProvisioningStatusUnknown),
 		},
 		Target: []string{
