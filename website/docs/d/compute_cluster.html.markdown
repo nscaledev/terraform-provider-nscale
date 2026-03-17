@@ -7,6 +7,8 @@ description: |-
 
 # Data Source: nscale_compute_cluster
 
+!> **Deprecated:** This data source is deprecated and will be removed in a future release.
+
 Retrieves information about an existing compute cluster by its unique identifier.
 
 ## Example Usage

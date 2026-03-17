@@ -81,6 +81,7 @@ func (r *ComputeClusterResource) Metadata(ctx context.Context, request resource.
 
 func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
 	response.Schema = schema.Schema{
+		DeprecationMessage:  "The nscale_compute_cluster resource is deprecated and will be removed in a future release. Consider using the nscale_instance resource for more flexible configuration.",
 		MarkdownDescription: "Nscale Compute Cluster",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{

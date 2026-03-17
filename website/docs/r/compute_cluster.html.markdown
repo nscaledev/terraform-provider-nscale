@@ -7,6 +7,9 @@ description: |-
 
 # Resource: nscale_compute_cluster
 
+!> **Deprecated:** This resource is deprecated and will be removed in a future release. Consider using the
+`nscale_instance` resource for more flexible configuration.
+
 Compute clusters provide managed groups of machines organized into workload pools, where each pool can have distinct
 configurations for flavor, image, replica count, and networking. Workload pools support autoscaling through replica
 configuration, custom firewall rules for traffic control, public IP assignment, and user data for cloud-init
