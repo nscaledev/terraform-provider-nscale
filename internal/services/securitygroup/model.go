@@ -184,7 +184,7 @@ func (m *SecurityGroupRuleModel) NscaleSecurityGroupRule() regionapi.SecurityGro
 	var portMax *int
 	if value := m.ToPort.ValueInt32Pointer(); value != nil {
 		temp := int(*value)
-		port = &temp
+		portMax = &temp
 	}
 
 	return regionapi.SecurityGroupRuleV2{
