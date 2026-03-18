@@ -71,7 +71,7 @@ type InstanceFlavorGPUModel struct {
 
 func NewInstanceFlavorGPUModel(source *regionapi.GpuSpec) types.Object {
 	return types.ObjectValueMust(
-		InstanceNetworkInterfaceModelAttributeType.AttrTypes,
+		InstanceFlavorGPUModelAttributeType.AttrTypes,
 		map[string]attr.Value{
 			"vendor":         types.StringValue(string(source.Vendor)),
 			"model":          types.StringValue(source.Model),

@@ -139,7 +139,7 @@ func (s *InstanceFlavorDataSource) Read(ctx context.Context, request datasource.
 
 	regionID := data.RegionID.ValueString()
 
-	flavorListResponse, err := s.client.Region.GetApiV1OrganizationsOrganizationIDRegionsRegionIDFlavors(ctx, s.client.OrganizationID, regionID)
+	flavorListResponse, err := s.client.Compute.GetApiV1OrganizationsOrganizationIDRegionsRegionIDFlavors(ctx, s.client.OrganizationID, regionID)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Instance Flavor",
