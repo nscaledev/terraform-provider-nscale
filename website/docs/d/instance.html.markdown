@@ -34,6 +34,7 @@ data "nscale_instance" "example" {
 - `network_interface` (Block, Read-only) The network interface configuration of the instance. (see [below for nested schema](#nestedblock--network_interface))
 - `power_state` (String) The power state of the instance.
 - `private_ip` (String) The private IP address assigned to the instance.
+- `project_id` (String) The identifier of the project where the instance is provisioned.
 - `public_ip` (String) The public IP address assigned to the instance.
 - `region_id` (String) The identifier of the region where the instance is provisioned.
 - `tags` (Map of String) A map of tags assigned to the instance.

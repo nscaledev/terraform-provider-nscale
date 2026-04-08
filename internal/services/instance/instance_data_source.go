@@ -102,6 +102,10 @@ func (s *InstanceDataSource) Schema(ctx context.Context, request datasource.Sche
 				ElementType:         types.StringType,
 				Computed:            true,
 			},
+			"project_id": schema.StringAttribute{
+				MarkdownDescription: "The identifier of the project where the instance is provisioned.",
+				Computed:            true,
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the instance is provisioned.",
 				Computed:            true,

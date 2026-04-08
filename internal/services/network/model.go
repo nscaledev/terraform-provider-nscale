@@ -37,6 +37,7 @@ type NetworkModel struct {
 	Routes         types.List   `tfsdk:"routes"`
 	CIDRBlock      types.String `tfsdk:"cidr_block"`
 	Tags           types.Map    `tfsdk:"tags"`
+	ProjectID      types.String `tfsdk:"project_id"`
 	RegionID       types.String `tfsdk:"region_id"`
 	CreationTime   types.String `tfsdk:"creation_time"`
 }
@@ -62,12 +63,13 @@ func NewNetworkModel(source *regionapi.NetworkV2Read) NetworkModel {
 		Routes:         routes,
 		CIDRBlock:      types.StringValue(source.Status.Prefix),
 		Tags:           tftypes.TagMapValueMust(tags),
+		ProjectID:      types.StringValue(source.Metadata.ProjectId),
 		RegionID:       types.StringValue(source.Status.RegionId),
 		CreationTime:   types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
 	}
 }
 
-func (m *NetworkModel) NscaleNetworkCreateParams(organizationID, projectID string) (regionapi.NetworkV2Create, diag.Diagnostics) {
+func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regionapi.NetworkV2Create, diag.Diagnostics) {
 	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.NetworkV2Create{}, diagnostics
@@ -105,7 +107,7 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID, projectID strin
 			DnsNameservers: dnsNameservers,
 			OrganizationId: organizationID,
 			Prefix:         m.CIDRBlock.ValueString(),
-			ProjectId:      projectID,
+			ProjectId:      m.ProjectID.ValueString(),
 			RegionId:       m.RegionID.ValueString(),
 			Routes:         nonEmptyRoutes,
 		},

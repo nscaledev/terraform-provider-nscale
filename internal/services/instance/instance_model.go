@@ -43,6 +43,7 @@ type InstanceModel struct {
 	ImageID          types.String `tfsdk:"image_id"`
 	FlavorID         types.String `tfsdk:"flavor_id"`
 	Tags             types.Map    `tfsdk:"tags"`
+	ProjectID        types.String `tfsdk:"project_id"`
 	RegionID         types.String `tfsdk:"region_id"`
 	CreationTime     types.String `tfsdk:"creation_time"`
 }
@@ -72,12 +73,13 @@ func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
 		ImageID:          types.StringValue(source.Spec.ImageId),
 		FlavorID:         types.StringValue(source.Spec.FlavorId),
 		Tags:             tftypes.TagMapValueMust(tags),
+		ProjectID:        types.StringValue(source.Metadata.ProjectId),
 		RegionID:         types.StringValue(source.Status.RegionId),
 		CreationTime:     types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
 	}
 }
 
-func (m *InstanceModel) NscaleInstanceCreateParams(organizationID, projectID string) (computeapi.InstanceCreate, diag.Diagnostics) {
+func (m *InstanceModel) NscaleInstanceCreateParams(organizationID string) (computeapi.InstanceCreate, diag.Diagnostics) {
 	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return computeapi.InstanceCreate{}, diagnostics
@@ -113,7 +115,7 @@ func (m *InstanceModel) NscaleInstanceCreateParams(organizationID, projectID str
 			NetworkId:      sourceNetworkInterface.NetworkID.ValueString(),
 			Networking:     &networking,
 			OrganizationId: organizationID,
-			ProjectId:      projectID,
+			ProjectId:      m.ProjectID.ValueString(),
 			UserData:       userData,
 		},
 	}
