@@ -56,6 +56,7 @@ resource "nscale_security_group" "example" {
 - `region_id` (String) The identifier of the region where the security group is provisioned. If not specified, this defaults to the region ID configured in the provider.
 - `rules` (Attributes List) A list of rules for the security group. (see [below for nested schema](#nestedatt--rules))
 - `tags` (Map of String) A map of tags assigned to the security group.
+- `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
 
@@ -75,3 +76,13 @@ Optional:
 - `cidr_block` (String) The CIDR block for the security group rule. Default is `0.0.0.0/0`, which allows traffic from any IP address.
 - `from_port` (Number) The starting port of the port range for the security group rule.
 - `to_port` (Number) The ending port of the port range for the security group rule.
+
+
+<a id="nestedblock--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+- `delete` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.
+- `update` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).

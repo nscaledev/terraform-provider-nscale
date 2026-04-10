@@ -41,6 +41,7 @@ resource "nscale_network" "example" {
 - `region_id` (String) The identifier of the region where the network is provisioned. If not specified, this defaults to the region ID configured in the provider.
 - `routes` (Attributes List) A list of routes for the network. (see [below for nested schema](#nestedatt--routes))
 - `tags` (Map of String) A map of tags assigned to the network.
+- `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
 
@@ -54,3 +55,13 @@ Required:
 
 - `destination` (String) The destination CIDR block for the route.
 - `nexthop` (String) The next-hop address for the route.
+
+
+<a id="nestedblock--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+- `delete` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.
+- `update` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
