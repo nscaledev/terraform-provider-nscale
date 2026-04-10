@@ -94,6 +94,10 @@ func (s *FileStorageDataSource) Schema(ctx context.Context, request datasource.S
 				ElementType:         types.StringType,
 				Computed:            true,
 			},
+			"project_id": schema.StringAttribute{
+				MarkdownDescription: "The identifier of the project where the file storage is provisioned.",
+				Computed:            true,
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the file storage is provisioned.",
 				Computed:            true,

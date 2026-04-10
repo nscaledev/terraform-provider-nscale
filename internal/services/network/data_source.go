@@ -103,6 +103,10 @@ func (s *NetworkDataSource) Schema(ctx context.Context, request datasource.Schem
 				ElementType:         types.StringType,
 				Computed:            true,
 			},
+			"project_id": schema.StringAttribute{
+				MarkdownDescription: "The identifier of the project where the network is provisioned.",
+				Computed:            true,
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the network is provisioned.",
 				Computed:            true,

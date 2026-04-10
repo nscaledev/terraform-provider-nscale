@@ -74,6 +74,7 @@ resource "nscale_instance" "example" {
 
 - `description` (String) The description of the instance.
 - `network_interface` (Block, Optional) The network interface configuration of the instance. (see [below for nested schema](#nestedblock--network_interface))
+- `project_id` (String) The identifier of the project where the instance is provisioned. If not specified, this defaults to the project ID configured in the provider.
 - `region_id` (String) The identifier of the region where the instance is provisioned. If not specified, this defaults to the region ID configured in the provider.
 - `tags` (Map of String) A map of tags assigned to the instance.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))

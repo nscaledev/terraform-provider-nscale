@@ -133,6 +133,11 @@ func (r *NetworkResource) Schema(ctx context.Context, request resource.SchemaReq
 					mapvalidator.KeysAre(validators.NoReservedPrefix(nscale.TerraformOperationTagPrefix)),
 				},
 			},
+			"project_id": schema.StringAttribute{
+				MarkdownDescription: "The identifier of the project where the network is provisioned. If not specified, this defaults to the project ID configured in the provider.",
+				Optional:            true,
+				Computed:            true,
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the network is provisioned. If not specified, this defaults to the region ID configured in the provider.",
 				Optional:            true,
@@ -156,20 +161,23 @@ func (r *NetworkResource) Schema(ctx context.Context, request resource.SchemaReq
 	}
 }
 
-func (r *NetworkResource) setDefaultRegionID(data *NetworkResourceModel) {
+func (r *NetworkResource) setDefaultIDs(data *NetworkResourceModel) {
+	if data.ProjectID.ValueString() == "" {
+		data.ProjectID = types.StringValue(r.client.ProjectID)
+	}
 	if data.RegionID.ValueString() == "" {
 		data.RegionID = types.StringValue(r.client.RegionID)
 	}
 }
 
 func (r *NetworkResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.Plan.Get, r.setDefaultIDs)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
-	params, diagnostics := data.NscaleNetworkCreateParams(r.client.OrganizationID, r.client.ProjectID)
+	params, diagnostics := data.NscaleNetworkCreateParams(r.client.OrganizationID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -219,7 +227,7 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 }
 
 func (r *NetworkResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.State.Get, r.setDefaultIDs)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -243,7 +251,7 @@ func (r *NetworkResource) Read(ctx context.Context, request resource.ReadRequest
 }
 
 func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.Plan.Get, r.setDefaultIDs)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -295,7 +303,7 @@ func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateReq
 }
 
 func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.State.Get, r.setDefaultIDs)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return

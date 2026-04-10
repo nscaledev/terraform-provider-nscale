@@ -39,6 +39,7 @@ type FileStorageModel struct {
 	RootSquash     types.Bool   `tfsdk:"root_squash"`
 	Network        types.List   `tfsdk:"network"`
 	Tags           types.Map    `tfsdk:"tags"`
+	ProjectID      types.String `tfsdk:"project_id"`
 	RegionID       types.String `tfsdk:"region_id"`
 	CreationTime   types.String `tfsdk:"creation_time"`
 }
@@ -71,6 +72,7 @@ func NewFileStorageModel(source *regionapi.StorageV2Read) FileStorageModel {
 		RootSquash:     rootSquash,
 		Network:        networks,
 		Tags:           tftypes.TagMapValueMust(tags),
+		ProjectID:      types.StringValue(source.Metadata.ProjectId),
 		RegionID:       types.StringValue(source.Status.RegionId),
 		CreationTime:   types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
 	}
@@ -90,7 +92,7 @@ func (m *FileStorageModel) networkIDs() ([]string, diag.Diagnostics) {
 	return networkIDs, nil
 }
 
-func (m *FileStorageModel) NscaleFileStorageCreateParams(organizationID, projectID string) (regionapi.StorageV2Create, diag.Diagnostics) {
+func (m *FileStorageModel) NscaleFileStorageCreateParams(organizationID string) (regionapi.StorageV2Create, diag.Diagnostics) {
 	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Create{}, diagnostics
@@ -122,7 +124,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(organizationID, project
 				NetworkIds: networkIDs,
 			},
 			OrganizationId: organizationID,
-			ProjectId:      projectID,
+			ProjectId:      m.ProjectID.ValueString(),
 			RegionId:       m.RegionID.ValueString(),
 			SizeGiB:        m.Capacity.ValueInt64(),
 			StorageClassId: m.StorageClassID.ValueString(),

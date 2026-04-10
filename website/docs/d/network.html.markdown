@@ -31,6 +31,7 @@ data "nscale_network" "example" {
 - `description` (String) The description of the network.
 - `dns_nameservers` (List of String) A list of DNS nameservers associated with the network.
 - `name` (String) The name of the network.
+- `project_id` (String) The identifier of the project where the network is provisioned.
 - `region_id` (String) The identifier of the region where the network is provisioned.
 - `routes` (Attributes List) A list of routes associated with the network. (see [below for nested schema](#nestedatt--routes))
 - `tags` (Map of String) A map of tags assigned to the network.

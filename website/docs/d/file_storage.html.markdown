@@ -31,6 +31,7 @@ data "nscale_file_storage" "example" {
 - `description` (String) The description of the file storage.
 - `name` (String) The name of the file storage.
 - `network` (Block List) The network to which the file storage is attached. (see [below for nested schema](#nestedblock--network))
+- `project_id` (String) The identifier of the project where the file storage is provisioned.
 - `region_id` (String) The identifier of the region where the file storage is provisioned.
 - `root_squash` (Boolean) Indicates whether root squashing is enabled for the file storage.
 - `size` (Number) The amount of storage currently used, in gibibytes.
