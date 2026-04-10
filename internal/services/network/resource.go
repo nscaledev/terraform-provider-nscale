@@ -123,6 +123,12 @@ func (r *NetworkResource) Schema(ctx context.Context, request resource.SchemaReq
 			"cidr_block": schema.StringAttribute{
 				MarkdownDescription: "The CIDR block assigned to the network.",
 				Required:            true,
+				Validators: []validator.String{
+					validators.CIDRValidator{},
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"tags": schema.MapAttribute{
 				MarkdownDescription: "A map of tags assigned to the network.",
@@ -137,11 +143,19 @@ func (r *NetworkResource) Schema(ctx context.Context, request resource.SchemaReq
 				MarkdownDescription: "The identifier of the project where the network is provisioned. If not specified, this defaults to the project ID configured in the provider.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplaceIfConfigured(),
+				},
 			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the network is provisioned. If not specified, this defaults to the region ID configured in the provider.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplaceIfConfigured(),
+				},
 			},
 			"creation_time": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the network was created.",

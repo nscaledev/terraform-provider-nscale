@@ -32,7 +32,6 @@ resource "nscale_security_group" "example" {
   ]
 
   network_id = nscale_network.example.id
-  region_id  = data.nscale_region.glo1.id
 }
 
 data "nscale_instance_flavor" "g_4_standard_40s" {
@@ -51,5 +50,4 @@ resource "nscale_instance" "example" {
 
   image_id  = "<image-id>"
   flavor_id = data.nscale_instance_flavor.g_4_standard_40s.id
-  region_id = data.nscale_region.glo1.id
 }

@@ -146,6 +146,9 @@ func (r *SecurityGroupResource) Schema(ctx context.Context, request resource.Sch
 			"network_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the network to where the security group is attached.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"tags": schema.MapAttribute{
 				MarkdownDescription: "A map of tags assigned to the security group.",
@@ -157,9 +160,11 @@ func (r *SecurityGroupResource) Schema(ctx context.Context, request resource.Sch
 				},
 			},
 			"region_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the region where the security group is provisioned. If not specified, this defaults to the region ID configured in the provider.",
-				Optional:            true,
+				MarkdownDescription: "The identifier of the region where the security group is provisioned.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"creation_time": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the security group was created.",
@@ -179,14 +184,8 @@ func (r *SecurityGroupResource) Schema(ctx context.Context, request resource.Sch
 	}
 }
 
-func (r *SecurityGroupResource) setDefaultRegionID(data *SecurityGroupResourceModel) {
-	if data.RegionID.ValueString() == "" {
-		data.RegionID = types.StringValue(r.client.RegionID)
-	}
-}
-
 func (r *SecurityGroupResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.Plan.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -242,7 +241,7 @@ func (r *SecurityGroupResource) Create(ctx context.Context, request resource.Cre
 }
 
 func (r *SecurityGroupResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.State.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -266,7 +265,7 @@ func (r *SecurityGroupResource) Read(ctx context.Context, request resource.ReadR
 }
 
 func (r *SecurityGroupResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.Plan.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -318,7 +317,7 @@ func (r *SecurityGroupResource) Update(ctx context.Context, request resource.Upd
 }
 
 func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
+	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.State.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return

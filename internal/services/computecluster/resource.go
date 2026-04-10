@@ -264,6 +264,9 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 				MarkdownDescription: "The identifier of the region where the compute cluster is provisioned. If not specified, this defaults to the region ID configured in the provider.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"provisioning_status": schema.StringAttribute{
 				MarkdownDescription: "The provisioning status of the compute cluster.",

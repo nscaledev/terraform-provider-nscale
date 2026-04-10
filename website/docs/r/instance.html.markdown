@@ -75,7 +75,6 @@ resource "nscale_instance" "example" {
 - `description` (String) The description of the instance.
 - `network_interface` (Block, Optional) The network interface configuration of the instance. (see [below for nested schema](#nestedblock--network_interface))
 - `project_id` (String) The identifier of the project where the instance is provisioned. If not specified, this defaults to the project ID configured in the provider.
-- `region_id` (String) The identifier of the region where the instance is provisioned. If not specified, this defaults to the region ID configured in the provider.
 - `tags` (Map of String) A map of tags assigned to the instance.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 - `user_data` (String) The data to pass to the instance at boot time.
@@ -87,6 +86,7 @@ resource "nscale_instance" "example" {
 - `power_state` (String) The power state of the instance.
 - `private_ip` (String) The private IP address assigned to the instance.
 - `public_ip` (String) The public IP address assigned to the instance.
+- `region_id` (String) The identifier of the region where the instance is provisioned.
 
 <a id="nestedblock--network_interface"></a>
 ### Nested Schema for `network_interface`
