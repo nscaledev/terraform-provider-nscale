@@ -104,6 +104,9 @@ func (r *FileStorageResource) Schema(ctx context.Context, request resource.Schem
 			"storage_class_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the storage class used for the file storage.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"size": schema.Int64Attribute{
 				MarkdownDescription: "The amount of storage currently used, in gibibytes.",
@@ -130,11 +133,19 @@ func (r *FileStorageResource) Schema(ctx context.Context, request resource.Schem
 				MarkdownDescription: "The identifier of the project where the file storage is provisioned. If not specified, this defaults to the project ID configured in the provider.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplaceIfConfigured(),
+				},
 			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region where the file storage is provisioned. If not specified, this defaults to the region ID configured in the provider.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplaceIfConfigured(),
+				},
 			},
 			"creation_time": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the file storage was created.",

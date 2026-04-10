@@ -117,6 +117,9 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 			"private_ip": schema.StringAttribute{
 				MarkdownDescription: "The private IP address assigned to the instance.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"power_state": schema.StringAttribute{
 				MarkdownDescription: "The power state of the instance.",
@@ -143,11 +146,17 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 				MarkdownDescription: "The identifier of the project where the instance is provisioned. If not specified, this defaults to the project ID configured in the provider.",
 				Optional:            true,
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplaceIfConfigured(),
+				},
 			},
 			"region_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the region where the instance is provisioned. If not specified, this defaults to the region ID configured in the provider.",
-				Optional:            true,
+				MarkdownDescription: "The identifier of the region where the instance is provisioned.",
 				Computed:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"creation_time": schema.StringAttribute{
 				MarkdownDescription: "The timestamp when the instance was created.",
@@ -164,6 +173,9 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 					"network_id": schema.StringAttribute{
 						MarkdownDescription: "The identifier of the network to where the instance is provisioned.",
 						Required:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"enable_public_ip": schema.BoolAttribute{
 						MarkdownDescription: "Whether the instance should have a public IP.",
@@ -203,9 +215,6 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 func (r *InstanceResource) setDefaultIDs(data *InstanceResourceModel) {
 	if data.ProjectID.ValueString() == "" {
 		data.ProjectID = types.StringValue(r.client.ProjectID)
-	}
-	if data.RegionID.ValueString() == "" {
-		data.RegionID = types.StringValue(r.client.RegionID)
 	}
 }
 
