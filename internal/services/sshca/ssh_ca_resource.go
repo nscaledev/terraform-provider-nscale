@@ -109,12 +109,10 @@ func (r *SSHCertificateAuthorityResource) Schema(ctx context.Context, request re
 			},
 			"public_key": schema.StringAttribute{
 				MarkdownDescription: "The SSH CA public key in OpenSSH format (e.g. ssh-ed25519 AAAA...).",
-				Optional:            true,
-				Computed:            true,
+				Required:            true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
 					normalizeWhitespacePlanModifier{},
-					stringplanmodifier.RequiresReplaceIfConfigured(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"project_id": schema.StringAttribute{

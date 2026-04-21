@@ -32,8 +32,8 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/instance"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/region"
-	"github.com/nscaledev/terraform-provider-nscale/internal/services/sshca"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/securitygroup"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/sshca"
 	"github.com/nscaledev/terraform-provider-nscale/version"
 )
 

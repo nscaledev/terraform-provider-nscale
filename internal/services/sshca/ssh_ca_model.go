@@ -54,7 +54,7 @@ func (m *SSHCertificateAuthorityModel) NscaleSSHCACreateParams(organizationID st
 		Spec: regionapi.SshCertificateAuthorityV2CreateSpec{
 			OrganizationId: organizationID,
 			ProjectId:      m.ProjectID.ValueString(),
-			PublicKey:       strings.TrimSpace(m.PublicKey.ValueString()),
+			PublicKey:      strings.TrimSpace(m.PublicKey.ValueString()),
 		},
 	}
 }

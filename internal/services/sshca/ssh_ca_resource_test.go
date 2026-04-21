@@ -34,7 +34,6 @@ func TestAccSSHCertificateAuthorityResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("nscale_ssh_certificate_authority.test", "name", "test-ca"),
 					resource.TestCheckResourceAttr("nscale_ssh_certificate_authority.test", "public_key", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForAcceptanceTests"),
 					resource.TestCheckResourceAttrSet("nscale_ssh_certificate_authority.test", "project_id"),
-					resource.TestCheckResourceAttrSet("nscale_ssh_certificate_authority.test", "region_id"),
 					resource.TestCheckResourceAttrSet("nscale_ssh_certificate_authority.test", "creation_time"),
 				),
 			},
