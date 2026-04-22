@@ -14,7 +14,7 @@ Documentation for this provider is available on the [Terraform Registry](https:/
 
 ## Quick Start
 
-The provider is distributed via the Terraform Registry as `nscaledev/nscale`. Declare it in your `required_providers`block:
+The provider is distributed via the Terraform Registry as `nscaledev/nscale`. Declare it in your `required_providers` block:
 
 ```terraform
 terraform {

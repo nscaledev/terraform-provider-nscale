@@ -62,7 +62,7 @@ func (s *InstanceDataSource) Schema(ctx context.Context, request datasource.Sche
 		MarkdownDescription: "Nscale Instance",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "An unique identifier for the instance.",
+				MarkdownDescription: "A unique identifier for the instance.",
 				Required:            true,
 			},
 			"name": schema.StringAttribute{
@@ -120,7 +120,7 @@ func (s *InstanceDataSource) Schema(ctx context.Context, request datasource.Sche
 				MarkdownDescription: "The network interface configuration of the instance.",
 				Attributes: map[string]schema.Attribute{
 					"network_id": schema.StringAttribute{
-						MarkdownDescription: "The identifier of the network to where the instance is provisioned.",
+						MarkdownDescription: "The identifier of the network where the instance is provisioned.",
 						Computed:            true,
 					},
 					"enable_public_ip": schema.BoolAttribute{

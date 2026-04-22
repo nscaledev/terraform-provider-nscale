@@ -14,7 +14,7 @@ Retrieves information about an existing compute cluster by its unique identifier
 ## Example Usage
 
 ```hcl
-data "nscale_file_storage" "example" {
+data "nscale_compute_cluster" "example" {
   id = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
 }
 ```
@@ -24,7 +24,7 @@ data "nscale_file_storage" "example" {
 
 ### Required
 
-- `id` (String) An unique identifier for the compute cluster.
+- `id` (String) A unique identifier for the compute cluster.
 
 ### Read-Only
 

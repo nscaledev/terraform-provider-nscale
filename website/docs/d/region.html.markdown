@@ -22,7 +22,7 @@ data "nscale_region" "example" {
 
 ### Optional
 
-- `id` (String) An unique identifier for the region.
+- `id` (String) A unique identifier for the region.
 
 ### Read-Only
 

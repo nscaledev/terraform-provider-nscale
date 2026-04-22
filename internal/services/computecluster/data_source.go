@@ -63,7 +63,7 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 		MarkdownDescription: "Nscale Compute Cluster",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "An unique identifier for the compute cluster.",
+				MarkdownDescription: "A unique identifier for the compute cluster.",
 				Required:            true,
 			},
 			"name": schema.StringAttribute{

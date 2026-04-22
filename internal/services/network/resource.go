@@ -69,7 +69,7 @@ func (r *NetworkResource) Schema(ctx context.Context, request resource.SchemaReq
 		MarkdownDescription: "Nscale Network",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "An unique identifier for the network.",
+				MarkdownDescription: "A unique identifier for the network.",
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),

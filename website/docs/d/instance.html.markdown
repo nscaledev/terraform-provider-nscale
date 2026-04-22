@@ -1,5 +1,5 @@
 ---
-page_title: "Data Source: nscale_instance"
+page_title: "Nscale: nscale_instance"
 subcategory: ""
 description: |-
   Nscale Instance
@@ -22,7 +22,7 @@ data "nscale_instance" "example" {
 
 ### Required
 
-- `id` (String) An unique identifier for the instance.
+- `id` (String) A unique identifier for the instance.
 
 ### Read-Only
 
@@ -47,5 +47,5 @@ Read-Only:
 
 - `allowed_destinations` (List of String) A list of CIDR blocks that are allowed to egress from the instance without SNAT.
 - `enable_public_ip` (Boolean) Indicates whether the instance has a public IP.
-- `network_id` (String) The identifier of the network to where the instance is provisioned.
+- `network_id` (String) The identifier of the network where the instance is provisioned.
 - `security_group_ids` (List of String) A list of security group identifiers associated with the instance.

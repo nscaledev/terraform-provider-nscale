@@ -71,7 +71,7 @@ resource "nscale_compute_cluster" "example" {
 ### Read-Only
 
 - `creation_time` (String) The timestamp when the compute cluster was created.
-- `id` (String) An unique identifier for the compute cluster.
+- `id` (String) A unique identifier for the compute cluster.
 - `provisioning_status` (String) The provisioning status of the compute cluster.
 - `ssh_private_key` (String, Sensitive) The SSH private key for accessing the compute cluster.
 

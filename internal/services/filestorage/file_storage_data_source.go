@@ -62,7 +62,7 @@ func (s *FileStorageDataSource) Schema(ctx context.Context, request datasource.S
 		MarkdownDescription: "Nscale File Storage",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "An unique identifier for the file storage.",
+				MarkdownDescription: "A unique identifier for the file storage.",
 				Required:            true,
 			},
 			"name": schema.StringAttribute{

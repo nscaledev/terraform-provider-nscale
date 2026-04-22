@@ -66,7 +66,7 @@ resource "nscale_file_storage" "example" {
 ### Read-Only
 
 - `creation_time` (String) The timestamp when the file storage was created.
-- `id` (String) An unique identifier for the file storage.
+- `id` (String) A unique identifier for the file storage.
 - `size` (Number) The amount of storage currently used, in gibibytes.
 
 <a id="nestedblock--network"></a>

@@ -62,7 +62,7 @@ func (s *SecurityGroupDataSource) Schema(ctx context.Context, request datasource
 		MarkdownDescription: "Nscale Security Group",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "An unique identifier for the security group.",
+				MarkdownDescription: "A unique identifier for the security group.",
 				Required:            true,
 			},
 			"name": schema.StringAttribute{
@@ -102,7 +102,7 @@ func (s *SecurityGroupDataSource) Schema(ctx context.Context, request datasource
 				},
 			},
 			"network_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the network to where the security group is attached.",
+				MarkdownDescription: "The identifier of the network to which the security group is attached.",
 				Computed:            true,
 			},
 			"tags": schema.MapAttribute{
