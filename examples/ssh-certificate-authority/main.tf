@@ -14,7 +14,6 @@ resource "nscale_ssh_certificate_authority" "example" {
   public_key = file("/tmp/test_ca.pub")
 }
 
-# Look up the CA we just created by name
 data "nscale_ssh_certificate_authority" "lookup" {
-  name = nscale_ssh_certificate_authority.example.name
+  id = nscale_ssh_certificate_authority.example.id
 }

@@ -49,7 +49,7 @@ resource "nscale_ssh_certificate_authority" "test" {
 }
 
 data "nscale_ssh_certificate_authority" "test" {
-  name = nscale_ssh_certificate_authority.test.name
+  id = nscale_ssh_certificate_authority.test.id
 }
 `, name, publicKey)
 }

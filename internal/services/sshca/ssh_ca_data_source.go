@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
 
 var _ datasource.DataSourceWithConfigure = &SSHCertificateAuthorityDataSource{}
@@ -63,11 +62,11 @@ func (s *SSHCertificateAuthorityDataSource) Schema(ctx context.Context, request 
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				MarkdownDescription: "A unique identifier for the SSH certificate authority.",
-				Computed:            true,
+				Required:            true,
 			},
 			"name": schema.StringAttribute{
 				MarkdownDescription: "The name of the SSH certificate authority.",
-				Required:            true,
+				Computed:            true,
 			},
 			"description": schema.StringAttribute{
 				MarkdownDescription: "The description of the SSH certificate authority.",
@@ -96,46 +95,16 @@ func (s *SSHCertificateAuthorityDataSource) Read(ctx context.Context, request da
 		return
 	}
 
-	params := &regionapi.GetApiV2SshcertificateauthoritiesParams{
-		OrganizationID: &regionapi.OrganizationIDQueryParameter{
-			s.client.OrganizationID,
-		},
-		ProjectID: &regionapi.ProjectIDQueryParameter{
-			s.client.ProjectID,
-		},
-	}
-
-	listResponse, err := s.client.Region.GetApiV2Sshcertificateauthorities(ctx, params)
-	if err != nil {
-		response.Diagnostics.AddError(
-			"Failed to List SSH Certificate Authorities",
-			fmt.Sprintf("An error occurred while listing SSH certificate authorities: %s", err),
-		)
-		return
-	}
-
-	sshCAs, err := nscale.ReadJSONResponseValue[[]regionapi.SshCertificateAuthorityV2Read](listResponse)
+	sshCA, _, err := getSSHCA(ctx, data.ID.ValueString(), s.client)
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
-			"Failed to List SSH Certificate Authorities",
-			fmt.Sprintf("An error occurred while listing SSH certificate authorities: %s", err),
+			"Failed to Read SSH Certificate Authority",
+			fmt.Sprintf("An error occurred while retrieving the SSH certificate authority: %s", err),
 		)
 		return
 	}
 
-	name := data.Name.ValueString()
-
-	for _, sshCA := range sshCAs {
-		if sshCA.Metadata.Name == name {
-			data = NewSSHCertificateAuthorityModel(&sshCA)
-			response.Diagnostics.Append(response.State.Set(ctx, &data)...)
-			return
-		}
-	}
-
-	response.Diagnostics.AddError(
-		"SSH Certificate Authority Not Found",
-		fmt.Sprintf("An SSH certificate authority with name %q was not found.", name),
-	)
+	data = NewSSHCertificateAuthorityModel(sshCA)
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
