@@ -33,6 +33,7 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/region"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/securitygroup"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/sshca"
 	"github.com/nscaledev/terraform-provider-nscale/version"
 )
 
@@ -192,6 +193,7 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		instance.NewInstanceFlavorDataSource,
 		instance.NewInstanceDataSource,
 		instance.NewInstanceSSHKeyDataSource,
+		sshca.NewSSHCertificateAuthorityDataSource,
 		computecluster.NewComputeClusterDataSource,
 	}
 }
@@ -202,6 +204,7 @@ func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resourc
 		securitygroup.NewSecurityGroupResource,
 		filestorage.NewFileStorageResource,
 		instance.NewInstanceResource,
+		sshca.NewSSHCertificateAuthorityResource,
 		computecluster.NewComputeClusterResource,
 	}
 }

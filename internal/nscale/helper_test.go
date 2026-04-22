@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 )
@@ -62,7 +63,8 @@ func TestCreateStateWatcherWaitHandlesTransientProvisioningStates(t *testing.T) 
 
 			var response resource.CreateResponse
 
-			got, ok := watcher.Wait(ctx, &response)
+			var timeouts tftimeouts.Value
+			got, ok := watcher.Wait(ctx, timeouts, &response)
 			if !ok {
 				t.Fatalf("Wait() returned ok=false with diagnostics: %#v", response.Diagnostics)
 			}
