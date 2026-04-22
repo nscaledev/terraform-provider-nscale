@@ -86,7 +86,7 @@ func (r *SecurityGroupResource) Schema(ctx context.Context, request resource.Sch
 		MarkdownDescription: "Nscale Security Group",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "An unique identifier for the security group.",
+				MarkdownDescription: "A unique identifier for the security group.",
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -144,7 +144,7 @@ func (r *SecurityGroupResource) Schema(ctx context.Context, request resource.Sch
 				},
 			},
 			"network_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the network to where the security group is attached.",
+				MarkdownDescription: "The identifier of the network to which the security group is attached.",
 				Required:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),

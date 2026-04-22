@@ -62,7 +62,7 @@ func (s *NetworkDataSource) Schema(ctx context.Context, request datasource.Schem
 		MarkdownDescription: "Nscale Network",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "An unique identifier for the network.",
+				MarkdownDescription: "A unique identifier for the network.",
 				Required:            true,
 			},
 			"name": schema.StringAttribute{

@@ -84,7 +84,7 @@ func (r *FileStorageResource) Schema(ctx context.Context, request resource.Schem
 		MarkdownDescription: "Nscale File Storage",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "An unique identifier for the file storage.",
+				MarkdownDescription: "A unique identifier for the file storage.",
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),

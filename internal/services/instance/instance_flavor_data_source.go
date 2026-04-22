@@ -63,7 +63,7 @@ func (s *InstanceFlavorDataSource) Schema(ctx context.Context, request datasourc
 		MarkdownDescription: "Nscale Instance Flavor",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "An unique identifier for the instance flavor.",
+				MarkdownDescription: "A unique identifier for the instance flavor.",
 				Required:            true,
 			},
 			"name": schema.StringAttribute{

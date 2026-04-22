@@ -22,7 +22,7 @@ data "nscale_instance_flavor" "example" {
 
 ### Required
 
-- `id` (String) An unique identifier for the instance flavor.
+- `id` (String) A unique identifier for the instance flavor.
 
 ### Optional
 

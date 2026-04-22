@@ -48,7 +48,7 @@ resource "nscale_security_group" "example" {
 ### Required
 
 - `name` (String) The name of the security group.
-- `network_id` (String) The identifier of the network to where the security group is attached.
+- `network_id` (String) The identifier of the network to which the security group is attached.
 
 ### Optional
 
@@ -60,7 +60,7 @@ resource "nscale_security_group" "example" {
 ### Read-Only
 
 - `creation_time` (String) The timestamp when the security group was created.
-- `id` (String) An unique identifier for the security group.
+- `id` (String) A unique identifier for the security group.
 - `region_id` (String) The identifier of the region where the security group is provisioned.
 
 <a id="nestedatt--rules"></a>

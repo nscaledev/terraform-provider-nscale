@@ -22,7 +22,7 @@ data "nscale_network" "example" {
 
 ### Required
 
-- `id` (String) An unique identifier for the network.
+- `id` (String) A unique identifier for the network.
 
 ### Read-Only
 

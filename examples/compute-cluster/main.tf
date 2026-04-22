@@ -1,8 +1,7 @@
 terraform {
   required_providers {
     nscale = {
-      source  = "nscaledev/nscale"
-      version = "0.0.6"
+      source = "nscaledev/nscale"
     }
   }
 }

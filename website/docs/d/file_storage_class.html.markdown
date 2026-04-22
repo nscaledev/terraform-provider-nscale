@@ -22,7 +22,7 @@ data "nscale_file_storage_class" "example" {
 
 ### Required
 
-- `id` (String) An unique identifier for the file storage class.
+- `id` (String) A unique identifier for the file storage class.
 
 ### Optional
 

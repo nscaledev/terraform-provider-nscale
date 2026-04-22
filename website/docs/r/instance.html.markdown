@@ -82,7 +82,7 @@ resource "nscale_instance" "example" {
 ### Read-Only
 
 - `creation_time` (String) The timestamp when the instance was created.
-- `id` (String) An unique identifier for the instance.
+- `id` (String) A unique identifier for the instance.
 - `power_state` (String) The power state of the instance.
 - `private_ip` (String) The private IP address assigned to the instance.
 - `public_ip` (String) The public IP address assigned to the instance.
@@ -93,7 +93,7 @@ resource "nscale_instance" "example" {
 
 Required:
 
-- `network_id` (String) The identifier of the network to where the instance is provisioned.
+- `network_id` (String) The identifier of the network where the instance is provisioned.
 
 Optional:
 

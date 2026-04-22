@@ -91,7 +91,7 @@ func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.Sc
 		MarkdownDescription: "Nscale Compute Cluster",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				MarkdownDescription: "An unique identifier for the compute cluster.",
+				MarkdownDescription: "A unique identifier for the compute cluster.",
 				Computed:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),

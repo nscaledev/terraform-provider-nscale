@@ -47,7 +47,7 @@ resource "nscale_network" "example" {
 ### Read-Only
 
 - `creation_time` (String) The timestamp when the network was created.
-- `id` (String) An unique identifier for the network.
+- `id` (String) A unique identifier for the network.
 
 <a id="nestedatt--routes"></a>
 ### Nested Schema for `routes`
