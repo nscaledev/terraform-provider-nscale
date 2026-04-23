@@ -32,20 +32,21 @@ import (
 )
 
 type InstanceModel struct {
-	ID               types.String `tfsdk:"id"`
-	Name             types.String `tfsdk:"name"`
-	Description      types.String `tfsdk:"description"`
-	NetworkInterface types.Object `tfsdk:"network_interface"`
-	UserData         types.String `tfsdk:"user_data"`
-	PublicIP         types.String `tfsdk:"public_ip"`
-	PrivateIP        types.String `tfsdk:"private_ip"`
-	PowerState       types.String `tfsdk:"power_state"`
-	ImageID          types.String `tfsdk:"image_id"`
-	FlavorID         types.String `tfsdk:"flavor_id"`
-	Tags             types.Map    `tfsdk:"tags"`
-	ProjectID        types.String `tfsdk:"project_id"`
-	RegionID         types.String `tfsdk:"region_id"`
-	CreationTime     types.String `tfsdk:"creation_time"`
+	ID                        types.String `tfsdk:"id"`
+	Name                      types.String `tfsdk:"name"`
+	Description               types.String `tfsdk:"description"`
+	NetworkInterface          types.Object `tfsdk:"network_interface"`
+	UserData                  types.String `tfsdk:"user_data"`
+	PublicIP                  types.String `tfsdk:"public_ip"`
+	PrivateIP                 types.String `tfsdk:"private_ip"`
+	PowerState                types.String `tfsdk:"power_state"`
+	ImageID                   types.String `tfsdk:"image_id"`
+	FlavorID                  types.String `tfsdk:"flavor_id"`
+	SSHCertificateAuthorityID types.String `tfsdk:"ssh_certificate_authority_id"`
+	Tags                      types.Map    `tfsdk:"tags"`
+	ProjectID                 types.String `tfsdk:"project_id"`
+	RegionID                  types.String `tfsdk:"region_id"`
+	CreationTime              types.String `tfsdk:"creation_time"`
 }
 
 func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
@@ -62,20 +63,21 @@ func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
 	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
 
 	return InstanceModel{
-		ID:               types.StringValue(source.Metadata.Id),
-		Name:             types.StringValue(source.Metadata.Name),
-		Description:      types.StringPointerValue(source.Metadata.Description),
-		NetworkInterface: NewInstanceNetworkInterfaceModel(source.Spec, source.Status),
-		UserData:         userData,
-		PublicIP:         types.StringPointerValue(source.Status.PublicIP),
-		PrivateIP:        types.StringPointerValue(source.Status.PrivateIP),
-		PowerState:       powerState,
-		ImageID:          types.StringValue(source.Spec.ImageId),
-		FlavorID:         types.StringValue(source.Spec.FlavorId),
-		Tags:             tftypes.TagMapValueMust(tags),
-		ProjectID:        types.StringValue(source.Metadata.ProjectId),
-		RegionID:         types.StringValue(source.Status.RegionId),
-		CreationTime:     types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
+		ID:                        types.StringValue(source.Metadata.Id),
+		Name:                      types.StringValue(source.Metadata.Name),
+		Description:               types.StringPointerValue(source.Metadata.Description),
+		NetworkInterface:          NewInstanceNetworkInterfaceModel(source.Spec, source.Status),
+		UserData:                  userData,
+		PublicIP:                  types.StringPointerValue(source.Status.PublicIP),
+		PrivateIP:                 types.StringPointerValue(source.Status.PrivateIP),
+		PowerState:                powerState,
+		ImageID:                   types.StringValue(source.Spec.ImageId),
+		FlavorID:                  types.StringValue(source.Spec.FlavorId),
+		SSHCertificateAuthorityID: types.StringPointerValue(source.Spec.SshCertificateAuthorityId),
+		Tags:                      tftypes.TagMapValueMust(tags),
+		ProjectID:                 types.StringValue(source.Metadata.ProjectId),
+		RegionID:                  types.StringValue(source.Status.RegionId),
+		CreationTime:              types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
 	}
 }
 
@@ -110,13 +112,14 @@ func (m *InstanceModel) NscaleInstanceCreateParams(organizationID string) (compu
 			Tags:        tags,
 		},
 		Spec: computeapi.InstanceCreateSpec{
-			FlavorId:       m.FlavorID.ValueString(),
-			ImageId:        m.ImageID.ValueString(),
-			NetworkId:      sourceNetworkInterface.NetworkID.ValueString(),
-			Networking:     &networking,
-			OrganizationId: organizationID,
-			ProjectId:      m.ProjectID.ValueString(),
-			UserData:       userData,
+			FlavorId:                  m.FlavorID.ValueString(),
+			ImageId:                   m.ImageID.ValueString(),
+			NetworkId:                 sourceNetworkInterface.NetworkID.ValueString(),
+			Networking:                &networking,
+			OrganizationId:            organizationID,
+			ProjectId:                 m.ProjectID.ValueString(),
+			SshCertificateAuthorityId: m.SSHCertificateAuthorityID.ValueStringPointer(),
+			UserData:                  userData,
 		},
 	}
 
@@ -154,10 +157,11 @@ func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate,
 			Tags:        tags,
 		},
 		Spec: computeapi.InstanceSpec{
-			FlavorId:   m.FlavorID.ValueString(),
-			ImageId:    m.ImageID.ValueString(),
-			Networking: &networking,
-			UserData:   userData,
+			FlavorId:                  m.FlavorID.ValueString(),
+			ImageId:                   m.ImageID.ValueString(),
+			Networking:                &networking,
+			SshCertificateAuthorityId: m.SSHCertificateAuthorityID.ValueStringPointer(),
+			UserData:                  userData,
 		},
 	}
 

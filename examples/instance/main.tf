@@ -38,6 +38,11 @@ data "nscale_instance_flavor" "g_4_standard_40s" {
   region_id = data.nscale_region.glo1.id
 }
 
+resource "nscale_ssh_certificate_authority" "example" {
+  name       = "example-ca"
+  public_key = file("/tmp/test_ca.pub")
+}
+
 resource "nscale_instance" "example" {
   name = "example"
 
@@ -47,6 +52,7 @@ resource "nscale_instance" "example" {
     security_group_ids = [nscale_security_group.example.id]
   }
 
-  image_id  = "<image-id>"
-  flavor_id = data.nscale_instance_flavor.g_4_standard_40s.id
+  image_id                     = "<image-id>"
+  flavor_id                    = data.nscale_instance_flavor.g_4_standard_40s.id
+  ssh_certificate_authority_id = nscale_ssh_certificate_authority.example.id
 }
