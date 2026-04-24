@@ -8,17 +8,19 @@ terraform {
 
 provider "nscale" {}
 
-resource "nscale_ssh_certificate_authority" "example" {
-  name       = "example-ca"
-  public_key = file("/tmp/test_ca.pub")
+data "nscale_region" "glo1" {
+  id = "<glo1-region-id>"
 }
 
-data "nscale_network" "example" {
-  id = "a3ef33f1-a8fe-409f-a793-867532dd3cd2"
+resource "nscale_network" "example" {
+  name            = "example"
+  cidr_block      = "192.168.0.0/24"
+  dns_nameservers = ["8.8.8.8", "8.8.4.4"]
+  region_id       = data.nscale_region.glo1.id
 }
 
 resource "nscale_security_group" "example" {
-  name = "dx785-example"
+  name = "example"
 
   rules = [
     {
@@ -28,24 +30,30 @@ resource "nscale_security_group" "example" {
     }
   ]
 
-  network_id = data.nscale_network.example.id
+  network_id = nscale_network.example.id
 }
 
-data "nscale_instance_flavor" "example" {
-  id = "1d9e96bf-4f0f-40dd-93ea-205f293eaf77"
+data "nscale_instance_flavor" "g_4_standard_40s" {
+  id        = "<g-4-standard-40s-flavor-id>"
+  region_id = data.nscale_region.glo1.id
+}
+
+resource "nscale_ssh_certificate_authority" "example" {
+  name       = "example-ca"
+  public_key = file("/tmp/test_ca.pub")
 }
 
 resource "nscale_instance" "example" {
-  name = "dx785-example"
+  name = "example"
 
   network_interface {
-    network_id         = data.nscale_network.example.id
+    network_id         = nscale_network.example.id
     enable_public_ip   = true
     security_group_ids = [nscale_security_group.example.id]
   }
 
-  image_id                     = "43f82789-e45d-4dac-a364-26b5040fc47b"
-  flavor_id                    = data.nscale_instance_flavor.example.id
+  image_id                     = "<image-id>"
+  flavor_id                    = data.nscale_instance_flavor.g_4_standard_40s.id
   ssh_certificate_authority_id = nscale_ssh_certificate_authority.example.id
 }
 
