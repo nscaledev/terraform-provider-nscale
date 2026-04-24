@@ -157,11 +157,10 @@ func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate,
 			Tags:        tags,
 		},
 		Spec: computeapi.InstanceSpec{
-			FlavorId:                  m.FlavorID.ValueString(),
-			ImageId:                   m.ImageID.ValueString(),
-			Networking:                &networking,
-			SshCertificateAuthorityId: m.SSHCertificateAuthorityID.ValueStringPointer(),
-			UserData:                  userData,
+			FlavorId:   m.FlavorID.ValueString(),
+			ImageId:    m.ImageID.ValueString(),
+			Networking: &networking,
+			UserData:   userData,
 		},
 	}
 

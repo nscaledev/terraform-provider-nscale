@@ -136,6 +136,9 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 			"ssh_certificate_authority_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created.",
 				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"tags": schema.MapAttribute{
 				MarkdownDescription: "A map of tags assigned to the instance.",
