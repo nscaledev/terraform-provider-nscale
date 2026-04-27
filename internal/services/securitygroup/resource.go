@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -41,6 +42,7 @@ import (
 var (
 	_ resource.ResourceWithConfigure   = &SecurityGroupResource{}
 	_ resource.ResourceWithImportState = &SecurityGroupResource{}
+	_ resource.ResourceWithModifyPlan  = &SecurityGroupResource{}
 )
 
 type SecurityGroupResourceModel struct {
@@ -339,7 +341,9 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 			response.Diagnostics.AddError(
 				"Failed to Delete Security Group",
-				fmt.Sprintf("An error occurred while deleting the security group: %s", err),
+				fmt.Sprintf("An error occurred while deleting the security group: %s. "+
+					"If the security group is still attached to one or more instances, "+
+					"remove the reference from `network_interface.security_group_ids` and re-apply.", err),
 			)
 			return
 		}
@@ -354,4 +358,41 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 	}
 
 	stateWatcher.Wait(ctx, data.Timeouts, response)
+}
+
+func (r *SecurityGroupResource) ModifyPlan(ctx context.Context, request resource.ModifyPlanRequest, response *resource.ModifyPlanResponse) {
+	if r.client == nil {
+		return
+	}
+
+	if !request.Plan.Raw.IsNull() || request.State.Raw.IsNull() {
+		return
+	}
+
+	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.State.Get)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
+	id := data.ID.ValueString()
+	instances, err := findInstancesUsingSecurityGroup(ctx, r.client, data.NetworkID.ValueString(), id)
+	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
+		response.Diagnostics.AddWarning(
+			"Could not validate Security Group deletion",
+			fmt.Sprintf("Failed to check whether security group %s is still in use: %s. "+
+				"The deletion may still fail at apply time if the security group is attached to an instance.", id, err),
+		)
+		return
+	}
+
+	if len(instances) > 0 {
+		response.Diagnostics.AddError(
+			"Security Group is in use",
+			fmt.Sprintf("Cannot destroy security group %s because it is still attached to instance(s): %s. "+
+				"Remove this security group from `network_interface.security_group_ids` on the listed instance(s) "+
+				"before destroying it.", id, strings.Join(instances, ", ")),
+		)
+	}
 }
