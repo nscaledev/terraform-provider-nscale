@@ -134,7 +134,7 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 				Required:            true,
 			},
 			"ssh_certificate_authority_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created.",
+				MarkdownDescription: "The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created. Changing this value forces the instance to be replaced because the CA is installed by cloud-init on first boot and cannot be rotated on a running server.",
 				Optional:            true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
