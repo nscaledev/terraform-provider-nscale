@@ -46,6 +46,11 @@ data "nscale_instance_flavor" "g_4_standard_40s" {
   region_id = data.nscale_region.glo1.id
 }
 
+resource "nscale_ssh_certificate_authority" "example" {
+  name       = "example-ca"
+  public_key = file("/path/to/ca.pub")
+}
+
 resource "nscale_instance" "example" {
   name = "example"
 
@@ -55,9 +60,10 @@ resource "nscale_instance" "example" {
     security_group_ids = [nscale_security_group.example.id]
   }
 
-  image_id  = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
-  flavor_id = data.nscale_instance_flavor.g_4_standard_40s.id
-  region_id = data.nscale_region.glo1.id
+  image_id                     = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+  flavor_id                    = data.nscale_instance_flavor.g_4_standard_40s.id
+  ssh_certificate_authority_id = nscale_ssh_certificate_authority.example.id
+  region_id                    = data.nscale_region.glo1.id
 }
 ```
 
@@ -75,6 +81,7 @@ resource "nscale_instance" "example" {
 - `description` (String) The description of the instance.
 - `network_interface` (Block, Optional) The network interface configuration of the instance. (see [below for nested schema](#nestedblock--network_interface))
 - `project_id` (String) The identifier of the project where the instance is provisioned. If not specified, this defaults to the project ID configured in the provider.
+- `ssh_certificate_authority_id` (String) The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created. Changing this value forces the instance to be replaced because the CA is installed by cloud-init on first boot and cannot be rotated on a running server.
 - `tags` (Map of String) A map of tags assigned to the instance.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 - `user_data` (String) The data to pass to the instance at boot time.

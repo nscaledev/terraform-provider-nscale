@@ -97,6 +97,10 @@ func (s *InstanceDataSource) Schema(ctx context.Context, request datasource.Sche
 				MarkdownDescription: "The identifier of the flavor used for the instance.",
 				Computed:            true,
 			},
+			"ssh_certificate_authority_id": schema.StringAttribute{
+				MarkdownDescription: "The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created.",
+				Computed:            true,
+			},
 			"tags": schema.MapAttribute{
 				MarkdownDescription: "A map of tags assigned to the instance.",
 				ElementType:         types.StringType,

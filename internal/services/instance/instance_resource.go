@@ -133,6 +133,13 @@ func (r *InstanceResource) Schema(ctx context.Context, request resource.SchemaRe
 				MarkdownDescription: "The identifier of the flavor used for the instance.",
 				Required:            true,
 			},
+			"ssh_certificate_authority_id": schema.StringAttribute{
+				MarkdownDescription: "The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created. Changing this value forces the instance to be replaced because the CA is installed by cloud-init on first boot and cannot be rotated on a running server.",
+				Optional:            true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+			},
 			"tags": schema.MapAttribute{
 				MarkdownDescription: "A map of tags assigned to the instance.",
 				ElementType:         types.StringType,

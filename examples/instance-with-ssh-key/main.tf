@@ -26,7 +26,7 @@ resource "nscale_security_group" "example" {
     {
       type      = "ingress"
       protocol  = "tcp"
-      from_port = 80
+      from_port = 22
     }
   ]
 
@@ -55,4 +55,8 @@ resource "nscale_instance" "example" {
   image_id                     = "<image-id>"
   flavor_id                    = data.nscale_instance_flavor.g_4_standard_40s.id
   ssh_certificate_authority_id = nscale_ssh_certificate_authority.example.id
+}
+
+data "nscale_instance_ssh_key" "example" {
+  instance_id = nscale_instance.example.id
 }

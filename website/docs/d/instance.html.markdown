@@ -37,6 +37,7 @@ data "nscale_instance" "example" {
 - `project_id` (String) The identifier of the project where the instance is provisioned.
 - `public_ip` (String) The public IP address assigned to the instance.
 - `region_id` (String) The identifier of the region where the instance is provisioned.
+- `ssh_certificate_authority_id` (String) The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created.
 - `tags` (Map of String) A map of tags assigned to the instance.
 - `user_data` (String) The data to pass to the instance at boot time.
 

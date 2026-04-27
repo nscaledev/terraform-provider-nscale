@@ -19,9 +19,11 @@ package instance
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
@@ -94,6 +96,16 @@ func (s *InstanceSSHKeyDataSource) Read(ctx context.Context, request datasource.
 
 	sshKey, err := nscale.ReadJSONResponsePointer[regionapi.SshKey](sshKeyResponse)
 	if err != nil {
+		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
+			response.Diagnostics.AddWarning(
+				"Instance SSH Key Not Available",
+				fmt.Sprintf("The instance with ID %s has no auto-generated SSH key, likely because it was created with an SSH certificate authority. The private_key attribute will be null.", instanceID),
+			)
+			data.PrivateKey = types.StringNull()
+			response.Diagnostics.Append(response.State.Set(ctx, data)...)
+			return
+		}
+
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Read Instance SSH Key",
