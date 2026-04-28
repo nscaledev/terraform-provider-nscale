@@ -12,10 +12,6 @@ groups allow all egress traffic while ingress traffic must be explicitly allowed
 attached to networks and can define rules based on protocol type (any, tcp, udp, icmp, vrrp), port ranges, and CIDR
 blocks.
 
-When planning the destruction of a security group, the provider checks whether the security group is still attached to
-any instance in the same network. If it is, `terraform plan` fails with an error listing the offending instance(s),
-allowing the conflict to be resolved before applying.
-
 ## Example Usage
 
 ```hcl

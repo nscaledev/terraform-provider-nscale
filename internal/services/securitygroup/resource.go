@@ -19,8 +19,7 @@ package securitygroup
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"strings"
+	"time"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -42,7 +41,6 @@ import (
 var (
 	_ resource.ResourceWithConfigure   = &SecurityGroupResource{}
 	_ resource.ResourceWithImportState = &SecurityGroupResource{}
-	_ resource.ResourceWithModifyPlan  = &SecurityGroupResource{}
 )
 
 type SecurityGroupResourceModel struct {
@@ -327,26 +325,33 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 
 	id := data.ID.ValueString()
 
-	securityGroupDeleteResponse, err := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, id)
-	if err != nil {
-		response.Diagnostics.AddError(
-			"Failed to Delete Security Group",
-			fmt.Sprintf("An error occurred while deleting the security group: %s", err),
-		)
+	deleteTimeout, diagnostics := data.Timeouts.Delete(ctx, 30*time.Minute)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
-	if err = nscale.ReadEmptyResponse(securityGroupDeleteResponse); err != nil {
-		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
-			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-			response.Diagnostics.AddError(
-				"Failed to Delete Security Group",
-				fmt.Sprintf("An error occurred while deleting the security group: %s. "+
-					"If the security group is still attached to one or more instances, "+
-					"remove the reference from `network_interface.security_group_ids` and re-apply.", err),
-			)
-			return
+	// Retry while the API reports the SG is still in use — typically a parallel
+	// instance update is dropping the reference. See nscale.RetryDelete.
+	err := nscale.RetryDelete(ctx, deleteTimeout, func(ctx context.Context) (error, bool) {
+		deleteResponse, err := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, id)
+		if err != nil {
+			return err, false
 		}
+		if err := nscale.ReadEmptyResponse(deleteResponse); err != nil {
+			return err, nscale.IsAPIErrorInUse(err)
+		}
+		return nil, false
+	})
+	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
+		response.Diagnostics.AddError(
+			"Failed to Delete Security Group",
+			fmt.Sprintf("An error occurred while deleting the security group: %s. "+
+				"If the security group is still attached to one or more instances, "+
+				"remove the reference from `network_interface.security_group_ids` and re-apply.", err),
+		)
+		return
 	}
 
 	stateWatcher := nscale.DeleteStateWatcher{
@@ -358,41 +363,4 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 	}
 
 	stateWatcher.Wait(ctx, data.Timeouts, response)
-}
-
-func (r *SecurityGroupResource) ModifyPlan(ctx context.Context, request resource.ModifyPlanRequest, response *resource.ModifyPlanResponse) {
-	if r.client == nil {
-		return
-	}
-
-	if !request.Plan.Raw.IsNull() || request.State.Raw.IsNull() {
-		return
-	}
-
-	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.State.Get)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	id := data.ID.ValueString()
-	instances, err := findInstancesUsingSecurityGroup(ctx, r.client, data.NetworkID.ValueString(), id)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddWarning(
-			"Could not validate Security Group deletion",
-			fmt.Sprintf("Failed to check whether security group %s is still in use: %s. "+
-				"The deletion may still fail at apply time if the security group is attached to an instance.", id, err),
-		)
-		return
-	}
-
-	if len(instances) > 0 {
-		response.Diagnostics.AddError(
-			"Security Group is in use",
-			fmt.Sprintf("Cannot destroy security group %s because it is still attached to instance(s): %s. "+
-				"Remove this security group from `network_interface.security_group_ids` on the listed instance(s) "+
-				"before destroying it.", id, strings.Join(instances, ", ")),
-		)
-	}
 }

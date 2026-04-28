@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
 )
@@ -37,45 +36,4 @@ func getSecurityGroup(ctx context.Context, id string, client *nscale.Client) (*r
 	}
 
 	return securityGroup, &securityGroup.Metadata, nil
-}
-
-func findInstancesUsingSecurityGroup(ctx context.Context, client *nscale.Client, networkID, securityGroupID string) ([]string, error) {
-	organizationFilter := computeapi.OrganizationIDQueryParameter{client.OrganizationID}
-	projectFilter := computeapi.ProjectIDQueryParameter{client.ProjectID}
-	regionFilter := computeapi.RegionIDQueryParameter{client.RegionID}
-
-	params := &computeapi.GetApiV2InstancesParams{
-		OrganizationID: &organizationFilter,
-		ProjectID:      &projectFilter,
-		RegionID:       &regionFilter,
-	}
-	if networkID != "" {
-		networkFilter := computeapi.NetworkIDQueryParameter{networkID}
-		params.NetworkID = &networkFilter
-	}
-
-	response, err := client.Compute.GetApiV2Instances(ctx, params)
-	if err != nil {
-		return nil, err
-	}
-
-	instances, err := nscale.ReadJSONResponseValue[computeapi.InstancesRead](response)
-	if err != nil {
-		return nil, err
-	}
-
-	var matches []string
-	for _, instance := range instances {
-		if instance.Spec.Networking == nil || instance.Spec.Networking.SecurityGroups == nil {
-			continue
-		}
-		for _, sgID := range *instance.Spec.Networking.SecurityGroups {
-			if sgID == securityGroupID {
-				matches = append(matches, instance.Metadata.Id)
-				break
-			}
-		}
-	}
-
-	return matches, nil
 }
