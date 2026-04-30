@@ -330,8 +330,7 @@ func (r *InstanceResource) Update(ctx context.Context, request resource.UpdateRe
 		return
 	}
 
-	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceUpdateResponse)
-	if err != nil {
+	if _, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceUpdateResponse); err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Update Instance",

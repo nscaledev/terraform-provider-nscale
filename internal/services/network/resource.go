@@ -289,8 +289,7 @@ func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateReq
 		return
 	}
 
-	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse)
-	if err != nil {
+	if _, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse); err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Update Network",

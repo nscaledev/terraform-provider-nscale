@@ -294,8 +294,7 @@ func (r *FileStorageResource) Update(ctx context.Context, request resource.Updat
 		return
 	}
 
-	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageUpdateResponse)
-	if err != nil {
+	if _, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageUpdateResponse); err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Update File Storage",
