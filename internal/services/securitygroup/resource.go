@@ -19,7 +19,7 @@ package securitygroup
 import (
 	"context"
 	"fmt"
-	"net/http"
+	"time"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -325,24 +325,33 @@ func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.Del
 
 	id := data.ID.ValueString()
 
-	securityGroupDeleteResponse, err := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, id)
-	if err != nil {
-		response.Diagnostics.AddError(
-			"Failed to Delete Security Group",
-			fmt.Sprintf("An error occurred while deleting the security group: %s", err),
-		)
+	deleteTimeout, diagnostics := data.Timeouts.Delete(ctx, 30*time.Minute)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
-	if err = nscale.ReadEmptyResponse(securityGroupDeleteResponse); err != nil {
-		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
-			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-			response.Diagnostics.AddError(
-				"Failed to Delete Security Group",
-				fmt.Sprintf("An error occurred while deleting the security group: %s", err),
-			)
-			return
+	// Retry while the API reports the SG is still in use — typically a parallel
+	// instance update is dropping the reference. See nscale.RetryDelete.
+	err := nscale.RetryDelete(ctx, deleteTimeout, func(ctx context.Context) (error, bool) {
+		deleteResponse, err := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, id)
+		if err != nil {
+			return err, false
 		}
+		if err := nscale.ReadEmptyResponse(deleteResponse); err != nil {
+			return err, nscale.IsAPIErrorInUse(err)
+		}
+		return nil, false
+	})
+	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
+		response.Diagnostics.AddError(
+			"Failed to Delete Security Group",
+			fmt.Sprintf("An error occurred while deleting the security group: %s. "+
+				"If the security group is still attached to one or more instances, "+
+				"remove the reference from `network_interface.security_group_ids` and re-apply.", err),
+		)
+		return
 	}
 
 	stateWatcher := nscale.DeleteStateWatcher{
