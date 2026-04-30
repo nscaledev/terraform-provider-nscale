@@ -289,8 +289,7 @@ func (r *SecurityGroupResource) Update(ctx context.Context, request resource.Upd
 		return
 	}
 
-	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupUpdateResponse)
-	if err != nil {
+	if _, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupUpdateResponse); err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Update Security Group",
