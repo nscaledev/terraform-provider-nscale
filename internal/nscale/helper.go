@@ -67,7 +67,7 @@ func assertState[T any](state any, diagnostics *diag.Diagnostics) (*T, bool) {
 	return result, true
 }
 
-func appendProvisioningErrorDiagnostic(diagnostics *diag.Diagnostics, resourceTitle string, metadata *coreapi.ProjectScopedResourceReadMetadata, detail string) bool {
+func addProvisioningErrorDiagnostic(diagnostics *diag.Diagnostics, resourceTitle string, metadata *coreapi.ProjectScopedResourceReadMetadata, detail string) bool {
 	if metadata == nil || metadata.ProvisioningStatus != coreapi.ResourceProvisioningStatusError {
 		return false
 	}
@@ -137,7 +137,7 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, timeouts tftimeouts.Va
 		return zero, false
 	}
 
-	if appendProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
+	if addProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
 		"was created but transitioned to 'error' instead of 'provisioned'. Run 'terraform apply' to try again, or reach out to support.") {
 		return result, false
 	}
@@ -290,7 +290,7 @@ func (w *UpdateStateWatcher[T]) Wait(ctx context.Context, operationTagKey string
 		return zero, false
 	}
 
-	if appendProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
+	if addProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
 		"transitioned to 'error' during update. Run 'terraform apply' to try again, or reach out to support.") {
 		return result, false
 	}
@@ -351,7 +351,7 @@ func (w *DeleteStateWatcher) Wait(ctx context.Context, timeouts tftimeouts.Value
 		return false
 	}
 
-	if appendProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
+	if addProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
 		"transitioned to 'error' during deprovisioning instead of being removed. Re-run 'terraform destroy' to try again, or reach out to support.") {
 		return false
 	}
