@@ -143,3 +143,49 @@ func TestCreateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
 		t.Fatalf("Wait() diagnostics did not include resource ID %q: %#v", resourceID, response.Diagnostics)
 	}
 }
+
+// TestUpdateStateWatcherWaitTreatsErrorAsTerminal ensures the update waiter exits cleanly with a
+// diagnostic when the API reports provisioningStatus=error during an update.
+func TestUpdateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
+	const (
+		resourceID      = "fe563485-0631-4707-bec7-0d661cf20efc"
+		operationTagKey = TerraformOperationTagPrefix + "test-op"
+	)
+
+	watcher := UpdateStateWatcher[waitTestResource]{
+		ResourceTitle: "Instance",
+		ResourceName:  "instance",
+		GetFunc: func(ctx context.Context) (*waitTestResource, *coreapi.ProjectScopedResourceReadMetadata, error) {
+			return &waitTestResource{name: "failed"}, &coreapi.ProjectScopedResourceReadMetadata{
+				Id:                 resourceID,
+				ProvisioningStatus: coreapi.ResourceProvisioningStatusError,
+			}, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var response resource.UpdateResponse
+	var timeouts tftimeouts.Value
+
+	_, ok := watcher.Wait(ctx, operationTagKey, timeouts, &response)
+	if ok {
+		t.Fatalf("Wait() returned ok=true, want ok=false on error state")
+	}
+
+	if !response.Diagnostics.HasError() {
+		t.Fatalf("Wait() did not produce error diagnostics: %#v", response.Diagnostics)
+	}
+
+	var found bool
+	for _, d := range response.Diagnostics.Errors() {
+		if strings.Contains(d.Detail(), resourceID) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("Wait() diagnostics did not include resource ID %q: %#v", resourceID, response.Diagnostics)
+	}
+}

@@ -222,9 +222,10 @@ func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
 }
 
 const (
-	UpdateStateUpdating = "updating"
-	UpdateStateErrored  = "errored"
-	UpdateStateUpdated  = "updated"
+	UpdateStateUpdating          = "updating"
+	UpdateStateErrored           = "errored"
+	UpdateStateUpdated           = "updated"
+	UpdateStateProvisioningError = "provisioning_error"
 )
 
 type UpdateStateWatcher[T any] struct {
@@ -240,14 +241,22 @@ func (w *UpdateStateWatcher[T]) Wait(ctx context.Context, operationTagKey string
 		return nil, false
 	}
 
+	var lastMetadata *coreapi.ProjectScopedResourceReadMetadata
+
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
 		Pending: []string{UpdateStateUpdating},
-		Target:  []string{UpdateStateUpdated},
+		Target:  []string{UpdateStateUpdated, UpdateStateProvisioningError},
 		Refresh: func() (any, string, error) {
 			result, metadata, err := w.GetFunc(ctx)
 			if err != nil {
 				return nil, UpdateStateErrored, err
+			}
+
+			lastMetadata = metadata
+
+			if metadata.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+				return result, UpdateStateProvisioningError, nil
 			}
 
 			if HasOperationTag(metadata.Tags, operationTagKey) {
@@ -270,7 +279,24 @@ func (w *UpdateStateWatcher[T]) Wait(ctx context.Context, operationTagKey string
 		return zero, false
 	}
 
-	return assertState[T](state, &response.Diagnostics)
+	result, ok := assertState[T](state, &response.Diagnostics)
+	if !ok {
+		return zero, false
+	}
+
+	if lastMetadata != nil && lastMetadata.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+		response.Diagnostics.AddError(
+			fmt.Sprintf("%s Entered Error State", w.ResourceTitle),
+			fmt.Sprintf(
+				"%s %s (name %s) transitioned to 'error' during update. "+
+					"Run 'terraform apply' to try again, or reach out to support.",
+				w.ResourceTitle, lastMetadata.Id, lastMetadata.Name,
+			),
+		)
+		return result, false
+	}
+
+	return result, true
 }
 
 const (
