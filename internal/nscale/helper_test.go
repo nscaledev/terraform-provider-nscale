@@ -144,6 +144,49 @@ func TestCreateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
 	}
 }
 
+// TestDeleteStateWatcherWaitTreatsErrorAsTerminal ensures the delete waiter exits cleanly with a
+// diagnostic when the API reports provisioningStatus=error instead of 404'ing.
+func TestDeleteStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
+	const resourceID = "c2b8d351-c7b1-4fd5-a2c3-0f897a1df29c"
+
+	watcher := DeleteStateWatcher{
+		ResourceTitle: "Instance",
+		ResourceName:  "instance",
+		GetFunc: func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error) {
+			return struct{}{}, &coreapi.ProjectScopedResourceReadMetadata{
+				Id:                 resourceID,
+				ProvisioningStatus: coreapi.ResourceProvisioningStatusError,
+			}, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var response resource.DeleteResponse
+	var timeouts tftimeouts.Value
+
+	ok := watcher.Wait(ctx, timeouts, &response)
+	if ok {
+		t.Fatalf("Wait() returned ok=true, want ok=false on error state")
+	}
+
+	if !response.Diagnostics.HasError() {
+		t.Fatalf("Wait() did not produce error diagnostics: %#v", response.Diagnostics)
+	}
+
+	var found bool
+	for _, d := range response.Diagnostics.Errors() {
+		if strings.Contains(d.Detail(), resourceID) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("Wait() diagnostics did not include resource ID %q: %#v", resourceID, response.Diagnostics)
+	}
+}
+
 // TestUpdateStateWatcherWaitTreatsErrorAsTerminal ensures the update waiter exits cleanly with a
 // diagnostic when the API reports provisioningStatus=error during an update.
 func TestUpdateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {

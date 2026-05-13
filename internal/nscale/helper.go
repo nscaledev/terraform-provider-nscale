@@ -300,9 +300,10 @@ func (w *UpdateStateWatcher[T]) Wait(ctx context.Context, operationTagKey string
 }
 
 const (
-	DeleteStateDeleting = "deleting"
-	DeleteStateErrored  = "errored"
-	DeleteStateDeleted  = "deleted"
+	DeleteStateDeleting          = "deleting"
+	DeleteStateErrored           = "errored"
+	DeleteStateDeleted           = "deleted"
+	DeleteStateProvisioningError = "provisioning_error"
 )
 
 type DeleteStateWatcher struct {
@@ -318,13 +319,19 @@ func (w *DeleteStateWatcher) Wait(ctx context.Context, timeouts tftimeouts.Value
 		return false
 	}
 
+	var lastMetadata *coreapi.ProjectScopedResourceReadMetadata
+
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
 		Pending: []string{DeleteStateDeleting},
-		Target:  []string{DeleteStateDeleted},
+		Target:  []string{DeleteStateDeleted, DeleteStateProvisioningError},
 		Refresh: func() (any, string, error) {
-			_, _, err := w.GetFunc(ctx)
+			_, metadata, err := w.GetFunc(ctx)
 			if err == nil {
+				lastMetadata = metadata
+				if metadata != nil && metadata.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+					return struct{}{}, DeleteStateProvisioningError, nil
+				}
 				return struct{}{}, DeleteStateDeleting, nil
 			}
 
@@ -341,6 +348,18 @@ func (w *DeleteStateWatcher) Wait(ctx context.Context, timeouts tftimeouts.Value
 		response.Diagnostics.AddError(
 			fmt.Sprintf("Failed to Wait for %s to be Deleted", w.ResourceTitle),
 			fmt.Sprintf("An error occurred while waiting for the %s to be deleted: %s", w.ResourceName, err),
+		)
+		return false
+	}
+
+	if lastMetadata != nil && lastMetadata.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+		response.Diagnostics.AddError(
+			fmt.Sprintf("%s Entered Error State", w.ResourceTitle),
+			fmt.Sprintf(
+				"Deprovisioning of %s %s (name %s) failed; it transitioned to 'error' instead of being removed. "+
+					"Re-run 'terraform destroy' to try again, or reach out to support.",
+				w.ResourceTitle, lastMetadata.Id, lastMetadata.Name,
+			),
 		)
 		return false
 	}
