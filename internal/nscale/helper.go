@@ -80,6 +80,8 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, timeouts tftimeouts.Va
 		return nil, false
 	}
 
+	var lastMetadata *coreapi.ProjectScopedResourceReadMetadata
+
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
 		Pending: []string{
@@ -89,6 +91,7 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, timeouts tftimeouts.Va
 		},
 		Target: []string{
 			string(coreapi.ResourceProvisioningStatusProvisioned),
+			string(coreapi.ResourceProvisioningStatusError),
 		},
 		Refresh: func() (any, string, error) {
 			result, metadata, err := w.GetFunc(ctx)
@@ -99,6 +102,7 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, timeouts tftimeouts.Va
 				}
 				return nil, "", err
 			}
+			lastMetadata = metadata
 			return result, string(metadata.ProvisioningStatus), nil
 		},
 	}
@@ -115,7 +119,24 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, timeouts tftimeouts.Va
 		return zero, false
 	}
 
-	return assertState[T](state, &response.Diagnostics)
+	result, ok := assertState[T](state, &response.Diagnostics)
+	if !ok {
+		return zero, false
+	}
+
+	if lastMetadata != nil && lastMetadata.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+		response.Diagnostics.AddError(
+			fmt.Sprintf("%s Entered Error State", w.ResourceTitle),
+			fmt.Sprintf(
+				"%s %s (name %s) was created but transitioned to 'error' instead of 'provisioned'. "+
+					"Run 'terraform apply' to try again, or reach out to support.",
+				w.ResourceTitle, lastMetadata.Id, lastMetadata.Name,
+			),
+		)
+		return result, false
+	}
+
+	return result, true
 }
 
 type ResourceReader[T any] struct {

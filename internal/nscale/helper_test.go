@@ -2,6 +2,7 @@ package nscale
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -85,5 +86,60 @@ func TestCreateStateWatcherWaitHandlesTransientProvisioningStates(t *testing.T) 
 				t.Fatalf("Wait() returned unexpected diagnostics: %#v", response.Diagnostics)
 			}
 		})
+	}
+}
+
+// TestCreateStateWatcherWaitTreatsErrorAsTerminal ensures the create waiter exits cleanly with a
+// diagnostic when the API reports provisioningStatus=error, instead of producing
+// `unexpected state 'error', wanted target 'provisioned'. last error: %!s(<nil>)`.
+func TestCreateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
+	const resourceID = "f51ac0e0-d2e4-4648-99cf-c18a19c4934a"
+
+	var calls int
+
+	watcher := CreateStateWatcher[waitTestResource]{
+		ResourceTitle: "Instance",
+		ResourceName:  "instance",
+		GetFunc: func(ctx context.Context) (*waitTestResource, *coreapi.ProjectScopedResourceReadMetadata, error) {
+			calls++
+
+			if calls == 1 {
+				return &waitTestResource{name: "creating"}, &coreapi.ProjectScopedResourceReadMetadata{
+					Id:                 resourceID,
+					ProvisioningStatus: coreapi.ResourceProvisioningStatusProvisioning,
+				}, nil
+			}
+
+			return &waitTestResource{name: "failed"}, &coreapi.ProjectScopedResourceReadMetadata{
+				Id:                 resourceID,
+				ProvisioningStatus: coreapi.ResourceProvisioningStatusError,
+			}, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	var response resource.CreateResponse
+	var timeouts tftimeouts.Value
+
+	_, ok := watcher.Wait(ctx, timeouts, &response)
+	if ok {
+		t.Fatalf("Wait() returned ok=true, want ok=false on error state")
+	}
+
+	if !response.Diagnostics.HasError() {
+		t.Fatalf("Wait() did not produce error diagnostics: %#v", response.Diagnostics)
+	}
+
+	var found bool
+	for _, d := range response.Diagnostics.Errors() {
+		if strings.Contains(d.Detail(), resourceID) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("Wait() diagnostics did not include resource ID %q: %#v", resourceID, response.Diagnostics)
 	}
 }
