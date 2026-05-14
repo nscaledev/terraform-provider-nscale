@@ -60,6 +60,7 @@ resource "nscale_file_storage" "example" {
 - `network` (Block List) The network to which the file storage is attached. (see [below for nested schema](#nestedblock--network))
 - `project_id` (String) The identifier of the project where the file storage is provisioned. If not specified, this defaults to the project ID configured in the provider.
 - `region_id` (String) The identifier of the region where the file storage is provisioned. If not specified, this defaults to the region ID configured in the provider.
+- `refresh_usage` (Boolean) Whether to refresh the computed `size` usage value from the Nscale API. Set to `false` to keep `size` stable in Terraform state and avoid plan noise from file usage changes.
 - `tags` (Map of String) A map of tags assigned to the file storage.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 

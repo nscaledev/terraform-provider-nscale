@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -43,7 +44,8 @@ var (
 
 type FileStorageResourceModel struct {
 	FileStorageModel
-	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
+	RefreshUsage types.Bool       `tfsdk:"refresh_usage"`
+	Timeouts     tftimeouts.Value `tfsdk:"timeouts"`
 }
 
 type FileStorageResource struct {
@@ -111,6 +113,12 @@ func (r *FileStorageResource) Schema(ctx context.Context, request resource.Schem
 			"size": schema.Int64Attribute{
 				MarkdownDescription: "The amount of storage currently used, in gibibytes.",
 				Computed:            true,
+			},
+			"refresh_usage": schema.BoolAttribute{
+				MarkdownDescription: "Whether to refresh the computed `size` usage value from the Nscale API. Set to `false` to keep `size` stable in Terraform state and avoid plan noise from file usage changes.",
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(true),
 			},
 			"capacity": schema.Int64Attribute{
 				MarkdownDescription: "The total capacity requested for the file storage, in gibibytes.",
@@ -180,17 +188,28 @@ func (r *FileStorageResource) Schema(ctx context.Context, request resource.Schem
 	}
 }
 
-func (r *FileStorageResource) setDefaultIDs(data *FileStorageResourceModel) {
+func (r *FileStorageResource) setDefaults(data *FileStorageResourceModel) {
 	if data.ProjectID.ValueString() == "" {
 		data.ProjectID = types.StringValue(r.client.ProjectID)
 	}
 	if data.RegionID.ValueString() == "" {
 		data.RegionID = types.StringValue(r.client.RegionID)
 	}
+	if data.RefreshUsage.IsNull() || data.RefreshUsage.IsUnknown() {
+		data.RefreshUsage = types.BoolValue(true)
+	}
+}
+
+func (m *FileStorageResourceModel) preserveSizeIfUsageRefreshDisabled(previousSize types.Int64) {
+	if m.RefreshUsage.ValueBool() {
+		return
+	}
+
+	m.Size = previousSize
 }
 
 func (r *FileStorageResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.Plan.Get, r.setDefaultIDs)
+	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.Plan.Get, r.setDefaults)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -246,11 +265,12 @@ func (r *FileStorageResource) Create(ctx context.Context, request resource.Creat
 }
 
 func (r *FileStorageResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.State.Get, r.setDefaultIDs)
+	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.State.Get, r.setDefaults)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
 	}
+	previousSize := data.Size
 
 	resourceReader := nscale.ResourceReader[regionapi.StorageV2Read]{
 		ResourceTitle: "File Storage",
@@ -266,11 +286,18 @@ func (r *FileStorageResource) Read(ctx context.Context, request resource.ReadReq
 	}
 
 	data.FileStorageModel = NewFileStorageModel(fileStorage)
+	data.preserveSizeIfUsageRefreshDisabled(previousSize)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *FileStorageResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.Plan.Get, r.setDefaultIDs)
+	priorState, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.State.Get, r.setDefaults)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
+	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.Plan.Get, r.setDefaults)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -317,11 +344,12 @@ func (r *FileStorageResource) Update(ctx context.Context, request resource.Updat
 	}
 
 	data.FileStorageModel = NewFileStorageModel(fileStorage)
+	data.preserveSizeIfUsageRefreshDisabled(priorState.Size)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
 func (r *FileStorageResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.State.Get, r.setDefaultIDs)
+	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.State.Get, r.setDefaults)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
