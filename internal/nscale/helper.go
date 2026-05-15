@@ -67,6 +67,19 @@ func assertState[T any](state any, diagnostics *diag.Diagnostics) (*T, bool) {
 	return result, true
 }
 
+func addProvisioningErrorDiagnostic(diagnostics *diag.Diagnostics, resourceTitle string, metadata *coreapi.ProjectScopedResourceReadMetadata, detail string) bool {
+	if metadata == nil || metadata.ProvisioningStatus != coreapi.ResourceProvisioningStatusError {
+		return false
+	}
+
+	diagnostics.AddError(
+		fmt.Sprintf("%s Entered Error State", resourceTitle),
+		fmt.Sprintf("%s %s (name %s) %s", resourceTitle, metadata.Id, metadata.Name, detail),
+	)
+
+	return true
+}
+
 type CreateStateWatcher[T any] struct {
 	ResourceTitle string
 	ResourceName  string
@@ -80,6 +93,8 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, timeouts tftimeouts.Va
 		return nil, false
 	}
 
+	var lastMetadata *coreapi.ProjectScopedResourceReadMetadata
+
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
 		Pending: []string{
@@ -89,6 +104,7 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, timeouts tftimeouts.Va
 		},
 		Target: []string{
 			string(coreapi.ResourceProvisioningStatusProvisioned),
+			string(coreapi.ResourceProvisioningStatusError),
 		},
 		Refresh: func() (any, string, error) {
 			result, metadata, err := w.GetFunc(ctx)
@@ -99,6 +115,7 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, timeouts tftimeouts.Va
 				}
 				return nil, "", err
 			}
+			lastMetadata = metadata
 			return result, string(metadata.ProvisioningStatus), nil
 		},
 	}
@@ -115,7 +132,17 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, timeouts tftimeouts.Va
 		return zero, false
 	}
 
-	return assertState[T](state, &response.Diagnostics)
+	result, ok := assertState[T](state, &response.Diagnostics)
+	if !ok {
+		return zero, false
+	}
+
+	if addProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
+		"was created but transitioned to 'error' instead of 'provisioned'. Run 'terraform apply' to try again, or reach out to support.") {
+		return result, false
+	}
+
+	return result, true
 }
 
 type ResourceReader[T any] struct {
@@ -201,9 +228,10 @@ func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
 }
 
 const (
-	UpdateStateUpdating = "updating"
-	UpdateStateErrored  = "errored"
-	UpdateStateUpdated  = "updated"
+	UpdateStateUpdating          = "updating"
+	UpdateStateErrored           = "errored"
+	UpdateStateUpdated           = "updated"
+	UpdateStateProvisioningError = "provisioning_error"
 )
 
 type UpdateStateWatcher[T any] struct {
@@ -219,14 +247,22 @@ func (w *UpdateStateWatcher[T]) Wait(ctx context.Context, operationTagKey string
 		return nil, false
 	}
 
+	var lastMetadata *coreapi.ProjectScopedResourceReadMetadata
+
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
 		Pending: []string{UpdateStateUpdating},
-		Target:  []string{UpdateStateUpdated},
+		Target:  []string{UpdateStateUpdated, UpdateStateProvisioningError},
 		Refresh: func() (any, string, error) {
 			result, metadata, err := w.GetFunc(ctx)
 			if err != nil {
 				return nil, UpdateStateErrored, err
+			}
+
+			lastMetadata = metadata
+
+			if metadata.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+				return result, UpdateStateProvisioningError, nil
 			}
 
 			if HasOperationTag(metadata.Tags, operationTagKey) {
@@ -249,13 +285,24 @@ func (w *UpdateStateWatcher[T]) Wait(ctx context.Context, operationTagKey string
 		return zero, false
 	}
 
-	return assertState[T](state, &response.Diagnostics)
+	result, ok := assertState[T](state, &response.Diagnostics)
+	if !ok {
+		return zero, false
+	}
+
+	if addProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
+		"transitioned to 'error' during update. Run 'terraform apply' to try again, or reach out to support.") {
+		return result, false
+	}
+
+	return result, true
 }
 
 const (
-	DeleteStateDeleting = "deleting"
-	DeleteStateErrored  = "errored"
-	DeleteStateDeleted  = "deleted"
+	DeleteStateDeleting          = "deleting"
+	DeleteStateErrored           = "errored"
+	DeleteStateDeleted           = "deleted"
+	DeleteStateProvisioningError = "provisioning_error"
 )
 
 type DeleteStateWatcher struct {
@@ -271,13 +318,19 @@ func (w *DeleteStateWatcher) Wait(ctx context.Context, timeouts tftimeouts.Value
 		return false
 	}
 
+	var lastMetadata *coreapi.ProjectScopedResourceReadMetadata
+
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
 		Pending: []string{DeleteStateDeleting},
-		Target:  []string{DeleteStateDeleted},
+		Target:  []string{DeleteStateDeleted, DeleteStateProvisioningError},
 		Refresh: func() (any, string, error) {
-			_, _, err := w.GetFunc(ctx)
+			_, metadata, err := w.GetFunc(ctx)
 			if err == nil {
+				lastMetadata = metadata
+				if metadata != nil && metadata.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+					return struct{}{}, DeleteStateProvisioningError, nil
+				}
 				return struct{}{}, DeleteStateDeleting, nil
 			}
 
@@ -295,6 +348,11 @@ func (w *DeleteStateWatcher) Wait(ctx context.Context, timeouts tftimeouts.Value
 			fmt.Sprintf("Failed to Wait for %s to be Deleted", w.ResourceTitle),
 			fmt.Sprintf("An error occurred while waiting for the %s to be deleted: %s", w.ResourceName, err),
 		)
+		return false
+	}
+
+	if addProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
+		"transitioned to 'error' during deprovisioning instead of being removed. Re-run 'terraform destroy' to try again, or reach out to support.") {
 		return false
 	}
 
