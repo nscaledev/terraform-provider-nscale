@@ -1,0 +1,212 @@
+name: Weekly tf-provider-feature Skill Research
+
+on:
+  schedule:
+    - cron: '0 8 * * 1' # Every Monday at 8am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: weekly-tf-provider-research
+  cancel-in-progress: false
+
+jobs:
+  research-and-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Mint a short-lived installation token for the Alfred GitHub App.
+      # Commits/PRs made with this token DO trigger downstream workflows
+      # (unlike the default GITHUB_TOKEN), so CI runs on the resulting PR.
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.ALFRED_APP_ID }}
+          private-key: ${{ secrets.ALFRED_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Run Claude tf-provider-feature skill research
+        id: claude-research
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
+          prompt: |
+            REPO: ${{ github.repository }}
+
+            You are a research bot whose job is to keep the
+            `.claude/skills/tf-provider-feature` skill current with the latest
+            best practices, gotchas, and patterns for writing high-quality
+            Terraform providers. You compound the team's institutional
+            knowledge so the skill produces better providers every week.
+
+            ## Step 1: Read the current skill state
+
+            Read these files in full so you understand what is already
+            captured (and therefore what NOT to re-add):
+
+            - `.claude/skills/tf-provider-feature/SKILL.md`
+            - `.claude/skills/tf-provider-feature/reference/conventions.md`
+            - `.claude/skills/tf-provider-feature/reference/playbook.md`
+            - `.claude/skills/tf-provider-feature/reference/testing.md`
+            - `.claude/skills/tf-provider-feature/reference/manual-test-runbook.md`
+            - `.claude/skills/tf-provider-feature/templates/spec-template.md`
+            - `CLAUDE.md`
+
+            Also glance at recent commits touching `internal/services/**` and
+            `website/docs/**` to spot any new patterns or gotchas that
+            real-world work surfaced this week:
+
+            ```
+            git log --since='8 days ago' --pretty=format:'%h %s' -- \
+              'internal/services/**' 'website/docs/**' '.claude/skills/**'
+            ```
+
+            ## Step 2: Research new methods and gotchas
+
+            Use WebSearch and WebFetch to look for material published or
+            updated in roughly the last 4–6 weeks. Prioritise authoritative
+            sources over blog noise. Good sources to consult:
+
+            - https://developer.hashicorp.com/terraform/plugin/framework
+              (framework release notes, what's new, deprecations)
+            - https://github.com/hashicorp/terraform-plugin-framework/releases
+            - https://github.com/hashicorp/terraform-plugin-testing/releases
+            - https://github.com/hashicorp/terraform-plugin-docs/releases
+            - HashiCorp engineering blog provider posts
+            - Recent provider-development talks / write-ups from
+              well-regarded providers (AWS, GCP, Azure, GitHub, Vercel,
+              Cloudflare, Databricks) — look specifically at how they handle
+              schema design, plan modifiers, write-once secrets, async
+              lifecycle, and import round-tripping.
+            - Open issues / discussions on
+              hashicorp/terraform-plugin-framework that signal upcoming
+              changes or recurring footguns.
+
+            For each candidate finding, ask:
+
+            1. Is it actionable for THIS provider (Plugin Framework, not
+               SDKv2)?
+            2. Is it NOT already in our skill files? (Be strict — duplicate
+               guidance bloats the skill and dilutes signal.)
+            3. Does it prevent a real failure mode, or is it just stylistic?
+               Prefer concrete gotchas over taste.
+            4. Can it be expressed in ≤10 lines of guidance with a code
+               example or a §-style cross-reference?
+
+            Discard anything that fails these gates.
+
+            ## Step 3: Apply updates
+
+            Pick the right home for each finding:
+
+            - **`reference/playbook.md`** — schema design, lifecycle,
+              error UX, docs, release, code organisation. Add to the
+              existing § sections; only invent a new § if no section fits.
+            - **`reference/testing.md`** — new test patterns, framework
+              changes to `terraform-plugin-testing`, new assertion helpers,
+              new minimum-bar items.
+            - **`reference/conventions.md`** — codebase-shape conventions
+              (file layout, naming, registration). Only update if a new
+              repo-wide convention has actually landed.
+            - **`reference/manual-test-runbook.md`** — new manual-test
+              checks worth running before declaring a resource done.
+            - **`SKILL.md`** — only if a phase changes shape or a new
+              cross-reference is needed. Keep the five-phase flow stable.
+            - **New file under `reference/`** — only if you have a
+              coherent topic that doesn't fit elsewhere (e.g.
+              `reference/framework-changelog-notes.md`). Don't create
+              orphan files just to record one tip.
+
+            Editing rules:
+
+            - Preserve the existing voice: terse, opinionated, failure-mode
+              first. No marketing language. No filler.
+            - When you add a new playbook item, give it a § number that
+              fits the existing sequence and cross-link from SKILL.md only
+              if the skill flow already references that section.
+            - Cite the upstream source inline as a parenthetical link so a
+              human reviewer can verify (`(see terraform-plugin-framework
+              v1.x release notes)`).
+            - If a previously-captured guideline is now obsolete (e.g.
+              superseded by a framework feature), UPDATE it in place
+              rather than appending a contradiction. Note the supersession
+              in one line.
+            - Hard limit: at most 5 distinct changes across all files per
+              run. Quality over volume.
+
+            If nothing genuinely new and useful surfaced this week, do
+            NOTHING. No empty PR. No "minor wording" PR. Exit cleanly.
+
+            ## Step 4: Open a verified PR
+
+            If you made edits, create the commit via the GitHub GraphQL
+            API (`createCommitOnBranch`) so it is signed by GitHub and
+            shows as **Verified**. Do NOT use `git commit` — local
+            commits are unsigned.
+
+            1. Compute base SHA and branch name:
+               ```
+               BASE_SHA="$(git rev-parse HEAD)"
+               BRANCH="chore/tf-provider-skill-research-$(date -u +%Y-%m-%d)"
+               ```
+            2. Skip if an open PR with the same prefix already exists:
+               ```
+               gh pr list --base main --state open \
+                 --search 'in:title "chore(skill): weekly tf-provider research"' \
+                 --json number --jq '.[0].number // empty'
+               ```
+               If non-empty, exit without opening another.
+            3. Push an empty branch at the base SHA so the API can
+               target it:
+               ```
+               git push origin "${BASE_SHA}:refs/heads/${BRANCH}"
+               ```
+            4. For each modified/added file under
+               `.claude/skills/tf-provider-feature/`, base64-encode its
+               contents and accumulate `{ path, contents }` entries in a
+               JSON additions array. For each deleted file, accumulate
+               `{ path }` in a deletions array. (Deletions should be
+               rare — only when removing a superseded reference file.)
+            5. Create a single signed commit via `gh api graphql` with
+               the `createCommitOnBranch` mutation, using
+               `expectedHeadOid=$BASE_SHA`.
+            6. Open the PR:
+               ```
+               gh pr create --base main --head "${BRANCH}" \
+                 --label "automated" \
+                 --title "chore(skill): weekly tf-provider research ($(date -u +%Y-%m-%d))" \
+                 --body "<bulleted list of each finding: what changed,
+                         which file, and the source link justifying it>"
+               ```
+               If the `automated` label does not exist, create it first
+               with `gh label create automated --color 0E8A16
+               --description "Automated PRs"`.
+
+            PR body requirements:
+
+            - One bullet per finding.
+            - Each bullet: **filename §section** — one-sentence summary —
+              `(source: <url>)`.
+            - End with a "Reviewer checklist" block:
+              - [ ] Each finding cites an authoritative source
+              - [ ] No duplication of existing guidance
+              - [ ] Voice matches the rest of the skill
+              - [ ] Net additions ≤ 5
+
+            Be precise. The goal is a steady, high-signal compounding of
+            the team's Terraform provider knowledge — not weekly churn.
+
+          claude_args: '--allowed-tools "Bash(git rev-parse:*),Bash(git log:*),Bash(git status:*),Bash(git push:*),Bash(base64:*),Bash(jq:*),Bash(date:*),Bash(gh api:*),Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh label create:*),Bash(gh label list:*),Read,Glob,Grep,Write,Edit,WebSearch,WebFetch"'
