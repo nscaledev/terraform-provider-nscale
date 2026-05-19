@@ -32,6 +32,7 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/filestorage"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/instance"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/objectstorage"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/region"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/securitygroup"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/sshca"
@@ -41,6 +42,7 @@ import (
 const (
 	DefaultNscaleRegionServiceAPIEndpoint  = "https://region.unikorn.nscale.com"
 	DefaultNscaleComputeServiceAPIEndpoint = "https://compute.unikorn.nscale.com"
+	DefaultNscaleStorageServiceAPIEndpoint = "https://storage.unikorn.nscale.com"
 )
 
 var _ provider.Provider = NscaleProvider{}
@@ -48,6 +50,7 @@ var _ provider.Provider = NscaleProvider{}
 type NscaleProviderModel struct {
 	RegionServiceAPIEndpoint  types.String `tfsdk:"region_service_api_endpoint"`
 	ComputeServiceAPIEndpoint types.String `tfsdk:"compute_service_api_endpoint"`
+	StorageServiceAPIEndpoint types.String `tfsdk:"storage_service_api_endpoint"`
 	ServiceToken              types.String `tfsdk:"service_token"`
 	RegionID                  types.String `tfsdk:"region_id"`
 	OrganizationID            types.String `tfsdk:"organization_id"`
@@ -78,6 +81,10 @@ func (p NscaleProvider) Schema(ctx context.Context, request provider.SchemaReque
 			},
 			"compute_service_api_endpoint": schema.StringAttribute{
 				MarkdownDescription: "The endpoint of the Nscale Compute Service API server.",
+				Optional:            true,
+			},
+			"storage_service_api_endpoint": schema.StringAttribute{
+				MarkdownDescription: "The endpoint of the Nscale Storage Service API server.",
 				Optional:            true,
 			},
 			"service_token": schema.StringAttribute{
@@ -127,6 +134,14 @@ func (p NscaleProvider) Configure(
 	}
 	if computeServiceAPIEndpoint == "" {
 		computeServiceAPIEndpoint = DefaultNscaleComputeServiceAPIEndpoint
+	}
+
+	storageServiceAPIEndpoint := data.StorageServiceAPIEndpoint.ValueString()
+	if value, ok := os.LookupEnv("NSCALE_STORAGE_SERVICE_API_ENDPOINT"); ok {
+		storageServiceAPIEndpoint = value
+	}
+	if storageServiceAPIEndpoint == "" {
+		storageServiceAPIEndpoint = DefaultNscaleStorageServiceAPIEndpoint
 	}
 
 	serviceToken := data.ServiceToken.ValueString()
@@ -186,6 +201,7 @@ func (p NscaleProvider) Configure(
 	client, err := nscale.NewClient(
 		regionServiceAPIEndpoint,
 		computeServiceAPIEndpoint,
+		storageServiceAPIEndpoint,
 		serviceToken,
 		organizationID,
 		projectID,
@@ -216,6 +232,9 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		instance.NewInstanceSSHKeyDataSource,
 		sshca.NewSSHCertificateAuthorityDataSource,
 		computecluster.NewComputeClusterDataSource,
+		objectstorage.NewObjectStorageEndpointClassDataSource,
+		objectstorage.NewObjectStorageEndpointDataSource,
+		objectstorage.NewObjectStorageAccessKeyDataSource,
 	}
 }
 
@@ -227,5 +246,7 @@ func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resourc
 		instance.NewInstanceResource,
 		sshca.NewSSHCertificateAuthorityResource,
 		computecluster.NewComputeClusterResource,
+		objectstorage.NewObjectStorageEndpointResource,
+		objectstorage.NewObjectStorageAccessKeyResource,
 	}
 }

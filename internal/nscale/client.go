@@ -24,6 +24,7 @@ import (
 
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 
 	// legacycomputeapi is the still-on-unikorn-cloud client used solely by the
 	// deprecated nscale_compute_cluster resource. The cluster surface was
@@ -40,10 +41,11 @@ type Client struct {
 	Region         regionapi.ClientInterface
 	Compute        computeapi.ClientInterface
 	LegacyCompute  legacycomputeapi.ClientInterface
+	Storage        storageapi.ClientInterface
 }
 
 func NewClient(
-	regionServiceBaseURL, computeServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string,
+	regionServiceBaseURL, computeServiceBaseURL, storageServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string,
 ) (*Client, error) {
 	httpClient := NewHTTPClient(userAgent, serviceToken)
 
@@ -65,6 +67,11 @@ func NewClient(
 		return nil, fmt.Errorf("failed to create Nscale legacy compute API client: %w", err)
 	}
 
+	storage, err := storageapi.NewClient(storageServiceBaseURL, storageapi.WithHTTPClient(httpClient))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Nscale storage API client: %w", err)
+	}
+
 	client := &Client{
 		RegionID:       regionID,
 		OrganizationID: organizationID,
@@ -72,6 +79,7 @@ func NewClient(
 		Region:         region,
 		Compute:        compute,
 		LegacyCompute:  legacyCompute,
+		Storage:        storage,
 	}
 
 	return client, nil
