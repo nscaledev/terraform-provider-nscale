@@ -1,0 +1,37 @@
+# golangci-lint configuration for the Nscale Terraform provider.
+# Run locally with `make lint` (requires golangci-lint v2.x).
+# See https://golangci-lint.run/usage/configuration/ for full reference.
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  default: none
+  enable:
+    - copyloopvar      # loop-variable copies (Go 1.22+ semantics)
+    - durationcheck    # two durations multiplied together
+    - errcheck         # unchecked errors
+    - forcetypeassert  # type assertions without comma-ok
+    - govet            # standard vet checks
+    - ineffassign      # ineffectual assignments
+    - misspell         # common English misspellings
+    - nilerr           # returns nil even when err is non-nil
+    - predeclared      # shadowing predeclared identifiers
+    - staticcheck      # broad correctness/style checks (absorbs gosimple in v2)
+    - unconvert        # redundant type conversions
+    - unparam          # unused function parameters
+    - unused           # unused code
+  settings:
+    misspell:
+      locale: US
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

@@ -133,7 +133,7 @@ func TestCreateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
 	}
 
 	if calls < 2 {
-		t.Fatalf("GetFunc call count = %d, want >= 2 (watcher must poll through provisioning before recognising error)", calls)
+		t.Fatalf("GetFunc call count = %d, want >= 2 (watcher must poll through provisioning before recognizing error)", calls)
 	}
 
 	if !response.Diagnostics.HasError() {

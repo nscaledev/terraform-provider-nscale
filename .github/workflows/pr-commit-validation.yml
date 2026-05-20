@@ -1,0 +1,19 @@
+---
+name: "[Pull Request] - Validate PR Name"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-pr-title:
+    name: Validate PR Title
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Commit Validation
+        uses: nscaledev/actions/validation/commits@6aed6334a10defa114a40449a5a2b7ac07bff588 # v0.2.6
