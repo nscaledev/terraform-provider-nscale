@@ -83,8 +83,6 @@ The Registry usually picks the release up within a few minutes via webhook.
 ### 6. Post-release
 
 - Announce in the relevant channel.
-- If the release was a major bump, update `examples/**/main.tf` and the
-  README quick-start version pin.
 
 ## GPG key
 

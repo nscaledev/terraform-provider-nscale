@@ -12,19 +12,15 @@ Categories used: `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 
 ### FEATURES
 
-- Added `nscale_ssh_certificate_authority` resource and data source ([#36](https://github.com/nscaledev/terraform-provider-nscale/pull/36)).
-- Wired `ssh_certificate_authority_id` into `nscale_instance` (DX-785).
 - Added file storage usage refresh control ([#40](https://github.com/nscaledev/terraform-provider-nscale/pull/40)).
 
 ### BUG FIXES
 
-- Detect in-use security group at plan time, surfacing the conflict before apply (ADA-12, [#37](https://github.com/nscaledev/terraform-provider-nscale/pull/37)).
 - Waiter now surfaces a diagnostic when a resource enters an error state (DX-1025, [#39](https://github.com/nscaledev/terraform-provider-nscale/pull/39)).
 
 ### DOCS
 
 - Added `tf-provider-feature` skill and reference guides ([#41](https://github.com/nscaledev/terraform-provider-nscale/pull/41)).
-- Tidied resource docs and examples.
 
 ## [1.1.0] - 2026-05-01
 
