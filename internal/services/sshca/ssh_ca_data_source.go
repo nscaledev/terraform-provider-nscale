@@ -22,6 +22,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
@@ -35,7 +36,11 @@ func NewSSHCertificateAuthorityDataSource() datasource.DataSource {
 	return &SSHCertificateAuthorityDataSource{}
 }
 
-func (s *SSHCertificateAuthorityDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
+func (s *SSHCertificateAuthorityDataSource) Configure(
+	ctx context.Context,
+	request datasource.ConfigureRequest,
+	response *datasource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -44,7 +49,10 @@ func (s *SSHCertificateAuthorityDataSource) Configure(ctx context.Context, reque
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -52,11 +60,19 @@ func (s *SSHCertificateAuthorityDataSource) Configure(ctx context.Context, reque
 	s.client = client
 }
 
-func (s *SSHCertificateAuthorityDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (s *SSHCertificateAuthorityDataSource) Metadata(
+	ctx context.Context,
+	request datasource.MetadataRequest,
+	response *datasource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_ssh_certificate_authority"
 }
 
-func (s *SSHCertificateAuthorityDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (s *SSHCertificateAuthorityDataSource) Schema(
+	ctx context.Context,
+	request datasource.SchemaRequest,
+	response *datasource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale SSH Certificate Authority",
 		Attributes: map[string]schema.Attribute{
@@ -88,7 +104,11 @@ func (s *SSHCertificateAuthorityDataSource) Schema(ctx context.Context, request 
 	}
 }
 
-func (s *SSHCertificateAuthorityDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (s *SSHCertificateAuthorityDataSource) Read(
+	ctx context.Context,
+	request datasource.ReadRequest,
+	response *datasource.ReadResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[SSHCertificateAuthorityModel](ctx, request.Config.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)

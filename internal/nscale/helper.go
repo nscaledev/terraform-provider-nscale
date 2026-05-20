@@ -67,7 +67,12 @@ func assertState[T any](state any, diagnostics *diag.Diagnostics) (*T, bool) {
 	return result, true
 }
 
-func addProvisioningErrorDiagnostic(diagnostics *diag.Diagnostics, resourceTitle string, metadata *coreapi.ProjectScopedResourceReadMetadata, detail string) bool {
+func addProvisioningErrorDiagnostic(
+	diagnostics *diag.Diagnostics,
+	resourceTitle string,
+	metadata *coreapi.ProjectScopedResourceReadMetadata,
+	detail string,
+) bool {
 	if metadata == nil || metadata.ProvisioningStatus != coreapi.ResourceProvisioningStatusError {
 		return false
 	}
@@ -86,7 +91,11 @@ type CreateStateWatcher[T any] struct {
 	GetFunc       func(ctx context.Context) (*T, *coreapi.ProjectScopedResourceReadMetadata, error)
 }
 
-func (w *CreateStateWatcher[T]) Wait(ctx context.Context, timeouts tftimeouts.Value, response *resource.CreateResponse) (*T, bool) {
+func (w *CreateStateWatcher[T]) Wait(
+	ctx context.Context,
+	timeouts tftimeouts.Value,
+	response *resource.CreateResponse,
+) (*T, bool) {
 	timeout, diagnostics := timeouts.Create(ctx, 30*time.Minute)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -137,8 +146,12 @@ func (w *CreateStateWatcher[T]) Wait(ctx context.Context, timeouts tftimeouts.Va
 		return zero, false
 	}
 
-	if addProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
-		"was created but transitioned to 'error' instead of 'provisioned'. Run 'terraform apply' to try again, or reach out to support.") {
+	if addProvisioningErrorDiagnostic(
+		&response.Diagnostics,
+		w.ResourceTitle,
+		lastMetadata,
+		"was created but transitioned to 'error' instead of 'provisioned'. Run 'terraform apply' to try again, or reach out to support.",
+	) {
 		return result, false
 	}
 
@@ -159,7 +172,11 @@ func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resou
 		if e, ok := AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 			response.Diagnostics.AddWarning(
 				fmt.Sprintf("%s Not Found", r.ResourceTitle),
-				fmt.Sprintf("The %s with ID %s was not found on the server and will be removed from the state file.", r.ResourceName, id),
+				fmt.Sprintf(
+					"The %s with ID %s was not found on the server and will be removed from the state file.",
+					r.ResourceName,
+					id,
+				),
 			)
 			response.State.RemoveResource(ctx)
 			return zero, false
@@ -240,7 +257,12 @@ type UpdateStateWatcher[T any] struct {
 	GetFunc       func(ctx context.Context) (*T, *coreapi.ProjectScopedResourceReadMetadata, error)
 }
 
-func (w *UpdateStateWatcher[T]) Wait(ctx context.Context, operationTagKey string, timeouts tftimeouts.Value, response *resource.UpdateResponse) (*T, bool) {
+func (w *UpdateStateWatcher[T]) Wait(
+	ctx context.Context,
+	operationTagKey string,
+	timeouts tftimeouts.Value,
+	response *resource.UpdateResponse,
+) (*T, bool) {
 	timeout, diagnostics := timeouts.Update(ctx, 30*time.Minute)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -311,7 +333,11 @@ type DeleteStateWatcher struct {
 	GetFunc       func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error)
 }
 
-func (w *DeleteStateWatcher) Wait(ctx context.Context, timeouts tftimeouts.Value, response *resource.DeleteResponse) bool {
+func (w *DeleteStateWatcher) Wait(
+	ctx context.Context,
+	timeouts tftimeouts.Value,
+	response *resource.DeleteResponse,
+) bool {
 	timeout, diagnostics := timeouts.Delete(ctx, 30*time.Minute)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -351,8 +377,12 @@ func (w *DeleteStateWatcher) Wait(ctx context.Context, timeouts tftimeouts.Value
 		return false
 	}
 
-	if addProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
-		"transitioned to 'error' during deprovisioning instead of being removed. Re-run 'terraform destroy' to try again, or reach out to support.") {
+	if addProvisioningErrorDiagnostic(
+		&response.Diagnostics,
+		w.ResourceTitle,
+		lastMetadata,
+		"transitioned to 'error' during deprovisioning instead of being removed. Re-run 'terraform destroy' to try again, or reach out to support.",
+	) {
 		return false
 	}
 

@@ -32,10 +32,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 )
 
 var (
@@ -56,7 +57,11 @@ func NewSecurityGroupResource() resource.Resource {
 	return &SecurityGroupResource{}
 }
 
-func (r *SecurityGroupResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
+func (r *SecurityGroupResource) Configure(
+	ctx context.Context,
+	request resource.ConfigureRequest,
+	response *resource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -65,7 +70,10 @@ func (r *SecurityGroupResource) Configure(ctx context.Context, request resource.
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -73,15 +81,27 @@ func (r *SecurityGroupResource) Configure(ctx context.Context, request resource.
 	r.client = client
 }
 
-func (r *SecurityGroupResource) ImportState(ctx context.Context, request resource.ImportStateRequest, response *resource.ImportStateResponse) {
+func (r *SecurityGroupResource) ImportState(
+	ctx context.Context,
+	request resource.ImportStateRequest,
+	response *resource.ImportStateResponse,
+) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), request, response)
 }
 
-func (r *SecurityGroupResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (r *SecurityGroupResource) Metadata(
+	ctx context.Context,
+	request resource.MetadataRequest,
+	response *resource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_security_group"
 }
 
-func (r *SecurityGroupResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (r *SecurityGroupResource) Schema(
+	ctx context.Context,
+	request resource.SchemaRequest,
+	response *resource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale Security Group",
 		Attributes: map[string]schema.Attribute{
@@ -184,7 +204,11 @@ func (r *SecurityGroupResource) Schema(ctx context.Context, request resource.Sch
 	}
 }
 
-func (r *SecurityGroupResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (r *SecurityGroupResource) Create(
+	ctx context.Context,
+	request resource.CreateRequest,
+	response *resource.CreateResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.Plan.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -240,7 +264,11 @@ func (r *SecurityGroupResource) Create(ctx context.Context, request resource.Cre
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *SecurityGroupResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (r *SecurityGroupResource) Read(
+	ctx context.Context,
+	request resource.ReadRequest,
+	response *resource.ReadResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.State.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -264,7 +292,11 @@ func (r *SecurityGroupResource) Read(ctx context.Context, request resource.ReadR
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *SecurityGroupResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (r *SecurityGroupResource) Update(
+	ctx context.Context,
+	request resource.UpdateRequest,
+	response *resource.UpdateResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.Plan.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -289,7 +321,9 @@ func (r *SecurityGroupResource) Update(ctx context.Context, request resource.Upd
 		return
 	}
 
-	if _, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupUpdateResponse); err != nil {
+	if _, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](
+		securityGroupUpdateResponse,
+	); err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Update Security Group",
@@ -315,7 +349,11 @@ func (r *SecurityGroupResource) Update(ctx context.Context, request resource.Upd
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *SecurityGroupResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (r *SecurityGroupResource) Delete(
+	ctx context.Context,
+	request resource.DeleteRequest,
+	response *resource.DeleteResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[SecurityGroupResourceModel](ctx, request.State.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)

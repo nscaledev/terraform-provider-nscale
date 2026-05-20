@@ -45,7 +45,9 @@ func NewSSHCertificateAuthorityModel(source *regionapi.SshCertificateAuthorityV2
 	}
 }
 
-func (m *SSHCertificateAuthorityModel) NscaleSSHCACreateParams(organizationID string) regionapi.SshCertificateAuthorityV2Create {
+func (m *SSHCertificateAuthorityModel) NscaleSSHCACreateParams(
+	organizationID string,
+) regionapi.SshCertificateAuthorityV2Create {
 	return regionapi.SshCertificateAuthorityV2Create{
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),

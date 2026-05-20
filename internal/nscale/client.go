@@ -34,7 +34,9 @@ type Client struct {
 	Compute        computeapi.ClientInterface
 }
 
-func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string) (*Client, error) {
+func NewClient(
+	regionServiceBaseURL, computeServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string,
+) (*Client, error) {
 	httpClient := NewHTTPClient(userAgent, serviceToken)
 
 	region, err := regionapi.NewClient(regionServiceBaseURL, regionapi.WithHTTPClient(httpClient))

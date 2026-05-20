@@ -19,8 +19,9 @@ package filestorage
 import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
 
 type FileStorageClassModel struct {

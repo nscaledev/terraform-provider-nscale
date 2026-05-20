@@ -40,7 +40,11 @@ func (v NoReservedPrefixValidator) MarkdownDescription(ctx context.Context) stri
 	return v.Description(ctx)
 }
 
-func (v NoReservedPrefixValidator) ValidateString(ctx context.Context, request validator.StringRequest, response *validator.StringResponse) {
+func (v NoReservedPrefixValidator) ValidateString(
+	ctx context.Context,
+	request validator.StringRequest,
+	response *validator.StringResponse,
+) {
 	if request.ConfigValue.IsNull() || request.ConfigValue.IsUnknown() {
 		return
 	}

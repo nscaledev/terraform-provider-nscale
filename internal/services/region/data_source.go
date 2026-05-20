@@ -23,8 +23,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &RegionDataSource{}
@@ -37,7 +38,11 @@ func NewRegionDataSource() datasource.DataSource {
 	return &RegionDataSource{}
 }
 
-func (s *RegionDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
+func (s *RegionDataSource) Configure(
+	ctx context.Context,
+	request datasource.ConfigureRequest,
+	response *datasource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -46,7 +51,10 @@ func (s *RegionDataSource) Configure(ctx context.Context, request datasource.Con
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -54,11 +62,19 @@ func (s *RegionDataSource) Configure(ctx context.Context, request datasource.Con
 	s.client = client
 }
 
-func (s *RegionDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (s *RegionDataSource) Metadata(
+	ctx context.Context,
+	request datasource.MetadataRequest,
+	response *datasource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_region"
 }
 
-func (s *RegionDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (s *RegionDataSource) Schema(
+	ctx context.Context,
+	request datasource.SchemaRequest,
+	response *datasource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale Region",
 		Attributes: map[string]schema.Attribute{
@@ -85,7 +101,11 @@ func (s *RegionDataSource) setDefaultID(data *RegionModel) {
 	}
 }
 
-func (s *RegionDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (s *RegionDataSource) Read(
+	ctx context.Context,
+	request datasource.ReadRequest,
+	response *datasource.ReadResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[RegionModel](ctx, request.Config.Get, s.setDefaultID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)

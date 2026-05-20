@@ -23,10 +23,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
 
 type SecurityGroupModel struct {

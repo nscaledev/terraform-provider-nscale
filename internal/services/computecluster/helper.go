@@ -21,13 +21,22 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
-func getComputeCluster(ctx context.Context, organizationID, id string, client *nscale.Client) (*computeapi.ComputeClusterRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	computeClusterListResponse, err := client.Compute.GetApiV1OrganizationsOrganizationIDClusters(ctx, organizationID, nil)
+func getComputeCluster(
+	ctx context.Context,
+	organizationID, id string,
+	client *nscale.Client,
+) (*computeapi.ComputeClusterRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
+	computeClusterListResponse, err := client.Compute.GetApiV1OrganizationsOrganizationIDClusters(
+		ctx,
+		organizationID,
+		nil,
+	)
 	if err != nil {
 		return nil, nil, err
 	}

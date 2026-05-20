@@ -19,12 +19,17 @@ package network
 import (
 	"context"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
-func getNetwork(ctx context.Context, id string, client *nscale.Client) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
+func getNetwork(
+	ctx context.Context,
+	id string,
+	client *nscale.Client,
+) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
 	networkResponse, err := client.Region.GetApiV2NetworksNetworkID(ctx, id)
 	if err != nil {
 		return nil, nil, err

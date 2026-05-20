@@ -24,8 +24,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &InstanceFlavorDataSource{}
@@ -38,7 +39,11 @@ func NewInstanceSSHKeyDataSource() datasource.DataSource {
 	return &InstanceSSHKeyDataSource{}
 }
 
-func (s *InstanceSSHKeyDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
+func (s *InstanceSSHKeyDataSource) Configure(
+	ctx context.Context,
+	request datasource.ConfigureRequest,
+	response *datasource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -47,7 +52,10 @@ func (s *InstanceSSHKeyDataSource) Configure(ctx context.Context, request dataso
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -55,11 +63,19 @@ func (s *InstanceSSHKeyDataSource) Configure(ctx context.Context, request dataso
 	s.client = client
 }
 
-func (s *InstanceSSHKeyDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (s *InstanceSSHKeyDataSource) Metadata(
+	ctx context.Context,
+	request datasource.MetadataRequest,
+	response *datasource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_instance_ssh_key"
 }
 
-func (s *InstanceSSHKeyDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (s *InstanceSSHKeyDataSource) Schema(
+	ctx context.Context,
+	request datasource.SchemaRequest,
+	response *datasource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale Instance SSH Key",
 		Attributes: map[string]schema.Attribute{
@@ -76,7 +92,11 @@ func (s *InstanceSSHKeyDataSource) Schema(ctx context.Context, request datasourc
 	}
 }
 
-func (s *InstanceSSHKeyDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (s *InstanceSSHKeyDataSource) Read(
+	ctx context.Context,
+	request datasource.ReadRequest,
+	response *datasource.ReadResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[InstanceSSHKeyModel](ctx, request.Config.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -99,7 +119,10 @@ func (s *InstanceSSHKeyDataSource) Read(ctx context.Context, request datasource.
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 			response.Diagnostics.AddWarning(
 				"Instance SSH Key Not Available",
-				fmt.Sprintf("The instance with ID %s has no auto-generated SSH key, likely because it was created with an SSH certificate authority. The private_key attribute will be null.", instanceID),
+				fmt.Sprintf(
+					"The instance with ID %s has no auto-generated SSH key, likely because it was created with an SSH certificate authority. The private_key attribute will be null.",
+					instanceID,
+				),
 			)
 			data.PrivateKey = types.StringNull()
 			response.Diagnostics.Append(response.State.Set(ctx, data)...)

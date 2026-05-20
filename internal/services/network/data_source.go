@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
@@ -36,7 +37,11 @@ func NewNetworkDataSource() datasource.DataSource {
 	return &NetworkDataSource{}
 }
 
-func (s *NetworkDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
+func (s *NetworkDataSource) Configure(
+	ctx context.Context,
+	request datasource.ConfigureRequest,
+	response *datasource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -45,7 +50,10 @@ func (s *NetworkDataSource) Configure(ctx context.Context, request datasource.Co
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -53,11 +61,19 @@ func (s *NetworkDataSource) Configure(ctx context.Context, request datasource.Co
 	s.client = client
 }
 
-func (s *NetworkDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (s *NetworkDataSource) Metadata(
+	ctx context.Context,
+	request datasource.MetadataRequest,
+	response *datasource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_network"
 }
 
-func (s *NetworkDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (s *NetworkDataSource) Schema(
+	ctx context.Context,
+	request datasource.SchemaRequest,
+	response *datasource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale Network",
 		Attributes: map[string]schema.Attribute{
@@ -119,7 +135,11 @@ func (s *NetworkDataSource) Schema(ctx context.Context, request datasource.Schem
 	}
 }
 
-func (s *NetworkDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (s *NetworkDataSource) Read(
+	ctx context.Context,
+	request datasource.ReadRequest,
+	response *datasource.ReadResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[NetworkModel](ctx, request.Config.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)

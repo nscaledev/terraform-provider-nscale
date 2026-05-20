@@ -24,11 +24,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
+	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/pointer"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
-	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
-	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 )
 
 type InstanceModel struct {
@@ -81,7 +82,9 @@ func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
 	}
 }
 
-func (m *InstanceModel) NscaleInstanceCreateParams(organizationID string) (computeapi.InstanceCreate, diag.Diagnostics) {
+func (m *InstanceModel) NscaleInstanceCreateParams(
+	organizationID string,
+) (computeapi.InstanceCreate, diag.Diagnostics) {
 	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return computeapi.InstanceCreate{}, diagnostics
@@ -90,7 +93,11 @@ func (m *InstanceModel) NscaleInstanceCreateParams(organizationID string) (compu
 	tags = nscale.RemoveOperationTags(tags)
 
 	var sourceNetworkInterface InstanceNetworkInterfaceModel
-	if diagnostics = m.NetworkInterface.As(context.TODO(), &sourceNetworkInterface, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
+	if diagnostics = m.NetworkInterface.As(
+		context.TODO(),
+		&sourceNetworkInterface,
+		basetypes.ObjectAsOptions{},
+	); diagnostics.HasError() {
 		return computeapi.InstanceCreate{}, diagnostics
 	}
 
@@ -135,7 +142,11 @@ func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate,
 	tags = nscale.RemoveOperationTags(tags)
 
 	var sourceNetworkInterface InstanceNetworkInterfaceModel
-	if diagnostics = m.NetworkInterface.As(context.TODO(), &sourceNetworkInterface, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
+	if diagnostics = m.NetworkInterface.As(
+		context.TODO(),
+		&sourceNetworkInterface,
+		basetypes.ObjectAsOptions{},
+	); diagnostics.HasError() {
 		return computeapi.InstanceUpdate{}, diagnostics
 	}
 
@@ -219,7 +230,11 @@ func NewInstanceNetworkInterfaceModel(spec computeapi.InstanceSpec, status compu
 
 func (m *InstanceNetworkInterfaceModel) NscaleInstanceNetworking() (computeapi.InstanceNetworking, diag.Diagnostics) {
 	var allowedSourceAddresses []string
-	if diagnostics := m.AllowedDestinations.ElementsAs(context.TODO(), &allowedSourceAddresses, false); diagnostics.HasError() {
+	if diagnostics := m.AllowedDestinations.ElementsAs(
+		context.TODO(),
+		&allowedSourceAddresses,
+		false,
+	); diagnostics.HasError() {
 		return computeapi.InstanceNetworking{}, diagnostics
 	}
 

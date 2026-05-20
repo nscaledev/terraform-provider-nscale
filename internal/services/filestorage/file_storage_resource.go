@@ -31,10 +31,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 )
 
 var (
@@ -56,7 +57,11 @@ func NewFileStorageResource() resource.Resource {
 	return &FileStorageResource{}
 }
 
-func (r *FileStorageResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
+func (r *FileStorageResource) Configure(
+	ctx context.Context,
+	request resource.ConfigureRequest,
+	response *resource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -65,7 +70,10 @@ func (r *FileStorageResource) Configure(ctx context.Context, request resource.Co
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -73,15 +81,27 @@ func (r *FileStorageResource) Configure(ctx context.Context, request resource.Co
 	r.client = client
 }
 
-func (r *FileStorageResource) ImportState(ctx context.Context, request resource.ImportStateRequest, response *resource.ImportStateResponse) {
+func (r *FileStorageResource) ImportState(
+	ctx context.Context,
+	request resource.ImportStateRequest,
+	response *resource.ImportStateResponse,
+) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), request, response)
 }
 
-func (r *FileStorageResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (r *FileStorageResource) Metadata(
+	ctx context.Context,
+	request resource.MetadataRequest,
+	response *resource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_file_storage"
 }
 
-func (r *FileStorageResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (r *FileStorageResource) Schema(
+	ctx context.Context,
+	request resource.SchemaRequest,
+	response *resource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale File Storage",
 		Attributes: map[string]schema.Attribute{
@@ -208,7 +228,11 @@ func (m *FileStorageResourceModel) preserveSizeIfUsageRefreshDisabled(previousSi
 	m.Size = previousSize
 }
 
-func (r *FileStorageResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (r *FileStorageResource) Create(
+	ctx context.Context,
+	request resource.CreateRequest,
+	response *resource.CreateResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.Plan.Get, r.setDefaults)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -290,8 +314,16 @@ func (r *FileStorageResource) Read(ctx context.Context, request resource.ReadReq
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *FileStorageResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	priorState, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.State.Get, r.setDefaults)
+func (r *FileStorageResource) Update(
+	ctx context.Context,
+	request resource.UpdateRequest,
+	response *resource.UpdateResponse,
+) {
+	priorState, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](
+		ctx,
+		request.State.Get,
+		r.setDefaults,
+	)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -348,7 +380,11 @@ func (r *FileStorageResource) Update(ctx context.Context, request resource.Updat
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *FileStorageResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (r *FileStorageResource) Delete(
+	ctx context.Context,
+	request resource.DeleteRequest,
+	response *resource.DeleteResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.State.Get, r.setDefaults)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)

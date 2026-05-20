@@ -26,10 +26,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
 
 type ComputeClusterModel struct {
@@ -163,7 +164,7 @@ type WorkloadPoolModel struct {
 	// REVIEW_ME: Should we accept the image and flavor names instead of their IDs?
 	ImageID  types.String `tfsdk:"image_id"`
 	FlavorID types.String `tfsdk:"flavor_id"`
-	//DiskSize          types.Int64  `tfsdk:"disk_size"`
+	// DiskSize          types.Int64  `tfsdk:"disk_size"`
 	UserData            types.String `tfsdk:"user_data"`
 	EnablePublicIP      types.Bool   `tfsdk:"enable_public_ip"`
 	AllowedAddressPairs types.Set    `tfsdk:"allowed_address_pairs"`
@@ -171,7 +172,10 @@ type WorkloadPoolModel struct {
 	Machines            types.List   `tfsdk:"machines"`
 }
 
-func NewWorkloadPoolModel(spec computeapi.ComputeClusterWorkloadPool, status *computeapi.ComputeClusterWorkloadPoolStatus) attr.Value {
+func NewWorkloadPoolModel(
+	spec computeapi.ComputeClusterWorkloadPool,
+	status *computeapi.ComputeClusterWorkloadPoolStatus,
+) attr.Value {
 	var userData types.String
 	if spec.Machine.UserData != nil {
 		userData = types.StringValue(string(*spec.Machine.UserData))
@@ -220,7 +224,10 @@ func NewWorkloadPoolModel(spec computeapi.ComputeClusterWorkloadPool, status *co
 	)
 }
 
-func NewWorkloadPoolModels(specs []computeapi.ComputeClusterWorkloadPool, statuses *computeapi.ComputeClusterWorkloadPoolsStatus) types.List {
+func NewWorkloadPoolModels(
+	specs []computeapi.ComputeClusterWorkloadPool,
+	statuses *computeapi.ComputeClusterWorkloadPoolsStatus,
+) types.List {
 	statusMemo := make(map[string]*computeapi.ComputeClusterWorkloadPoolStatus)
 	if statuses != nil {
 		workloadPools := *statuses

@@ -36,10 +36,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 )
 
 var (
@@ -60,7 +61,11 @@ func NewComputeClusterResource() resource.Resource {
 	return &ComputeClusterResource{}
 }
 
-func (r *ComputeClusterResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
+func (r *ComputeClusterResource) Configure(
+	ctx context.Context,
+	request resource.ConfigureRequest,
+	response *resource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -69,7 +74,10 @@ func (r *ComputeClusterResource) Configure(ctx context.Context, request resource
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -77,15 +85,27 @@ func (r *ComputeClusterResource) Configure(ctx context.Context, request resource
 	r.client = client
 }
 
-func (r *ComputeClusterResource) ImportState(ctx context.Context, request resource.ImportStateRequest, response *resource.ImportStateResponse) {
+func (r *ComputeClusterResource) ImportState(
+	ctx context.Context,
+	request resource.ImportStateRequest,
+	response *resource.ImportStateResponse,
+) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), request, response)
 }
 
-func (r *ComputeClusterResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (r *ComputeClusterResource) Metadata(
+	ctx context.Context,
+	request resource.MetadataRequest,
+	response *resource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_compute_cluster"
 }
 
-func (r *ComputeClusterResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (r *ComputeClusterResource) Schema(
+	ctx context.Context,
+	request resource.SchemaRequest,
+	response *resource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		DeprecationMessage:  "The nscale_compute_cluster resource is deprecated and will be removed in a future release. Consider using the nscale_instance resource for more flexible configuration.",
 		MarkdownDescription: "Nscale Compute Cluster",
@@ -296,8 +316,16 @@ func (r *ComputeClusterResource) setDefaultRegionID(data *ComputeClusterResource
 	}
 }
 
-func (r *ComputeClusterResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+func (r *ComputeClusterResource) Create(
+	ctx context.Context,
+	request resource.CreateRequest,
+	response *resource.CreateResponse,
+) {
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](
+		ctx,
+		request.Plan.Get,
+		r.setDefaultRegionID,
+	)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -310,7 +338,12 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 	}
 
 	// REVIEW_ME: Should we retrieve the organization ID and project ID using the service token, or is that even possible?
-	computeClusterCreateResponse, err := r.client.Compute.PostApiV1OrganizationsOrganizationIDProjectsProjectIDClusters(ctx, r.client.OrganizationID, r.client.ProjectID, requestData)
+	computeClusterCreateResponse, err := r.client.Compute.PostApiV1OrganizationsOrganizationIDProjectsProjectIDClusters(
+		ctx,
+		r.client.OrganizationID,
+		r.client.ProjectID,
+		requestData,
+	)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Compute Cluster",
@@ -353,8 +386,16 @@ func (r *ComputeClusterResource) Create(ctx context.Context, request resource.Cr
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *ComputeClusterResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
+func (r *ComputeClusterResource) Read(
+	ctx context.Context,
+	request resource.ReadRequest,
+	response *resource.ReadResponse,
+) {
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](
+		ctx,
+		request.State.Get,
+		r.setDefaultRegionID,
+	)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -377,8 +418,16 @@ func (r *ComputeClusterResource) Read(ctx context.Context, request resource.Read
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *ComputeClusterResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](ctx, request.Plan.Get, r.setDefaultRegionID)
+func (r *ComputeClusterResource) Update(
+	ctx context.Context,
+	request resource.UpdateRequest,
+	response *resource.UpdateResponse,
+) {
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](
+		ctx,
+		request.Plan.Get,
+		r.setDefaultRegionID,
+	)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -393,7 +442,13 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 	id := data.ID.ValueString()
 	operationTagKey := nscale.WriteOperationTag(&requestData.Metadata)
 
-	computeClusterUpdateResponse, err := r.client.Compute.PutApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(ctx, r.client.OrganizationID, r.client.ProjectID, id, requestData)
+	computeClusterUpdateResponse, err := r.client.Compute.PutApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(
+		ctx,
+		r.client.OrganizationID,
+		r.client.ProjectID,
+		id,
+		requestData,
+	)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Compute Cluster",
@@ -428,8 +483,16 @@ func (r *ComputeClusterResource) Update(ctx context.Context, request resource.Up
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](ctx, request.State.Get, r.setDefaultRegionID)
+func (r *ComputeClusterResource) Delete(
+	ctx context.Context,
+	request resource.DeleteRequest,
+	response *resource.DeleteResponse,
+) {
+	data, diagnostics := nscale.ReadTerraformState[ComputeClusterResourceModel](
+		ctx,
+		request.State.Get,
+		r.setDefaultRegionID,
+	)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -437,7 +500,12 @@ func (r *ComputeClusterResource) Delete(ctx context.Context, request resource.De
 
 	id := data.ID.ValueString()
 
-	computeClusterDeleteResponse, err := r.client.Compute.DeleteApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(ctx, r.client.OrganizationID, r.client.ProjectID, id)
+	computeClusterDeleteResponse, err := r.client.Compute.DeleteApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(
+		ctx,
+		r.client.OrganizationID,
+		r.client.ProjectID,
+		id,
+	)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete Compute Cluster",

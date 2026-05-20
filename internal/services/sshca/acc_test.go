@@ -19,6 +19,7 @@ package sshca_test
 import (
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/provider"
 )
 

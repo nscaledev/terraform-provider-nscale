@@ -19,12 +19,17 @@ package sshca
 import (
 	"context"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
-func getSSHCA(ctx context.Context, id string, client *nscale.Client) (*regionapi.SshCertificateAuthorityV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
+func getSSHCA(
+	ctx context.Context,
+	id string,
+	client *nscale.Client,
+) (*regionapi.SshCertificateAuthorityV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
 	resp, err := client.Region.GetApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, id)
 	if err != nil {
 		return nil, nil, err

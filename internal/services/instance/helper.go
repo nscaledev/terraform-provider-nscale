@@ -19,12 +19,17 @@ package instance
 import (
 	"context"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
-func getInstance(ctx context.Context, id string, client *nscale.Client) (*computeapi.InstanceRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
+func getInstance(
+	ctx context.Context,
+	id string,
+	client *nscale.Client,
+) (*computeapi.InstanceRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
 	instanceResponse, err := client.Compute.GetApiV2InstancesInstanceID(ctx, id)
 	if err != nil {
 		return nil, nil, err

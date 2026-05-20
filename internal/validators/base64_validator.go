@@ -34,7 +34,11 @@ func (v Base64Validator) MarkdownDescription(ctx context.Context) string {
 	return v.Description(ctx)
 }
 
-func (v Base64Validator) ValidateString(ctx context.Context, request validator.StringRequest, response *validator.StringResponse) {
+func (v Base64Validator) ValidateString(
+	ctx context.Context,
+	request validator.StringRequest,
+	response *validator.StringResponse,
+) {
 	if request.ConfigValue.IsNull() || request.ConfigValue.IsUnknown() {
 		return
 	}
