@@ -403,7 +403,18 @@ linters:
     wrapcheck:
       # Errors from these packages are surfaced to TF Diagnostics as-is — the framework
       # formats them for the user, so wrapping would add noise without value.
-      ignoreSigs:
+      ignore-sigs:
+        # Defaults — setting `ignore-sigs` replaces them entirely, so repeat here.
+        - .Errorf(
+        - errors.New(
+        - errors.Unwrap(
+        - errors.Join(
+        - .Wrap(
+        - .Wrapf(
+        - .WithMessage(
+        - .WithMessagef(
+        - .WithStack(
+        # Project-specific signatures.
         - .DefaultRetryPolicy(
         - .RetryContext(
         - .ReadEmptyResponse(

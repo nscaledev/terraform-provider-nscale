@@ -41,14 +41,12 @@ func NewClient(
 
 	region, err := regionapi.NewClient(regionServiceBaseURL, regionapi.WithHTTPClient(httpClient))
 	if err != nil {
-		err = fmt.Errorf("failed to create Nscale region API client: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create Nscale region API client: %w", err)
 	}
 
 	compute, err := computeapi.NewClient(computeServiceBaseURL, computeapi.WithHTTPClient(httpClient))
 	if err != nil {
-		err = fmt.Errorf("failed to create Nscale compute API client: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create Nscale compute API client: %w", err)
 	}
 
 	client := &Client{
