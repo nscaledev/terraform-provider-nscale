@@ -23,10 +23,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
 
 type FileStorageModel struct {
@@ -44,10 +45,13 @@ type FileStorageModel struct {
 	CreationTime   types.String `tfsdk:"creation_time"`
 }
 
+// bytesToGiBShift converts a byte count to whole gibibytes (1 GiB = 2^30 bytes).
+const bytesToGiBShift = 30
+
 func NewFileStorageModel(source *regionapi.StorageV2Read) FileStorageModel {
 	size := types.Int64Value(0)
 	if source.Status.Usage != nil && source.Status.Usage.UsedBytes != nil {
-		size = types.Int64Value(*source.Status.Usage.UsedBytes >> 30)
+		size = types.Int64Value(*source.Status.Usage.UsedBytes >> bytesToGiBShift)
 	}
 
 	rootSquash := types.BoolNull()
@@ -92,7 +96,9 @@ func (m *FileStorageModel) networkIDs() ([]string, diag.Diagnostics) {
 	return networkIDs, nil
 }
 
-func (m *FileStorageModel) NscaleFileStorageCreateParams(organizationID string) (regionapi.StorageV2Create, diag.Diagnostics) {
+func (m *FileStorageModel) NscaleFileStorageCreateParams(
+	organizationID string,
+) (regionapi.StorageV2Create, diag.Diagnostics) {
 	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Create{}, diagnostics

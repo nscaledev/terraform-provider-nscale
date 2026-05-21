@@ -1,0 +1,24 @@
+---
+name: "[Pull Request] - Validate PR Name"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-pr-title:
+    name: Validate PR Title
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+    steps:
+      # Uses the same upstream action that nscaledev/actions/validation/commits
+      # wraps at v0.2.6. The org wrapper repo is private and can't be resolved
+      # from this public repo, so we depend on the public upstream directly.
+      - name: PR Conventional Commit Validation
+        uses: ytanikin/pr-conventional-commits@05b6c51a991169e3ae3fad39cde73d6bae7285ec # 1.4.1
+        with:
+          task_types: '["build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "release", "revert", "style", "test"]'

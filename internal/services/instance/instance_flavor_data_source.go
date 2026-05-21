@@ -23,8 +23,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &InstanceFlavorDataSource{}
@@ -37,7 +38,11 @@ func NewInstanceFlavorDataSource() datasource.DataSource {
 	return &InstanceFlavorDataSource{}
 }
 
-func (s *InstanceFlavorDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
+func (s *InstanceFlavorDataSource) Configure(
+	ctx context.Context,
+	request datasource.ConfigureRequest,
+	response *datasource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -46,7 +51,10 @@ func (s *InstanceFlavorDataSource) Configure(ctx context.Context, request dataso
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -54,11 +62,19 @@ func (s *InstanceFlavorDataSource) Configure(ctx context.Context, request dataso
 	s.client = client
 }
 
-func (s *InstanceFlavorDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (s *InstanceFlavorDataSource) Metadata(
+	ctx context.Context,
+	request datasource.MetadataRequest,
+	response *datasource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_instance_flavor"
 }
 
-func (s *InstanceFlavorDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (s *InstanceFlavorDataSource) Schema(
+	ctx context.Context,
+	request datasource.SchemaRequest,
+	response *datasource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale Instance Flavor",
 		Attributes: map[string]schema.Attribute{
@@ -130,7 +146,11 @@ func (s *InstanceFlavorDataSource) setDefaultRegionID(data *InstanceFlavorModel)
 	}
 }
 
-func (s *InstanceFlavorDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (s *InstanceFlavorDataSource) Read(
+	ctx context.Context,
+	request datasource.ReadRequest,
+	response *datasource.ReadResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[InstanceFlavorModel](ctx, request.Config.Get, s.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -139,7 +159,11 @@ func (s *InstanceFlavorDataSource) Read(ctx context.Context, request datasource.
 
 	regionID := data.RegionID.ValueString()
 
-	flavorListResponse, err := s.client.Compute.GetApiV1OrganizationsOrganizationIDRegionsRegionIDFlavors(ctx, s.client.OrganizationID, regionID)
+	flavorListResponse, err := s.client.Compute.GetApiV1OrganizationsOrganizationIDRegionsRegionIDFlavors(
+		ctx,
+		s.client.OrganizationID,
+		regionID,
+	)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Instance Flavor",
@@ -147,6 +171,7 @@ func (s *InstanceFlavorDataSource) Read(ctx context.Context, request datasource.
 		)
 		return
 	}
+	defer flavorListResponse.Body.Close()
 
 	flavors, err := nscale.ReadJSONResponseValue[[]regionapi.Flavor](flavorListResponse)
 	if err != nil {

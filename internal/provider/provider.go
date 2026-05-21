@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/computecluster"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/filestorage"
@@ -59,7 +60,11 @@ func New() provider.Provider {
 	return NscaleProvider{}
 }
 
-func (p NscaleProvider) Metadata(ctx context.Context, request provider.MetadataRequest, response *provider.MetadataResponse) {
+func (p NscaleProvider) Metadata(
+	ctx context.Context,
+	request provider.MetadataRequest,
+	response *provider.MetadataResponse,
+) {
 	response.TypeName = "nscale"
 	response.Version = version.ProviderVersion
 }
@@ -96,7 +101,11 @@ func (p NscaleProvider) Schema(ctx context.Context, request provider.SchemaReque
 	}
 }
 
-func (p NscaleProvider) Configure(ctx context.Context, request provider.ConfigureRequest, response *provider.ConfigureResponse) {
+func (p NscaleProvider) Configure(
+	ctx context.Context,
+	request provider.ConfigureRequest,
+	response *provider.ConfigureResponse,
+) {
 	var data NscaleProviderModel
 
 	response.Diagnostics.Append(request.Config.Get(ctx, &data)...)
@@ -168,9 +177,21 @@ func (p NscaleProvider) Configure(ctx context.Context, request provider.Configur
 		return
 	}
 
-	userAgent := fmt.Sprintf("Terraform/%s terraform-provider-nscale/%s", request.TerraformVersion, version.ProviderVersion)
+	userAgent := fmt.Sprintf(
+		"Terraform/%s terraform-provider-nscale/%s",
+		request.TerraformVersion,
+		version.ProviderVersion,
+	)
 
-	client, err := nscale.NewClient(regionServiceAPIEndpoint, computeServiceAPIEndpoint, serviceToken, organizationID, projectID, regionID, userAgent)
+	client, err := nscale.NewClient(
+		regionServiceAPIEndpoint,
+		computeServiceAPIEndpoint,
+		serviceToken,
+		organizationID,
+		projectID,
+		regionID,
+		userAgent,
+	)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Create Nscale Client",

@@ -30,10 +30,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 )
 
 var (
@@ -43,6 +44,7 @@ var (
 
 type SSHCertificateAuthorityResourceModel struct {
 	SSHCertificateAuthorityModel
+
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
@@ -54,7 +56,11 @@ func NewSSHCertificateAuthorityResource() resource.Resource {
 	return &SSHCertificateAuthorityResource{}
 }
 
-func (r *SSHCertificateAuthorityResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
+func (r *SSHCertificateAuthorityResource) Configure(
+	ctx context.Context,
+	request resource.ConfigureRequest,
+	response *resource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -63,7 +69,10 @@ func (r *SSHCertificateAuthorityResource) Configure(ctx context.Context, request
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -71,15 +80,27 @@ func (r *SSHCertificateAuthorityResource) Configure(ctx context.Context, request
 	r.client = client
 }
 
-func (r *SSHCertificateAuthorityResource) ImportState(ctx context.Context, request resource.ImportStateRequest, response *resource.ImportStateResponse) {
+func (r *SSHCertificateAuthorityResource) ImportState(
+	ctx context.Context,
+	request resource.ImportStateRequest,
+	response *resource.ImportStateResponse,
+) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), request, response)
 }
 
-func (r *SSHCertificateAuthorityResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (r *SSHCertificateAuthorityResource) Metadata(
+	ctx context.Context,
+	request resource.MetadataRequest,
+	response *resource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_ssh_certificate_authority"
 }
 
-func (r *SSHCertificateAuthorityResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (r *SSHCertificateAuthorityResource) Schema(
+	ctx context.Context,
+	request resource.SchemaRequest,
+	response *resource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale SSH Certificate Authority",
 		Attributes: map[string]schema.Attribute{
@@ -147,8 +168,16 @@ func (r *SSHCertificateAuthorityResource) setDefaultIDs(data *SSHCertificateAuth
 	}
 }
 
-func (r *SSHCertificateAuthorityResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	data, diagnostics := nscale.ReadTerraformState[SSHCertificateAuthorityResourceModel](ctx, request.Plan.Get, r.setDefaultIDs)
+func (r *SSHCertificateAuthorityResource) Create(
+	ctx context.Context,
+	request resource.CreateRequest,
+	response *resource.CreateResponse,
+) {
+	data, diagnostics := nscale.ReadTerraformState[SSHCertificateAuthorityResourceModel](
+		ctx,
+		request.Plan.Get,
+		r.setDefaultIDs,
+	)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -166,6 +195,7 @@ func (r *SSHCertificateAuthorityResource) Create(ctx context.Context, request re
 		)
 		return
 	}
+	defer createResponse.Body.Close()
 
 	sshCA, err := nscale.ReadJSONResponsePointer[regionapi.SshCertificateAuthorityV2Read](createResponse)
 	if err != nil {
@@ -202,8 +232,16 @@ func (r *SSHCertificateAuthorityResource) Create(ctx context.Context, request re
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *SSHCertificateAuthorityResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[SSHCertificateAuthorityResourceModel](ctx, request.State.Get, r.setDefaultIDs)
+func (r *SSHCertificateAuthorityResource) Read(
+	ctx context.Context,
+	request resource.ReadRequest,
+	response *resource.ReadResponse,
+) {
+	data, diagnostics := nscale.ReadTerraformState[SSHCertificateAuthorityResourceModel](
+		ctx,
+		request.State.Get,
+		r.setDefaultIDs,
+	)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -226,15 +264,27 @@ func (r *SSHCertificateAuthorityResource) Read(ctx context.Context, request reso
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *SSHCertificateAuthorityResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (r *SSHCertificateAuthorityResource) Update(
+	ctx context.Context,
+	request resource.UpdateRequest,
+	response *resource.UpdateResponse,
+) {
 	response.Diagnostics.AddError(
 		"Update Not Supported",
 		"SSH Certificate Authorities are immutable and cannot be updated in-place. All changes require resource replacement.",
 	)
 }
 
-func (r *SSHCertificateAuthorityResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
-	data, diagnostics := nscale.ReadTerraformState[SSHCertificateAuthorityResourceModel](ctx, request.State.Get, r.setDefaultIDs)
+func (r *SSHCertificateAuthorityResource) Delete(
+	ctx context.Context,
+	request resource.DeleteRequest,
+	response *resource.DeleteResponse,
+) {
+	data, diagnostics := nscale.ReadTerraformState[SSHCertificateAuthorityResourceModel](
+		ctx,
+		request.State.Get,
+		r.setDefaultIDs,
+	)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -250,6 +300,7 @@ func (r *SSHCertificateAuthorityResource) Delete(ctx context.Context, request re
 		)
 		return
 	}
+	defer deleteResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(deleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
@@ -286,7 +337,11 @@ func (m normalizeWhitespacePlanModifier) MarkdownDescription(ctx context.Context
 	return m.Description(ctx)
 }
 
-func (m normalizeWhitespacePlanModifier) PlanModifyString(_ context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+func (m normalizeWhitespacePlanModifier) PlanModifyString(
+	_ context.Context,
+	req planmodifier.StringRequest,
+	resp *planmodifier.StringResponse,
+) {
 	if req.StateValue.IsNull() || req.StateValue.IsUnknown() {
 		return
 	}

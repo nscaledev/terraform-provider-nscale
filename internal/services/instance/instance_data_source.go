@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
@@ -36,7 +37,11 @@ func NewInstanceDataSource() datasource.DataSource {
 	return &InstanceDataSource{}
 }
 
-func (s *InstanceDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
+func (s *InstanceDataSource) Configure(
+	ctx context.Context,
+	request datasource.ConfigureRequest,
+	response *datasource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -45,7 +50,10 @@ func (s *InstanceDataSource) Configure(ctx context.Context, request datasource.C
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -53,11 +61,19 @@ func (s *InstanceDataSource) Configure(ctx context.Context, request datasource.C
 	s.client = client
 }
 
-func (s *InstanceDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (s *InstanceDataSource) Metadata(
+	ctx context.Context,
+	request datasource.MetadataRequest,
+	response *datasource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_instance"
 }
 
-func (s *InstanceDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (s *InstanceDataSource) Schema(
+	ctx context.Context,
+	request datasource.SchemaRequest,
+	response *datasource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale Instance",
 		Attributes: map[string]schema.Attribute{
@@ -147,7 +163,11 @@ func (s *InstanceDataSource) Schema(ctx context.Context, request datasource.Sche
 	}
 }
 
-func (s *InstanceDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (s *InstanceDataSource) Read(
+	ctx context.Context,
+	request datasource.ReadRequest,
+	response *datasource.ReadResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[InstanceModel](ctx, request.Config.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)

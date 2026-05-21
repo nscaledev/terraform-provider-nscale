@@ -28,11 +28,18 @@ func TestAccSSHCertificateAuthorityResource_basic(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccSSHCertificateAuthorityResourceConfig("test-ca", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForAcceptanceTests"),
+				Config: testAccSSHCertificateAuthorityResourceConfig(
+					"test-ca",
+					"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForAcceptanceTests",
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("nscale_ssh_certificate_authority.test", "id"),
 					resource.TestCheckResourceAttr("nscale_ssh_certificate_authority.test", "name", "test-ca"),
-					resource.TestCheckResourceAttr("nscale_ssh_certificate_authority.test", "public_key", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForAcceptanceTests"),
+					resource.TestCheckResourceAttr(
+						"nscale_ssh_certificate_authority.test",
+						"public_key",
+						"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForAcceptanceTests",
+					),
 					resource.TestCheckResourceAttrSet("nscale_ssh_certificate_authority.test", "project_id"),
 					resource.TestCheckResourceAttrSet("nscale_ssh_certificate_authority.test", "creation_time"),
 				),
@@ -51,10 +58,18 @@ func TestAccSSHCertificateAuthorityResource_withDescription(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccSSHCertificateAuthorityResourceConfigWithDescription("test-ca-desc", "Team CA for testing", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyWithDescription"),
+				Config: testAccSSHCertificateAuthorityResourceConfigWithDescription(
+					"test-ca-desc",
+					"Team CA for testing",
+					"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyWithDescription",
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("nscale_ssh_certificate_authority.test", "name", "test-ca-desc"),
-					resource.TestCheckResourceAttr("nscale_ssh_certificate_authority.test", "description", "Team CA for testing"),
+					resource.TestCheckResourceAttr(
+						"nscale_ssh_certificate_authority.test",
+						"description",
+						"Team CA for testing",
+					),
 				),
 			},
 		},

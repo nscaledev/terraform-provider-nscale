@@ -34,19 +34,19 @@ type Client struct {
 	Compute        computeapi.ClientInterface
 }
 
-func NewClient(regionServiceBaseURL, computeServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string) (*Client, error) {
+func NewClient(
+	regionServiceBaseURL, computeServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string,
+) (*Client, error) {
 	httpClient := NewHTTPClient(userAgent, serviceToken)
 
 	region, err := regionapi.NewClient(regionServiceBaseURL, regionapi.WithHTTPClient(httpClient))
 	if err != nil {
-		err = fmt.Errorf("failed to create Nscale region API client: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create Nscale region API client: %w", err)
 	}
 
 	compute, err := computeapi.NewClient(computeServiceBaseURL, computeapi.WithHTTPClient(httpClient))
 	if err != nil {
-		err = fmt.Errorf("failed to create Nscale compute API client: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("failed to create Nscale compute API client: %w", err)
 	}
 
 	client := &Client{

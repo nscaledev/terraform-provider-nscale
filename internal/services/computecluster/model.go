@@ -26,10 +26,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
 
 type ComputeClusterModel struct {
@@ -85,9 +86,9 @@ func (m *ComputeClusterModel) NscaleComputeCluster() (computeapi.ComputeClusterW
 
 	workloadPools := make([]computeapi.ComputeClusterWorkloadPool, 0, len(sourceWorkloadPools))
 	for _, source := range sourceWorkloadPools {
-		workloadPool, diagnostics := source.NscaleWorkloadPool()
-		if diagnostics.HasError() {
-			return computeapi.ComputeClusterWrite{}, diagnostics
+		workloadPool, poolDiagnostics := source.NscaleWorkloadPool()
+		if poolDiagnostics.HasError() {
+			return computeapi.ComputeClusterWrite{}, poolDiagnostics
 		}
 		workloadPools = append(workloadPools, workloadPool)
 	}
@@ -142,7 +143,7 @@ var WorkloadPoolModelAttributeType = types.ObjectType{
 		"replicas":  types.Int64Type,
 		"image_id":  types.StringType,
 		"flavor_id": types.StringType,
-		//"disk_size":         types.Int64Type,
+		// "disk_size":         types.Int64Type,
 		"user_data":        types.StringType,
 		"enable_public_ip": types.BoolType,
 		"allowed_address_pairs": types.SetType{
@@ -163,7 +164,7 @@ type WorkloadPoolModel struct {
 	// REVIEW_ME: Should we accept the image and flavor names instead of their IDs?
 	ImageID  types.String `tfsdk:"image_id"`
 	FlavorID types.String `tfsdk:"flavor_id"`
-	//DiskSize          types.Int64  `tfsdk:"disk_size"`
+	// DiskSize          types.Int64  `tfsdk:"disk_size"`
 	UserData            types.String `tfsdk:"user_data"`
 	EnablePublicIP      types.Bool   `tfsdk:"enable_public_ip"`
 	AllowedAddressPairs types.Set    `tfsdk:"allowed_address_pairs"`
@@ -171,7 +172,10 @@ type WorkloadPoolModel struct {
 	Machines            types.List   `tfsdk:"machines"`
 }
 
-func NewWorkloadPoolModel(spec computeapi.ComputeClusterWorkloadPool, status *computeapi.ComputeClusterWorkloadPoolStatus) attr.Value {
+func NewWorkloadPoolModel(
+	spec computeapi.ComputeClusterWorkloadPool,
+	status *computeapi.ComputeClusterWorkloadPoolStatus,
+) attr.Value {
 	var userData types.String
 	if spec.Machine.UserData != nil {
 		userData = types.StringValue(string(*spec.Machine.UserData))
@@ -209,8 +213,8 @@ func NewWorkloadPoolModel(spec computeapi.ComputeClusterWorkloadPool, status *co
 			// FIXME: Some machines may not have an image ID but have an image selector. We need to check whether we could populate the image ID from the selector.
 			"image_id":  types.StringPointerValue(spec.Machine.Image.Id),
 			"flavor_id": types.StringValue(spec.Machine.FlavorId),
-			//// FIXME: Some machines may not have a disk size specified as it's inherited from the flavor. We need to check whether we could populate the disk size from the flavor.
-			//"disk_size":               types.Int64Value(int64(spec.Machine.Disk.Size)),
+			// FIXME: Some machines may not have a disk size specified as it's inherited from the flavor. We need to check whether we could populate the disk size from the flavor.
+			// "disk_size":               types.Int64Value(int64(spec.Machine.Disk.Size)),
 			"user_data":             userData,
 			"enable_public_ip":      enablePublicIP,
 			"allowed_address_pairs": allowedAddressPairs,
@@ -220,7 +224,10 @@ func NewWorkloadPoolModel(spec computeapi.ComputeClusterWorkloadPool, status *co
 	)
 }
 
-func NewWorkloadPoolModels(specs []computeapi.ComputeClusterWorkloadPool, statuses *computeapi.ComputeClusterWorkloadPoolsStatus) types.List {
+func NewWorkloadPoolModels(
+	specs []computeapi.ComputeClusterWorkloadPool,
+	statuses *computeapi.ComputeClusterWorkloadPoolsStatus,
+) types.List {
 	statusMemo := make(map[string]*computeapi.ComputeClusterWorkloadPoolStatus)
 	if statuses != nil {
 		workloadPools := *statuses
@@ -241,11 +248,11 @@ func NewWorkloadPoolModels(specs []computeapi.ComputeClusterWorkloadPool, status
 
 func (m *WorkloadPoolModel) NscaleWorkloadPool() (computeapi.ComputeClusterWorkloadPool, diag.Diagnostics) {
 	var disk *computeapi.Volume
-	//if !m.DiskSize.IsNull() && !m.DiskSize.IsUnknown() {
-	//	disk = &computeapi.Volume{
-	//		Size: int(m.DiskSize.ValueInt64()),
-	//	}
-	//}
+	// if !m.DiskSize.IsNull() && !m.DiskSize.IsUnknown() {
+	// 	disk = &computeapi.Volume{
+	// 		Size: int(m.DiskSize.ValueInt64()),
+	// 	}
+	// }
 
 	var sourceFirewallRules []FirewallRuleModel
 	if diagnostics := m.FirewallRules.ElementsAs(context.TODO(), &sourceFirewallRules, false); diagnostics.HasError() {
@@ -354,7 +361,7 @@ func NewFirewallRuleModels(source []computeapi.FirewallRule) types.List {
 
 func (m *FirewallRuleModel) NscaleFirewallRule() (computeapi.FirewallRule, diag.Diagnostics) {
 	ports := strings.Split(m.Ports.ValueString(), "-")
-	if len(ports) > 2 {
+	if len(ports) > portRangeParts {
 		diagnostics := NewErrorDiagnostics(
 			"Invalid Port Format",
 			"Firewall rule ports must be either a single port or a range in the format 'start-end'.",

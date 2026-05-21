@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
@@ -36,7 +37,11 @@ func NewFileStorageDataSource() datasource.DataSource {
 	return &FileStorageDataSource{}
 }
 
-func (s *FileStorageDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
+func (s *FileStorageDataSource) Configure(
+	ctx context.Context,
+	request datasource.ConfigureRequest,
+	response *datasource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -45,7 +50,10 @@ func (s *FileStorageDataSource) Configure(ctx context.Context, request datasourc
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -53,11 +61,19 @@ func (s *FileStorageDataSource) Configure(ctx context.Context, request datasourc
 	s.client = client
 }
 
-func (s *FileStorageDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (s *FileStorageDataSource) Metadata(
+	ctx context.Context,
+	request datasource.MetadataRequest,
+	response *datasource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_file_storage"
 }
 
-func (s *FileStorageDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (s *FileStorageDataSource) Schema(
+	ctx context.Context,
+	request datasource.SchemaRequest,
+	response *datasource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale File Storage",
 		Attributes: map[string]schema.Attribute{
@@ -127,7 +143,11 @@ func (s *FileStorageDataSource) Schema(ctx context.Context, request datasource.S
 	}
 }
 
-func (s *FileStorageDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (s *FileStorageDataSource) Read(
+	ctx context.Context,
+	request datasource.ReadRequest,
+	response *datasource.ReadResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[FileStorageModel](ctx, request.Config.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)

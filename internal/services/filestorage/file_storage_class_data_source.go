@@ -23,8 +23,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &FileStorageClassDataSource{}
@@ -37,7 +38,11 @@ func NewFileStorageClassDataSource() datasource.DataSource {
 	return &FileStorageClassDataSource{}
 }
 
-func (s *FileStorageClassDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
+func (s *FileStorageClassDataSource) Configure(
+	ctx context.Context,
+	request datasource.ConfigureRequest,
+	response *datasource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -46,7 +51,10 @@ func (s *FileStorageClassDataSource) Configure(ctx context.Context, request data
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -54,11 +62,19 @@ func (s *FileStorageClassDataSource) Configure(ctx context.Context, request data
 	s.client = client
 }
 
-func (s *FileStorageClassDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (s *FileStorageClassDataSource) Metadata(
+	ctx context.Context,
+	request datasource.MetadataRequest,
+	response *datasource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_file_storage_class"
 }
 
-func (s *FileStorageClassDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (s *FileStorageClassDataSource) Schema(
+	ctx context.Context,
+	request datasource.SchemaRequest,
+	response *datasource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale File Storage Class",
 		Attributes: map[string]schema.Attribute{
@@ -88,13 +104,17 @@ func (s *FileStorageClassDataSource) Schema(ctx context.Context, request datasou
 	}
 }
 
-func (r *FileStorageClassDataSource) setDefaultRegionID(data *FileStorageClassModel) {
+func (s *FileStorageClassDataSource) setDefaultRegionID(data *FileStorageClassModel) {
 	if data.RegionID.ValueString() == "" {
-		data.RegionID = types.StringValue(r.client.RegionID)
+		data.RegionID = types.StringValue(s.client.RegionID)
 	}
 }
 
-func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (s *FileStorageClassDataSource) Read(
+	ctx context.Context,
+	request datasource.ReadRequest,
+	response *datasource.ReadResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[FileStorageClassModel](ctx, request.Config.Get, s.setDefaultRegionID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -117,6 +137,7 @@ func (s *FileStorageClassDataSource) Read(ctx context.Context, request datasourc
 		)
 		return
 	}
+	defer storageClassListResponse.Body.Close()
 
 	storageClasses, err := nscale.ReadJSONResponseValue[[]regionapi.StorageClassV2Read](storageClassListResponse)
 	if err != nil {

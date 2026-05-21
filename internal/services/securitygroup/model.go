@@ -23,10 +23,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
 
 type SecurityGroupModel struct {
@@ -76,12 +77,14 @@ type SecurityGroupRuleModel struct {
 func NewSecurityGroupRuleModel(source regionapi.SecurityGroupRuleV2) attr.Value {
 	fromPort := types.Int32Null()
 	if source.Port != nil {
-		fromPort = types.Int32Value(int32(*source.Port))
+		v := int32(*source.Port) //nolint:gosec // port numbers are 0-65535, within int32
+		fromPort = types.Int32Value(v)
 	}
 
 	toPort := types.Int32Null()
 	if source.PortMax != nil {
-		toPort = types.Int32Value(int32(*source.PortMax))
+		v := int32(*source.PortMax) //nolint:gosec // port numbers are 0-65535, within int32
+		toPort = types.Int32Value(v)
 	}
 
 	cidrBlock := types.StringNull()

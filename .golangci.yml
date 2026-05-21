@@ -1,0 +1,509 @@
+# golangci-lint configuration for the Nscale Terraform provider.
+# Adapted from github.com/nscaledev/nscale-cli.
+# Run locally with `make lint` (requires golangci-lint v2.x).
+# See https://golangci-lint.run/usage/configuration/ for full reference.
+version: "2"
+
+issues:
+  # Maximum count of issues with the same text.
+  # Set to 0 to disable.
+  # Default: 3
+  max-same-issues: 50
+
+formatters:
+  enable:
+    - goimports # checks if the code and import statements are formatted according to the 'goimports' command
+    - golines # checks if code is formatted, and fixes long lines
+    # - gci # checks if code and import statements are formatted, with additional rules
+    - gofumpt # enforces a stricter format than 'gofmt', while being backwards compatible
+
+  # All settings can be found here https://github.com/golangci/golangci-lint/blob/HEAD/.golangci.reference.yml
+  settings:
+    goimports:
+      # A list of prefixes, which, if set, checks import paths
+      # with the given prefixes are grouped after 3rd-party packages.
+      # Default: []
+      local-prefixes:
+        - github.com/nscaledev/terraform-provider-nscale
+
+    gofumpt:
+      module-path: github.com/nscaledev/terraform-provider-nscale
+      extra-rules: true
+
+    golines:
+      # Target maximum line length.
+      # Default: 100
+      max-len: 120
+
+linters:
+  enable:
+    - asasalint # checks for pass []any as any in variadic func(...any)
+    - asciicheck # checks that your code does not contain non-ASCII identifiers
+    - bidichk # checks for dangerous unicode character sequences
+    - bodyclose # checks whether HTTP response body is closed successfully
+    - canonicalheader # checks whether net/http.Header uses canonical header
+    - copyloopvar # detects places where loop variables are copied (Go 1.22+)
+    - cyclop # checks function and package cyclomatic complexity
+    - depguard # checks if package imports are in a list of acceptable packages
+    - dupl # tool for code clone detection
+    - durationcheck # checks for two durations multiplied together
+    - embeddedstructfieldcheck # checks embedded types in structs
+    - errcheck # checking for unchecked errors, these unchecked errors can be critical bugs in some cases
+    - errname # checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error
+    - errorlint # finds code that will cause problems with the error wrapping scheme introduced in Go 1.13
+    - exhaustive # checks exhaustiveness of enum switch statements
+    - exptostd # detects functions from golang.org/x/exp/ that can be replaced by std functions
+    - fatcontext # detects nested contexts in loops
+    - forbidigo # forbids identifiers
+    - funcorder # checks the order of functions, methods, and constructors
+    - funlen # tool for detection of long functions
+    - gocheckcompilerdirectives # validates go compiler directive comments (//go:)
+    - gochecknoglobals # checks that no global variables exist
+    - gochecknoinits # checks that no init functions are present in Go code
+    - gochecksumtype # checks exhaustiveness on Go "sum types"
+    - gocognit # computes and checks the cognitive complexity of functions
+    - goconst # finds repeated strings that could be replaced by a constant
+    - gocritic # provides diagnostics that check for bugs, performance and style issues
+    - gocyclo # computes and checks the cyclomatic complexity of functions
+    - godoclint # checks Golang's documentation practice
+    - godot # checks if comments end in a period
+    - gomoddirectives # manages the use of 'replace', 'retract', and 'excludes' directives in go.mod
+    - goprintffuncname # checks that printf-like functions are named with f at the end
+    - gosec # inspects source code for security problems
+    - govet # reports suspicious constructs, such as Printf calls whose arguments do not align with the format string
+    - iface # checks the incorrect use of interfaces, helping developers avoid interface pollution
+    - ineffassign # detects when assignments to existing variables are not used
+    - intrange # finds places where for loops could make use of an integer range
+    - iotamixing # checks if iotas are being used in const blocks with other non-iota declarations
+    - loggercheck # checks key value pairs for common logger libraries (kitlog,klog,logr,zap)
+    - makezero # finds slice declarations with non-zero initial length
+    - mirror # reports wrong mirror patterns of bytes/strings usage
+    - mnd # detects magic numbers
+    - modernize # suggests simplifications to Go code, using modern language and library features
+    - musttag # enforces field tags in (un)marshaled structs
+    - nakedret # finds naked returns in functions greater than a specified function length
+    - nestif # reports deeply nested if statements
+    - nilerr # finds the code that returns nil even if it checks that the error is not nil
+    - nilnesserr # reports that it checks for err != nil, but it returns a different nil value error (powered by nilness and nilerr)
+    - nilnil # checks that there is no simultaneous return of nil error and an invalid value
+    - noctx # finds sending http request without context.Context
+    - nolintlint # reports ill-formed or insufficient nolint directives
+    - nonamedreturns # reports all named returns
+    - nosprintfhostport # checks for misuse of Sprintf to construct a host with port in a URL
+    - perfsprint # checks that fmt.Sprintf can be replaced with a faster alternative
+    - predeclared # finds code that shadows one of Go's predeclared identifiers
+    - promlinter # checks Prometheus metrics naming via promlint
+    - protogetter # reports direct reads from proto message fields when getters should be used
+    - reassign # checks that package variables are not reassigned
+    - recvcheck # checks for receiver type consistency
+    - revive # fast, configurable, extensible, flexible, and beautiful linter for Go, drop-in replacement of golint
+    - rowserrcheck # checks whether Err of rows is checked successfully
+    - sloglint # ensure consistent code style when using log/slog
+    - spancheck # checks for mistakes with OpenTelemetry/Census spans
+    - sqlclosecheck # checks that sql.Rows and sql.Stmt are closed
+    - staticcheck # is a go vet on steroids, applying a ton of static analysis checks
+    - testableexamples # checks if examples are testable (have an expected output)
+    - testifylint # checks usage of github.com/stretchr/testify
+    - testpackage # makes you use a separate _test package
+    - tparallel # detects inappropriate usage of t.Parallel() method in your Go test codes
+    - unconvert # removes unnecessary type conversions
+    - unparam # reports unused function parameters
+    - unqueryvet # detects SELECT * in SQL queries and SQL builders, encouraging explicit column selection
+    - unused # checks for unused constants, variables, functions and types
+    - usestdlibvars # detects the possibility to use variables/constants from the Go standard library
+    - usetesting # reports uses of functions with replacement inside the testing package
+    - wastedassign # finds wasted assignment statements
+    - whitespace # detects leading and trailing whitespace
+    - decorder # checks declaration order and count of types, constants, variables and functions
+    - exhaustruct # [highly recommend to enable] checks if all structure fields are initialized
+    - godox # detects usage of FIXME, TODO and other keywords inside comments
+    - goheader # checks is file header matches to pattern
+    - ireturn # accept interfaces, return concrete types
+    - tagalign # checks that struct tags are well aligned
+    - wrapcheck # checks that errors returned from external packages are wrapped
+
+    ## you may want to enable
+    #- inamedparam # [great idea, but too strict, need to ignore a lot of cases by default] reports interfaces with unnamed method parameters
+    #- interfacebloat # checks the number of methods inside an interface
+    #- noinlineerr # disallows inline error handling `if err := ...; err != nil {`
+    #- prealloc # [premature optimization, but can be used in some cases] finds slice declarations that could potentially be preallocated
+    #- varnamelen # [great idea, but too many false positives] checks that the length of a variable's name matches its scope
+    #- zerologlint # detects the wrong usage of zerolog that a user forgets to dispatch zerolog.Event
+
+    ## disabled
+    #- containedctx # detects struct contained context.Context field
+    #- contextcheck # [too many false positives] checks the function whether use a non-inherited context
+    #- dogsled # checks assignments with too many blank identifiers (e.g. x, _, _, _, := f())
+    #- dupword # [useless without config] checks for duplicate words in the source code
+    #- err113 # [too strict] checks the errors handling expressions
+    #- errchkjson # [don't see profit + I'm against of omitting errors like in the first example https://github.com/breml/errchkjson] checks types passed to the json encoding functions. Reports unsupported types and optionally reports occasions, where the check for the returned error can be omitted
+    #- forcetypeassert # [replaced by errcheck] finds forced type assertions
+    #- gomodguard # [use more powerful depguard] allow and block lists linter for direct Go module dependencies
+    #- gosmopolitan # reports certain i18n/l10n anti-patterns in your Go codebase
+    #- grouper # analyzes expression groups
+    #- importas # enforces consistent import aliases
+    #- lll # [replaced by golines] reports long lines
+    #- maintidx # measures the maintainability index of each function
+    #- misspell # [useless] finds commonly misspelled English words in comments
+    #- nlreturn # [too strict and mostly code is not more readable] checks for a new line before return and branch statements to increase code clarity
+    #- paralleltest # [too many false positives] detects missing usage of t.Parallel() method in your Go test
+    #- tagliatelle # checks the struct tags
+    #- thelper # detects golang test helpers without t.Helper() call and checks the consistency of test helpers
+    #- wsl # [too strict and mostly code is not more readable] whitespace linter forces you to use empty lines
+    #- wsl_v5 # [too strict and mostly code is not more readable] add or remove empty lines
+
+  # All settings can be found here https://github.com/golangci/golangci-lint/blob/HEAD/.golangci.reference.yml
+  settings:
+    cyclop:
+      # The maximum code complexity to report.
+      # Default: 10
+      max-complexity: 30
+      # The maximum average package complexity.
+      # If it's higher than 0.0 (float) the check is enabled.
+      # Default: 0.0
+      package-average: 10.0
+
+    depguard:
+      # Rules to apply.
+      rules:
+        "deprecated":
+          files:
+            - "$all"
+          deny:
+            - pkg: github.com/golang/protobuf
+              desc: Use google.golang.org/protobuf instead, see https://developers.google.com/protocol-buffers/docs/reference/go/faq#modules
+            - pkg: github.com/satori/go.uuid
+              desc: Use github.com/google/uuid instead, satori's package is not maintained
+            - pkg: github.com/gofrs/uuid$
+              desc: Use github.com/gofrs/uuid/v5 or later, it was not a go module before v5
+        "non-test files":
+          files:
+            - "!$test"
+          deny:
+            - pkg: math/rand$
+              desc: Use math/rand/v2 instead, see https://go.dev/blog/randv2
+
+    embeddedstructfieldcheck:
+      # Checks that sync.Mutex and sync.RWMutex are not used as embedded fields.
+      # Default: false
+      forbid-mutex: true
+
+    errcheck:
+      # Report about not checking of errors in type assertions: `a := b.(MyStruct)`.
+      # Such cases aren't reported by default.
+      # Default: false
+      check-type-assertions: true
+
+    exhaustive:
+      # Program elements to check for exhaustiveness.
+      # Default: [ switch ]
+      check:
+        - switch
+        - map
+
+    exhaustruct:
+      # List of regular expressions to match type names that should be excluded from processing.
+      # Default: []
+      exclude:
+        # std libs
+        - ^net/http.Client$
+        - ^net/http.Cookie$
+        - ^net/http.Request$
+        - ^net/http.Response$
+        - ^net/http.Server$
+        - ^net/http.Transport$
+        - ^net/url.URL$
+        - ^os/exec.Cmd$
+        - ^reflect.StructField$
+        # public libs
+        - ^github.com/Shopify/sarama.Config$
+        - ^github.com/Shopify/sarama.ProducerMessage$
+        - ^github.com/mitchellh/mapstructure.DecoderConfig$
+        - ^github.com/prometheus/client_golang/.+Opts$
+        - ^github.com/spf13/cobra.Command$
+        - ^github.com/spf13/cobra.CompletionOptions$
+        - ^github.com/stretchr/testify/mock.Mock$
+        - ^github.com/testcontainers/testcontainers-go.+Request$
+        - ^github.com/testcontainers/testcontainers-go.FromDockerfile$
+        - ^golang.org/x/tools/go/analysis.Analyzer$
+        - ^google.golang.org/protobuf/.+Options$
+        - ^gopkg.in/yaml.v3.Node$
+        # terraform-plugin-framework schema + plan structs are partial-init by design
+        - ^github.com/hashicorp/terraform-plugin-framework/.+$
+        - ^github.com/hashicorp/terraform-plugin-framework-timeouts/.+$
+        # terraform-plugin-sdk v2 helpers (acceptance test scaffolding + retry helpers)
+        - ^github.com/hashicorp/terraform-plugin-sdk/v2/.+$
+        - ^github.com/hashicorp/terraform-plugin-testing/.+$
+        # OpenAPI request/response payloads — generated structs with many optional fields
+        - ^github.com/unikorn-cloud/.+/pkg/openapi\..+$
+        # Provider Resource/DataSource/Model factories: `client` is set in Configure(), and
+        # *Model types are populated incrementally during Read/Create/Update.
+        - ^github.com/nscaledev/terraform-provider-nscale/internal/services/.+(Resource|DataSource|Model)$
+        # Own error type — TraceID/Code/Endpoint/BodyBytes are populated when present.
+        - ^github.com/nscaledev/terraform-provider-nscale/internal/nscale\.APIError$
+      # Allows empty structures in return statements.
+      # Default: false
+      allow-empty-returns: true
+
+    funcorder:
+      # Checks if the exported methods of a structure are placed before the non-exported ones.
+      # Default: true
+      struct-method: false
+
+    funlen:
+      # Checks the number of lines in a function.
+      # If lower than 0, disable the check.
+      # Default: 60
+      lines: 100
+      # Checks the number of statements in a function.
+      # If lower than 0, disable the check.
+      # Default: 40
+      statements: 50
+
+    gochecksumtype:
+      # Presence of `default` case in switch statements satisfies exhaustiveness, if all members are not listed.
+      # Default: true
+      default-signifies-exhaustive: false
+
+    gocognit:
+      # Minimum code complexity to report.
+      # Default: 30 (but we recommend 10-20)
+      min-complexity: 20
+
+    gocritic:
+      # Settings passed to gocritic.
+      settings:
+        captLocal:
+          # Whether to restrict checker to params only.
+          # Default: true
+          paramsOnly: false
+        underef:
+          # Whether to skip (*x).method() calls where x is a pointer receiver.
+          # Default: true
+          skipRecvDeref: false
+
+    godoclint:
+      # List of rules to enable in addition to the default set.
+      # Default: empty
+      enable:
+        # Assert no unused link in godocs.
+        - no-unused-link
+        # Require proper doc links to standard library declarations where applicable.
+        - require-stdlib-doclink
+
+    govet:
+      # Enable all analyzers.
+      # Default: false
+      enable-all: true
+      # Disable analyzers by name.
+      # Default: []
+      disable:
+        - fieldalignment # too strict
+      # Settings per analyzer.
+      settings:
+        shadow:
+          # Whether to be strict about shadowing; can be noisy.
+          # Default: false
+          strict: true
+
+    inamedparam:
+      # Skips check for interface methods with only a single parameter.
+      # Default: false
+      skip-single-param: true
+
+    mnd:
+      # List of function patterns to exclude from analysis.
+      # Default: []
+      ignored-functions:
+        - args.Error
+        - flag.Arg
+        - flag.Duration.*
+        - flag.Float.*
+        - flag.Int.*
+        - flag.Uint.*
+        - os.Chmod
+        - os.Mkdir.*
+        - os.OpenFile
+        - os.WriteFile
+        - prometheus.ExponentialBuckets.*
+        - prometheus.LinearBuckets
+
+    nakedret:
+      # Make an issue if func has more lines of code than this setting, and it has naked returns.
+      # Default: 30
+      max-func-lines: 0
+
+    nolintlint:
+      # Exclude following linters from requiring an explanation.
+      # Default: []
+      allow-no-explanation: [funlen, gocognit, golines]
+      # Enable to require an explanation of nonzero length after each nolint directive.
+      # Default: false
+      require-explanation: true
+      # Enable to require nolint directives to mention the specific linter being suppressed.
+      # Default: false
+      require-specific: true
+
+    perfsprint:
+      # Optimizes into strings concatenation.
+      # Default: true
+      strconcat: false
+
+    reassign:
+      # Patterns for global variable names that are checked for reassignment.
+      # Default: ["EOF", "Err.*"]
+      patterns:
+        - ".*"
+
+    rowserrcheck:
+      # database/sql is always checked.
+      # Default: []
+      packages:
+        - github.com/jmoiron/sqlx
+
+    sloglint:
+      # Enforce not using global loggers.
+      # Default: ""
+      no-global: all
+      # Enforce using methods that accept a context.
+      # Default: ""
+      context: scope
+
+    staticcheck:
+      # SAxxxx checks in https://staticcheck.dev/docs/configuration/options/#checks
+      # Default: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
+      checks:
+        - all
+        # Incorrect or missing package comment.
+        - -ST1000
+        # Use consistent method receiver names.
+        - -ST1016
+        # Omit embedded fields from selector expression.
+        - -QF1008
+
+    usetesting:
+      # Enable/disable `os.TempDir()` detections.
+      # Default: false
+      os-temp-dir: true
+
+    ireturn:
+      allow:
+        - anon
+        - error
+        - empty
+        - stdlib
+        - generic
+        # terraform-plugin-framework constructors return interfaces by convention
+        - github.com/hashicorp/terraform-plugin-framework/provider.Provider
+        - github.com/hashicorp/terraform-plugin-framework/resource.Resource
+        - github.com/hashicorp/terraform-plugin-framework/datasource.DataSource
+        - github.com/hashicorp/terraform-plugin-framework/attr.Value
+        - github.com/hashicorp/terraform-plugin-framework/schema/validator.String
+
+    wrapcheck:
+      # Errors from these packages are surfaced to TF Diagnostics as-is — the framework
+      # formats them for the user, so wrapping would add noise without value.
+      ignore-sigs:
+        # Defaults — setting `ignore-sigs` replaces them entirely, so repeat here.
+        - .Errorf(
+        - errors.New(
+        - errors.Unwrap(
+        - errors.Join(
+        - .Wrap(
+        - .Wrapf(
+        - .WithMessage(
+        - .WithMessagef(
+        - .WithStack(
+        # Project-specific signatures.
+        - .DefaultRetryPolicy(
+        - .RetryContext(
+        - .ReadEmptyResponse(
+        - .ReadJSONResponse(
+        - .ReadJSONResponsePointer(
+        - .IsAPIErrorInUse(
+
+  exclusions:
+    # Log a warning if an exclusion rule is unused.
+    # Default: false
+    warn-unused: true
+    # Predefined exclusion rules.
+    # Default: []
+    presets:
+      - std-error-handling
+      - common-false-positives
+    # Excluding configuration per-path, per-linter, per-text and per-source.
+    rules:
+      - source: "TODO"
+        linters: [godot]
+      - text: "should have a package comment"
+        linters: [revive]
+      - text: 'exported \S+ \S+ should have comment( \(or a comment on this block\))? or be unexported'
+        linters: [revive]
+      - text: 'package comment should be of the form ".+"'
+        source: "// ?(nolint|TODO)"
+        linters: [revive]
+      - text: 'comment on exported \S+ \S+ should be of the form ".+"'
+        source: "// ?(nolint|TODO)"
+        linters: [revive, staticcheck]
+      - path: '_test\.go'
+        linters:
+          - bodyclose
+          - dupl
+          - errcheck
+          - funlen
+          - goconst
+          - gosec
+          - noctx
+          - wrapcheck
+          - testpackage
+          - gochecknoglobals
+
+      # terraform-plugin-framework callbacks (Configure / Metadata / Schema / Read / Create /
+      # Update / Delete / Description / MarkdownDescription / ValidateConfig) have fixed signatures;
+      # ctx/request/response are required even when unused in a particular implementation.
+      - text: "unused-parameter: parameter '(ctx|request|req|response|resp)'"
+        linters: [revive]
+
+      # TF convention is to name types after the package (e.g. region.RegionDataSource); the
+      # alternative (`region.DataSource`) is what Hashicorp's own examples use but the codebase
+      # standardised on the qualified form. Suppress the stutter complaint package-wide.
+      - text: 'exported: type name will be used as \S+ by other packages, and that stutters'
+        linters: [revive]
+
+      # `*ModelAttributeType` maps describe the shape of nested attr.Value types and have to be
+      # package-level so they can be referenced from both helpers and schema definitions. Same for
+      # version.ProviderVersion which is set by goreleaser ldflags.
+      - text: 'is a global variable \((ModelAttributeType|ProviderVersion)'
+        linters: [gochecknoglobals]
+      - path: '_attribute_type|model\.go$'
+        text: 'is a global variable'
+        linters: [gochecknoglobals]
+      - path: 'version/version\.go$'
+        linters: [gochecknoglobals]
+
+      # Schema(...) functions are flat attribute declarations — long but not complex.
+      - source: 'func \(.+\) Schema\('
+        linters: [funlen]
+
+      # FIXMEs are tracked notes, not lint problems; let them through here.
+      - source: "FIXME"
+        linters: [godox]
+
+      # An inline struct in file_storage_model.go must mirror the openapi-generated
+      # StorageV2Create.Spec layout exactly — including its `Id` (not `ID`) field names —
+      # or Go's structural typing rejects the assignment.
+      - path: 'file_storage_model\.go$'
+        text: 'struct field \w+Id should be'
+        linters: [revive, staticcheck]
+
+      # Errors returned by the generated openapi ClientInterface and unikorn-cloud helpers are
+      # propagated straight to TF Diagnostics, where the framework formats them for the user.
+      # `ignoreSigs` does not match interface method dispatches reliably, so suppress wrapcheck
+      # on the service helpers/resources that thinly wrap those calls.
+      - path: 'internal/services/.+/(helper|resource)\.go$'
+        linters: [wrapcheck]
+      - path: 'internal/services/.+/(ssh_ca|file_storage|instance|compute_cluster)_(helper|resource)\.go$'
+        linters: [wrapcheck]
+      # Same rationale for the small retryablehttp / terraform-plugin-sdk shims in internal/nscale.
+      - path: 'internal/nscale/(http_client|retry)\.go$'
+        linters: [wrapcheck]

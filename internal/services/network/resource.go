@@ -15,10 +15,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 )
 
 var (
@@ -28,6 +29,7 @@ var (
 
 type NetworkResourceModel struct {
 	NetworkModel
+
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
@@ -39,7 +41,11 @@ func NewNetworkResource() resource.Resource {
 	return &NetworkResource{}
 }
 
-func (r *NetworkResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
+func (r *NetworkResource) Configure(
+	ctx context.Context,
+	request resource.ConfigureRequest,
+	response *resource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -48,7 +54,10 @@ func (r *NetworkResource) Configure(ctx context.Context, request resource.Config
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -56,15 +65,27 @@ func (r *NetworkResource) Configure(ctx context.Context, request resource.Config
 	r.client = client
 }
 
-func (r *NetworkResource) ImportState(ctx context.Context, request resource.ImportStateRequest, response *resource.ImportStateResponse) {
+func (r *NetworkResource) ImportState(
+	ctx context.Context,
+	request resource.ImportStateRequest,
+	response *resource.ImportStateResponse,
+) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), request, response)
 }
 
-func (r *NetworkResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (r *NetworkResource) Metadata(
+	ctx context.Context,
+	request resource.MetadataRequest,
+	response *resource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_network"
 }
 
-func (r *NetworkResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (r *NetworkResource) Schema(
+	ctx context.Context,
+	request resource.SchemaRequest,
+	response *resource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		MarkdownDescription: "Nscale Network",
 		Attributes: map[string]schema.Attribute{
@@ -184,7 +205,11 @@ func (r *NetworkResource) setDefaultIDs(data *NetworkResourceModel) {
 	}
 }
 
-func (r *NetworkResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (r *NetworkResource) Create(
+	ctx context.Context,
+	request resource.CreateRequest,
+	response *resource.CreateResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.Plan.Get, r.setDefaultIDs)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -205,6 +230,7 @@ func (r *NetworkResource) Create(ctx context.Context, request resource.CreateReq
 		)
 		return
 	}
+	defer networkCreateResponse.Body.Close()
 
 	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkCreateResponse)
 	if err != nil {
@@ -264,7 +290,11 @@ func (r *NetworkResource) Read(ctx context.Context, request resource.ReadRequest
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (r *NetworkResource) Update(
+	ctx context.Context,
+	request resource.UpdateRequest,
+	response *resource.UpdateResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.Plan.Get, r.setDefaultIDs)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -288,12 +318,13 @@ func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateReq
 		)
 		return
 	}
+	defer networkUpdateResponse.Body.Close()
 
-	if _, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse); err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
+	if _, readErr := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse); readErr != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
 		response.Diagnostics.AddError(
 			"Failed to Update Network",
-			fmt.Sprintf("An error occurred while updating the network: %s", err),
+			fmt.Sprintf("An error occurred while updating the network: %s", readErr),
 		)
 		return
 	}
@@ -315,7 +346,11 @@ func (r *NetworkResource) Update(ctx context.Context, request resource.UpdateReq
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (r *NetworkResource) Delete(
+	ctx context.Context,
+	request resource.DeleteRequest,
+	response *resource.DeleteResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.State.Get, r.setDefaultIDs)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -332,6 +367,7 @@ func (r *NetworkResource) Delete(ctx context.Context, request resource.DeleteReq
 		)
 		return
 	}
+	defer networkDeleteResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(networkDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {

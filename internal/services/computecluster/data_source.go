@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
@@ -36,7 +37,11 @@ func NewComputeClusterDataSource() datasource.DataSource {
 	return &ComputeClusterDataSource{}
 }
 
-func (s *ComputeClusterDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
+func (s *ComputeClusterDataSource) Configure(
+	ctx context.Context,
+	request datasource.ConfigureRequest,
+	response *datasource.ConfigureResponse,
+) {
 	if request.ProviderData == nil {
 		return
 	}
@@ -45,7 +50,10 @@ func (s *ComputeClusterDataSource) Configure(ctx context.Context, request dataso
 	if !ok {
 		response.Diagnostics.AddError(
 			"Unexpected Resource Configuration Type",
-			fmt.Sprintf("Expected *nscale.Client, got: %T. Please contact the Nscale team for support.", request.ProviderData),
+			fmt.Sprintf(
+				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
+				request.ProviderData,
+			),
 		)
 		return
 	}
@@ -53,11 +61,19 @@ func (s *ComputeClusterDataSource) Configure(ctx context.Context, request dataso
 	s.client = client
 }
 
-func (s *ComputeClusterDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
+func (s *ComputeClusterDataSource) Metadata(
+	ctx context.Context,
+	request datasource.MetadataRequest,
+	response *datasource.MetadataResponse,
+) {
 	response.TypeName = request.ProviderTypeName + "_compute_cluster"
 }
 
-func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+func (s *ComputeClusterDataSource) Schema(
+	ctx context.Context,
+	request datasource.SchemaRequest,
+	response *datasource.SchemaResponse,
+) {
 	response.Schema = schema.Schema{
 		DeprecationMessage:  "The nscale_compute_cluster data source is deprecated and will be removed in a future release.",
 		MarkdownDescription: "Nscale Compute Cluster",
@@ -95,10 +111,10 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 							MarkdownDescription: "The identifier of the flavor (machine type) used for the workload pool VMs.",
 							Computed:            true,
 						},
-						//"disk_size": schema.Int64Attribute{
-						//	MarkdownDescription: "The size of the boot disk for each VM in the workload pool, in GiB.",
-						//	Computed:            true,
-						//},
+						// "disk_size": schema.Int64Attribute{
+						// 	MarkdownDescription: "The size of the boot disk for each VM in the workload pool, in GiB.",
+						// 	Computed:            true,
+						// },
 						"user_data": schema.StringAttribute{
 							MarkdownDescription: "The data to pass to the VMs at boot time.",
 							Computed:            true,
@@ -181,7 +197,11 @@ func (s *ComputeClusterDataSource) Schema(ctx context.Context, request datasourc
 	}
 }
 
-func (s *ComputeClusterDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {
+func (s *ComputeClusterDataSource) Read(
+	ctx context.Context,
+	request datasource.ReadRequest,
+	response *datasource.ReadResponse,
+) {
 	data, diagnostics := nscale.ReadTerraformState[ComputeClusterModel](ctx, request.Config.Get)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)

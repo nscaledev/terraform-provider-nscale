@@ -19,16 +19,22 @@ package filestorage
 import (
 	"context"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
-func getFileStorage(ctx context.Context, id string, client *nscale.Client) (*regionapi.StorageV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
+func getFileStorage(
+	ctx context.Context,
+	id string,
+	client *nscale.Client,
+) (*regionapi.StorageV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
 	fileStorageResponse, err := client.Region.GetApiV2FilestorageFilestorageID(ctx, id)
 	if err != nil {
 		return nil, nil, err
 	}
+	defer fileStorageResponse.Body.Close()
 
 	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageResponse)
 	if err != nil {

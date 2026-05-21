@@ -1,0 +1,8 @@
+# Code owners for the Nscale Terraform provider.
+# See https://docs.github.com/en/repositories/managing-your-repositories-settings-and-customization/customizing-your-repository/about-code-owners
+#
+# Owners are auto-requested for review on any PR that touches matching paths.
+# The last matching pattern wins — add more specific rules below the catch-all
+# if subsystems gain dedicated owners.
+
+* @nscaledev/ui-engineers
