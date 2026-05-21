@@ -44,6 +44,7 @@ func NewHTTPClient(userAgent, serviceToken string) *HTTPClient {
 func (c *HTTPClient) Do(r *http.Request) (*http.Response, error) {
 	r.Header.Set("User-Agent", c.userAgent)
 	r.Header.Set("Authorization", c.accessToken)
+	//nolint:gosec // request URL is built by the openapi-generated client against a configured API host, not user-controlled input
 	return c.internal.Do(r)
 }
 

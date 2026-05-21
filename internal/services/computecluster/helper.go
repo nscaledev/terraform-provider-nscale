@@ -40,6 +40,7 @@ func getComputeCluster(
 	if err != nil {
 		return nil, nil, err
 	}
+	defer computeClusterListResponse.Body.Close()
 
 	computeClusters, err := nscale.ReadJSONResponseValue[[]computeapi.ComputeClusterRead](computeClusterListResponse)
 	if err != nil {

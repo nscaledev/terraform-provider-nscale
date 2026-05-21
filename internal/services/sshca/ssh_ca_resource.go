@@ -44,6 +44,7 @@ var (
 
 type SSHCertificateAuthorityResourceModel struct {
 	SSHCertificateAuthorityModel
+
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
@@ -194,6 +195,7 @@ func (r *SSHCertificateAuthorityResource) Create(
 		)
 		return
 	}
+	defer createResponse.Body.Close()
 
 	sshCA, err := nscale.ReadJSONResponsePointer[regionapi.SshCertificateAuthorityV2Read](createResponse)
 	if err != nil {
@@ -298,6 +300,7 @@ func (r *SSHCertificateAuthorityResource) Delete(
 		)
 		return
 	}
+	defer deleteResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(deleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {

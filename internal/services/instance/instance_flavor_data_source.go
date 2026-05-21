@@ -171,6 +171,7 @@ func (s *InstanceFlavorDataSource) Read(
 		)
 		return
 	}
+	defer flavorListResponse.Body.Close()
 
 	flavors, err := nscale.ReadJSONResponseValue[[]regionapi.Flavor](flavorListResponse)
 	if err != nil {

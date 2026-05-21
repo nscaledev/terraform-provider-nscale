@@ -25,6 +25,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
+// portRangeParts is the number of components a "N-M" port range splits into.
+const portRangeParts = 2
+
 type PortsValidator struct{}
 
 func (v PortsValidator) Description(ctx context.Context) string {
@@ -47,7 +50,7 @@ func (v PortsValidator) ValidateString(
 	value := request.ConfigValue.ValueString()
 	ports := strings.Split(value, "-")
 
-	if len(ports) > 2 {
+	if len(ports) > portRangeParts {
 		response.Diagnostics.AddAttributeError(
 			request.Path,
 			"Invalid Port Format",

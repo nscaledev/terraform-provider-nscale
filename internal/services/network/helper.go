@@ -34,6 +34,7 @@ func getNetwork(
 	if err != nil {
 		return nil, nil, err
 	}
+	defer networkResponse.Body.Close()
 
 	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkResponse)
 	if err != nil {

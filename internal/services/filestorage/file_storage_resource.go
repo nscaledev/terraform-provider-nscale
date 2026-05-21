@@ -45,6 +45,7 @@ var (
 
 type FileStorageResourceModel struct {
 	FileStorageModel
+
 	RefreshUsage types.Bool       `tfsdk:"refresh_usage"`
 	Timeouts     tftimeouts.Value `tfsdk:"timeouts"`
 }
@@ -253,6 +254,7 @@ func (r *FileStorageResource) Create(
 		)
 		return
 	}
+	defer fileStorageCreateResponse.Body.Close()
 
 	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageCreateResponse)
 	if err != nil {
@@ -352,12 +354,15 @@ func (r *FileStorageResource) Update(
 		)
 		return
 	}
+	defer fileStorageUpdateResponse.Body.Close()
 
-	if _, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageUpdateResponse); err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
+	if _, readErr := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](
+		fileStorageUpdateResponse,
+	); readErr != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
 		response.Diagnostics.AddError(
 			"Failed to Update File Storage",
-			fmt.Sprintf("An error occurred while updating the file storage: %s", err),
+			fmt.Sprintf("An error occurred while updating the file storage: %s", readErr),
 		)
 		return
 	}
@@ -401,6 +406,7 @@ func (r *FileStorageResource) Delete(
 		)
 		return
 	}
+	defer fileStorageDeleteResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(fileStorageDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {

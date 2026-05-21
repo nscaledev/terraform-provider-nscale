@@ -104,9 +104,9 @@ func (s *FileStorageClassDataSource) Schema(
 	}
 }
 
-func (r *FileStorageClassDataSource) setDefaultRegionID(data *FileStorageClassModel) {
+func (s *FileStorageClassDataSource) setDefaultRegionID(data *FileStorageClassModel) {
 	if data.RegionID.ValueString() == "" {
-		data.RegionID = types.StringValue(r.client.RegionID)
+		data.RegionID = types.StringValue(s.client.RegionID)
 	}
 }
 
@@ -137,6 +137,7 @@ func (s *FileStorageClassDataSource) Read(
 		)
 		return
 	}
+	defer storageClassListResponse.Body.Close()
 
 	storageClasses, err := nscale.ReadJSONResponseValue[[]regionapi.StorageClassV2Read](storageClassListResponse)
 	if err != nil {

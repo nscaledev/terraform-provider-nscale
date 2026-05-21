@@ -228,6 +228,19 @@ linters:
         - ^golang.org/x/tools/go/analysis.Analyzer$
         - ^google.golang.org/protobuf/.+Options$
         - ^gopkg.in/yaml.v3.Node$
+        # terraform-plugin-framework schema + plan structs are partial-init by design
+        - ^github.com/hashicorp/terraform-plugin-framework/.+$
+        - ^github.com/hashicorp/terraform-plugin-framework-timeouts/.+$
+        # terraform-plugin-sdk v2 helpers (acceptance test scaffolding + retry helpers)
+        - ^github.com/hashicorp/terraform-plugin-sdk/v2/.+$
+        - ^github.com/hashicorp/terraform-plugin-testing/.+$
+        # OpenAPI request/response payloads — generated structs with many optional fields
+        - ^github.com/unikorn-cloud/.+/pkg/openapi\..+$
+        # Provider Resource/DataSource/Model factories: `client` is set in Configure(), and
+        # *Model types are populated incrementally during Read/Create/Update.
+        - ^github.com/nscaledev/terraform-provider-nscale/internal/services/.+(Resource|DataSource|Model)$
+        # Own error type — TraceID/Code/Endpoint/BodyBytes are populated when present.
+        - ^github.com/nscaledev/terraform-provider-nscale/internal/nscale\.APIError$
       # Allows empty structures in return statements.
       # Default: false
       allow-empty-returns: true
@@ -380,6 +393,23 @@ linters:
         - empty
         - stdlib
         - generic
+        # terraform-plugin-framework constructors return interfaces by convention
+        - github.com/hashicorp/terraform-plugin-framework/provider.Provider
+        - github.com/hashicorp/terraform-plugin-framework/resource.Resource
+        - github.com/hashicorp/terraform-plugin-framework/datasource.DataSource
+        - github.com/hashicorp/terraform-plugin-framework/attr.Value
+        - github.com/hashicorp/terraform-plugin-framework/schema/validator.String
+
+    wrapcheck:
+      # Errors from these packages are surfaced to TF Diagnostics as-is — the framework
+      # formats them for the user, so wrapping would add noise without value.
+      ignoreSigs:
+        - .DefaultRetryPolicy(
+        - .RetryContext(
+        - .ReadEmptyResponse(
+        - .ReadJSONResponse(
+        - .ReadJSONResponsePointer(
+        - .IsAPIErrorInUse(
 
   exclusions:
     # Log a warning if an exclusion rule is unused.
@@ -414,3 +444,55 @@ linters:
           - gosec
           - noctx
           - wrapcheck
+          - testpackage
+          - gochecknoglobals
+
+      # terraform-plugin-framework callbacks (Configure / Metadata / Schema / Read / Create /
+      # Update / Delete / Description / MarkdownDescription / ValidateConfig) have fixed signatures;
+      # ctx/request/response are required even when unused in a particular implementation.
+      - text: "unused-parameter: parameter '(ctx|request|req|response|resp)'"
+        linters: [revive]
+
+      # TF convention is to name types after the package (e.g. region.RegionDataSource); the
+      # alternative (`region.DataSource`) is what Hashicorp's own examples use but the codebase
+      # standardised on the qualified form. Suppress the stutter complaint package-wide.
+      - text: 'exported: type name will be used as \S+ by other packages, and that stutters'
+        linters: [revive]
+
+      # `*ModelAttributeType` maps describe the shape of nested attr.Value types and have to be
+      # package-level so they can be referenced from both helpers and schema definitions. Same for
+      # version.ProviderVersion which is set by goreleaser ldflags.
+      - text: 'is a global variable \((ModelAttributeType|ProviderVersion)'
+        linters: [gochecknoglobals]
+      - path: '_attribute_type|model\.go$'
+        text: 'is a global variable'
+        linters: [gochecknoglobals]
+      - path: 'version/version\.go$'
+        linters: [gochecknoglobals]
+
+      # Schema(...) functions are flat attribute declarations — long but not complex.
+      - source: 'func \(.+\) Schema\('
+        linters: [funlen]
+
+      # FIXMEs are tracked notes, not lint problems; let them through here.
+      - source: "FIXME"
+        linters: [godox]
+
+      # An inline struct in file_storage_model.go must mirror the openapi-generated
+      # StorageV2Create.Spec layout exactly — including its `Id` (not `ID`) field names —
+      # or Go's structural typing rejects the assignment.
+      - path: 'file_storage_model\.go$'
+        text: 'struct field \w+Id should be'
+        linters: [revive, staticcheck]
+
+      # Errors returned by the generated openapi ClientInterface and unikorn-cloud helpers are
+      # propagated straight to TF Diagnostics, where the framework formats them for the user.
+      # `ignoreSigs` does not match interface method dispatches reliably, so suppress wrapcheck
+      # on the service helpers/resources that thinly wrap those calls.
+      - path: 'internal/services/.+/(helper|resource)\.go$'
+        linters: [wrapcheck]
+      - path: 'internal/services/.+/(ssh_ca|file_storage|instance|compute_cluster)_(helper|resource)\.go$'
+        linters: [wrapcheck]
+      # Same rationale for the small retryablehttp / terraform-plugin-sdk shims in internal/nscale.
+      - path: 'internal/nscale/(http_client|retry)\.go$'
+        linters: [wrapcheck]

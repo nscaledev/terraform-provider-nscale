@@ -113,6 +113,7 @@ func (s *InstanceSSHKeyDataSource) Read(
 		)
 		return
 	}
+	defer sshKeyResponse.Body.Close()
 
 	sshKey, err := nscale.ReadJSONResponsePointer[regionapi.SshKey](sshKeyResponse)
 	if err != nil {

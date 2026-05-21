@@ -50,6 +50,7 @@ var (
 
 type ComputeClusterResourceModel struct {
 	ComputeClusterModel
+
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
@@ -155,13 +156,13 @@ func (r *ComputeClusterResource) Schema(
 							MarkdownDescription: "The identifier of the flavor (machine type) used for the workload pool VMs.",
 							Required:            true,
 						},
-						//"disk_size": schema.Int64Attribute{
-						//	MarkdownDescription: "The size of the boot disk for each VM in the workload pool, in GiB.",
-						//	Optional:            true,
-						//	Validators: []validator.Int64{
-						//		int64validator.AtLeast(10),
-						//	},
-						//},
+						// "disk_size": schema.Int64Attribute{
+						// 	MarkdownDescription: "The size of the boot disk for each VM in the workload pool, in GiB.",
+						// 	Optional:            true,
+						// 	Validators: []validator.Int64{
+						// 		int64validator.AtLeast(10),
+						// 	},
+						// },
 						"user_data": schema.StringAttribute{
 							MarkdownDescription: "The data to pass to the VMs at boot time.",
 							Optional:            true,
@@ -351,6 +352,7 @@ func (r *ComputeClusterResource) Create(
 		)
 		return
 	}
+	defer computeClusterCreateResponse.Body.Close()
 
 	computeCluster, err := nscale.ReadJSONResponsePointer[computeapi.ComputeClusterRead](computeClusterCreateResponse)
 	if err != nil {
@@ -456,6 +458,7 @@ func (r *ComputeClusterResource) Update(
 		)
 		return
 	}
+	defer computeClusterUpdateResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(computeClusterUpdateResponse); err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
@@ -513,6 +516,7 @@ func (r *ComputeClusterResource) Delete(
 		)
 		return
 	}
+	defer computeClusterDeleteResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(computeClusterDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {

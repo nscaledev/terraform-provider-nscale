@@ -34,6 +34,7 @@ func getFileStorage(
 	if err != nil {
 		return nil, nil, err
 	}
+	defer fileStorageResponse.Body.Close()
 
 	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageResponse)
 	if err != nil {

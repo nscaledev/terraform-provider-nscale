@@ -34,6 +34,7 @@ import (
 const (
 	TerraformOperationTagPrefix = "terraform.nscale.com/"
 	defaultOperationTagMaxAge   = 12 * time.Hour
+	defaultStateWatcherTimeout  = 30 * time.Minute
 )
 
 type StateReaderFunc func(ctx context.Context, target any) diag.Diagnostics
@@ -96,7 +97,7 @@ func (w *CreateStateWatcher[T]) Wait(
 	timeouts tftimeouts.Value,
 	response *resource.CreateResponse,
 ) (*T, bool) {
-	timeout, diagnostics := timeouts.Create(ctx, 30*time.Minute)
+	timeout, diagnostics := timeouts.Create(ctx, defaultStateWatcherTimeout)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return nil, false
@@ -263,7 +264,7 @@ func (w *UpdateStateWatcher[T]) Wait(
 	timeouts tftimeouts.Value,
 	response *resource.UpdateResponse,
 ) (*T, bool) {
-	timeout, diagnostics := timeouts.Update(ctx, 30*time.Minute)
+	timeout, diagnostics := timeouts.Update(ctx, defaultStateWatcherTimeout)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return nil, false
@@ -338,7 +339,7 @@ func (w *DeleteStateWatcher) Wait(
 	timeouts tftimeouts.Value,
 	response *resource.DeleteResponse,
 ) bool {
-	timeout, diagnostics := timeouts.Delete(ctx, 30*time.Minute)
+	timeout, diagnostics := timeouts.Delete(ctx, defaultStateWatcherTimeout)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return false

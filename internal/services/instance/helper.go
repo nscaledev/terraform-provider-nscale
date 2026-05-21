@@ -34,6 +34,7 @@ func getInstance(
 	if err != nil {
 		return nil, nil, err
 	}
+	defer instanceResponse.Body.Close()
 
 	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceResponse)
 	if err != nil {

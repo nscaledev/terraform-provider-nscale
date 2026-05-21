@@ -46,6 +46,7 @@ var (
 
 type InstanceResourceModel struct {
 	InstanceModel
+
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
@@ -270,6 +271,7 @@ func (r *InstanceResource) Create(
 		)
 		return
 	}
+	defer instanceCreateResponse.Body.Close()
 
 	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceCreateResponse)
 	if err != nil {
@@ -357,12 +359,13 @@ func (r *InstanceResource) Update(
 		)
 		return
 	}
+	defer instanceUpdateResponse.Body.Close()
 
-	if _, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceUpdateResponse); err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
+	if _, readErr := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceUpdateResponse); readErr != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
 		response.Diagnostics.AddError(
 			"Failed to Update Instance",
-			fmt.Sprintf("An error occurred while updating the instance: %s", err),
+			fmt.Sprintf("An error occurred while updating the instance: %s", readErr),
 		)
 		return
 	}
@@ -405,6 +408,7 @@ func (r *InstanceResource) Delete(
 		)
 		return
 	}
+	defer instanceDeleteResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(instanceDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {

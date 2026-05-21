@@ -29,6 +29,7 @@ var (
 
 type NetworkResourceModel struct {
 	NetworkModel
+
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
@@ -229,6 +230,7 @@ func (r *NetworkResource) Create(
 		)
 		return
 	}
+	defer networkCreateResponse.Body.Close()
 
 	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkCreateResponse)
 	if err != nil {
@@ -316,12 +318,13 @@ func (r *NetworkResource) Update(
 		)
 		return
 	}
+	defer networkUpdateResponse.Body.Close()
 
-	if _, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse); err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
+	if _, readErr := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse); readErr != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
 		response.Diagnostics.AddError(
 			"Failed to Update Network",
-			fmt.Sprintf("An error occurred while updating the network: %s", err),
+			fmt.Sprintf("An error occurred while updating the network: %s", readErr),
 		)
 		return
 	}
@@ -364,6 +367,7 @@ func (r *NetworkResource) Delete(
 		)
 		return
 	}
+	defer networkDeleteResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(networkDeleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {

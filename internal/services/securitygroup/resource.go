@@ -39,6 +39,8 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 )
 
+const defaultDeleteTimeout = 30 * time.Minute
+
 var (
 	_ resource.ResourceWithConfigure   = &SecurityGroupResource{}
 	_ resource.ResourceWithImportState = &SecurityGroupResource{}
@@ -46,6 +48,7 @@ var (
 
 type SecurityGroupResourceModel struct {
 	SecurityGroupModel
+
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
@@ -321,13 +324,13 @@ func (r *SecurityGroupResource) Update(
 		return
 	}
 
-	if _, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](
+	if _, readErr := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](
 		securityGroupUpdateResponse,
-	); err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
+	); readErr != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
 		response.Diagnostics.AddError(
 			"Failed to Update Security Group",
-			fmt.Sprintf("An error occurred while updating the security group: %s", err),
+			fmt.Sprintf("An error occurred while updating the security group: %s", readErr),
 		)
 		return
 	}
@@ -362,7 +365,7 @@ func (r *SecurityGroupResource) Delete(
 
 	id := data.ID.ValueString()
 
-	deleteTimeout, diagnostics := data.Timeouts.Delete(ctx, 30*time.Minute)
+	deleteTimeout, diagnostics := data.Timeouts.Delete(ctx, defaultDeleteTimeout)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -375,8 +378,9 @@ func (r *SecurityGroupResource) Delete(
 		if err != nil {
 			return err, false
 		}
-		if err := nscale.ReadEmptyResponse(deleteResponse); err != nil {
-			return err, nscale.IsAPIErrorInUse(err)
+		defer deleteResponse.Body.Close()
+		if readErr := nscale.ReadEmptyResponse(deleteResponse); readErr != nil {
+			return readErr, nscale.IsAPIErrorInUse(readErr)
 		}
 		return nil, false
 	})

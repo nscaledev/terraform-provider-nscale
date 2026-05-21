@@ -34,6 +34,7 @@ func getSSHCA(
 	if err != nil {
 		return nil, nil, err
 	}
+	defer resp.Body.Close()
 
 	sshCA, err := nscale.ReadJSONResponsePointer[regionapi.SshCertificateAuthorityV2Read](resp)
 	if err != nil {

@@ -45,10 +45,13 @@ type FileStorageModel struct {
 	CreationTime   types.String `tfsdk:"creation_time"`
 }
 
+// bytesToGiBShift converts a byte count to whole gibibytes (1 GiB = 2^30 bytes).
+const bytesToGiBShift = 30
+
 func NewFileStorageModel(source *regionapi.StorageV2Read) FileStorageModel {
 	size := types.Int64Value(0)
 	if source.Status.Usage != nil && source.Status.Usage.UsedBytes != nil {
-		size = types.Int64Value(*source.Status.Usage.UsedBytes >> 30)
+		size = types.Int64Value(*source.Status.Usage.UsedBytes >> bytesToGiBShift)
 	}
 
 	rootSquash := types.BoolNull()
