@@ -10,6 +10,8 @@ Categories used: `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-05-27
+
 ### FEATURES
 
 - Added file storage usage refresh control ([#40](https://github.com/nscaledev/terraform-provider-nscale/pull/40)).
@@ -69,7 +71,8 @@ breaking changes will increment the major version.
 
 Final pre-1.0 release. See git history for the full 0.0.x series.
 
-[Unreleased]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/nscaledev/terraform-provider-nscale/compare/v0.0.10...v1.0.0
 [0.0.10]: https://github.com/nscaledev/terraform-provider-nscale/releases/tag/v0.0.10
