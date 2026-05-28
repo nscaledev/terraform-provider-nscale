@@ -30,7 +30,7 @@ func TestAccSSHCertificateAuthorityDataSource_basic(t *testing.T) {
 			{
 				Config: testAccSSHCertificateAuthorityDataSourceConfig(
 					"test-ca-ds",
-					"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForDataSource",
+					"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKtqqCZcsD96OFVHm1Rx0IOGPMlW1oIEtFVQ8SY3Yyen tf-acc-ca-3",
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.nscale_ssh_certificate_authority.test", "id"),
@@ -38,7 +38,7 @@ func TestAccSSHCertificateAuthorityDataSource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"data.nscale_ssh_certificate_authority.test",
 						"public_key",
-						"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForDataSource",
+						"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKtqqCZcsD96OFVHm1Rx0IOGPMlW1oIEtFVQ8SY3Yyen tf-acc-ca-3",
 					),
 					resource.TestCheckResourceAttrSet("data.nscale_ssh_certificate_authority.test", "project_id"),
 					resource.TestCheckResourceAttrSet("data.nscale_ssh_certificate_authority.test", "creation_time"),

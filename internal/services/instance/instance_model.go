@@ -196,11 +196,7 @@ type InstanceNetworkInterfaceModel struct {
 }
 
 func NewInstanceNetworkInterfaceModel(spec computeapi.InstanceSpec, status computeapi.InstanceStatus) types.Object {
-	enablePublicIP := types.BoolValue(false)
-	if spec.Networking.PublicIP != nil {
-		// REVIEW_ME: Should we derive the value from the status, or rely on the spec definition?
-		enablePublicIP = types.BoolValue(*spec.Networking.PublicIP)
-	}
+	enablePublicIP := types.BoolPointerValue(spec.Networking.PublicIP)
 
 	var securityGroupIDs []attr.Value
 	if securityGroups := spec.Networking.SecurityGroups; securityGroups != nil {

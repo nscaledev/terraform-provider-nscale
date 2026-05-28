@@ -24,7 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-const testAccCAPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForInstanceAcceptanceTests"
+const testAccCAPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFq/TD20U9PX0vbuMPpo8MQfjimypEud+BNFUXZXz1uB tf-acc-ca-4"
 
 func TestAccInstanceResource_withSSHCertificateAuthority(t *testing.T) {
 	resource.Test(t, resource.TestCase{

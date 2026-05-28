@@ -78,9 +78,12 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 
 	tags = nscale.RemoveOperationTags(tags)
 
-	var dnsNameservers []string
+	dnsNameservers := []string{}
 	if diagnostics = m.DNSNameservers.ElementsAs(context.TODO(), &dnsNameservers, false); diagnostics.HasError() {
 		return regionapi.NetworkV2Create{}, diagnostics
+	}
+	if dnsNameservers == nil {
+		dnsNameservers = []string{}
 	}
 
 	var sourceRoutes []RouteModel
@@ -125,9 +128,12 @@ func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, d
 
 	tags = nscale.RemoveOperationTags(tags)
 
-	var dnsNameservers []string
+	dnsNameservers := []string{}
 	if diagnostics = m.DNSNameservers.ElementsAs(context.TODO(), &dnsNameservers, false); diagnostics.HasError() {
 		return regionapi.NetworkV2Update{}, diagnostics
+	}
+	if dnsNameservers == nil {
+		dnsNameservers = []string{}
 	}
 
 	var sourceRoutes []RouteModel
