@@ -133,7 +133,6 @@ require them on every PR.
 | `securitygroup` | ❌ | ❌ |
 | `network` | ❌ | ❌ |
 | `region` | ❌ | ❌ |
-| `computecluster` | ❌ | ❌ |
 | `objectstorage` *(new)* | ❌ | ✅ endpoint resource + update + DS, access key resource + DS, endpoint class DS |
 
 Object storage acceptance tests in detail:

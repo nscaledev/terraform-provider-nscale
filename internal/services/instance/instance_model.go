@@ -24,8 +24,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
-	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
+	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/pointer"
@@ -168,10 +168,11 @@ func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate,
 			Tags:        tags,
 		},
 		Spec: computeapi.InstanceSpec{
-			FlavorId:   m.FlavorID.ValueString(),
-			ImageId:    m.ImageID.ValueString(),
-			Networking: &networking,
-			UserData:   userData,
+			FlavorId:                  m.FlavorID.ValueString(),
+			ImageId:                   m.ImageID.ValueString(),
+			Networking:                &networking,
+			SshCertificateAuthorityId: m.SSHCertificateAuthorityID.ValueStringPointer(),
+			UserData:                  userData,
 		},
 	}
 

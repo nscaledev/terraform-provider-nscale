@@ -28,7 +28,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
-	"github.com/nscaledev/terraform-provider-nscale/internal/services/computecluster"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/filestorage"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/instance"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
@@ -215,7 +214,6 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		instance.NewInstanceDataSource,
 		instance.NewInstanceSSHKeyDataSource,
 		sshca.NewSSHCertificateAuthorityDataSource,
-		computecluster.NewComputeClusterDataSource,
 	}
 }
 
@@ -226,6 +224,5 @@ func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resourc
 		filestorage.NewFileStorageResource,
 		instance.NewInstanceResource,
 		sshca.NewSSHCertificateAuthorityResource,
-		computecluster.NewComputeClusterResource,
 	}
 }

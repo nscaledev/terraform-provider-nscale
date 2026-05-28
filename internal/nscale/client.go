@@ -22,8 +22,8 @@ import (
 	"io"
 	"net/http"
 
-	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
-	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 )
 
 type Client struct {

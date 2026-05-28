@@ -16,6 +16,10 @@ limitations under the License.
 
 package pointer
 
+// Reference returns a pointer to value. Unlike the built-in new(T), this
+// preserves the supplied value rather than producing a zero-valued pointer.
+//
+//nolint:modernize // new(expr) is not equivalent — it zero-values the result.
 func Reference[T any](value T) *T {
 	return &value
 }
@@ -32,5 +36,5 @@ func ReferenceSlice[T any](value []T) *[]T {
 	if value == nil {
 		value = make([]T, 0)
 	}
-	return Reference(value)
+	return Reference(value) //nolint:modernize // see Reference doc-comment.
 }

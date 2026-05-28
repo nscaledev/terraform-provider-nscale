@@ -10,6 +10,25 @@ Categories used: `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 
 ## [Unreleased]
 
+### BREAKING CHANGES
+
+- Removed the deprecated `nscale_compute_cluster` resource and data source. The
+  underlying API has been retired upstream; configurations referencing this
+  resource will need to migrate to the underlying primitives (instances,
+  networks, security groups). Plans that still reference `nscale_compute_cluster`
+  will fail.
+- Migrated all private API clients from the vendored `unikorn-cloud/*` and
+  `nscaledev/uni-storage` modules to the public
+  [`github.com/nscaledev/nscale-sdk-go`](https://github.com/nscaledev/nscale-sdk-go).
+  Consumers of the provider see no change; downstream forks that import the
+  provider's `internal/` packages will need to update import paths.
+
+### ENHANCEMENTS
+
+- The provider no longer ships a `vendor/` directory. Modules are now resolved
+  via the standard public Go module proxy, removing the auth-and-vendoring
+  workaround that the previous private storage client required.
+
 ## [1.2.0] - 2026-05-27
 
 ### FEATURES
