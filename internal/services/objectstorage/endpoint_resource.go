@@ -47,6 +47,7 @@ var (
 
 type ObjectStorageEndpointResourceModel struct {
 	ObjectStorageEndpointModel
+
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
@@ -253,6 +254,7 @@ func (r *ObjectStorageEndpointResource) Create(
 		)
 		return
 	}
+	defer createResponse.Body.Close()
 
 	endpoint, err := nscale.ReadJSONResponsePointer[storageapi.ObjectStorageEndpointRead](createResponse)
 	if err != nil {
@@ -366,12 +368,15 @@ func (r *ObjectStorageEndpointResource) Update(
 		)
 		return
 	}
+	defer updateResponse.Body.Close()
 
-	if _, err := nscale.ReadJSONResponsePointer[storageapi.ObjectStorageEndpointRead](updateResponse); err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
+	if _, readErr := nscale.ReadJSONResponsePointer[storageapi.ObjectStorageEndpointRead](
+		updateResponse,
+	); readErr != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
 		response.Diagnostics.AddError(
 			"Failed to Update Object Storage Endpoint",
-			fmt.Sprintf("An error occurred while updating the object storage endpoint: %s", err),
+			fmt.Sprintf("An error occurred while updating the object storage endpoint: %s", readErr),
 		)
 		return
 	}
@@ -423,6 +428,7 @@ func (r *ObjectStorageEndpointResource) Delete(
 		)
 		return
 	}
+	defer deleteResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(deleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {

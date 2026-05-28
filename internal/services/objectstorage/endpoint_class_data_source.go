@@ -150,6 +150,7 @@ func (s *ObjectStorageEndpointClassDataSource) Read(
 		)
 		return
 	}
+	defer listResponse.Body.Close()
 
 	classes, err := nscale.ReadJSONResponseValue[[]storageapi.ObjectStorageEndpointClassRead](listResponse)
 	if err != nil {

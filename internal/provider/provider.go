@@ -108,6 +108,7 @@ func (p NscaleProvider) Schema(ctx context.Context, request provider.SchemaReque
 	}
 }
 
+//nolint:funlen // Configure is a flat sequence of "resolve env-or-config" + diagnostic-emit pairs; refactoring obscures more than it helps.
 func (p NscaleProvider) Configure(
 	ctx context.Context,
 	request provider.ConfigureRequest,

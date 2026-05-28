@@ -167,7 +167,7 @@ func newExposureValue(source *storageapi.ObjectStorageEndpointExposureStatus) ty
 func marshalIdentityPolicyDocument(document storageapi.ObjectStorageIdentityPolicyDocument) (string, error) {
 	bytes, err := json.Marshal(document)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("marshal identity policy document: %w", err)
 	}
 	return string(bytes), nil
 }
@@ -243,6 +243,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointCreateParams(
 			ProjectId                    string                                      `json:"projectId"`
 			RegionId                     string                                      `json:"regionId"`
 		}{
+			IdentityPolicies:             nil,
 			ObjectStorageEndpointClassId: m.EndpointClassID.ValueString(),
 			OrganizationId:               organizationID,
 			ProjectId:                    m.ProjectID.ValueString(),
@@ -251,7 +252,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointCreateParams(
 	}
 
 	if policies != nil {
-		policyList := storageapi.ObjectStorageIdentityPolicyList(policies)
+		policyList := policies
 		endpoint.Spec.IdentityPolicies = &policyList
 	}
 
@@ -278,14 +279,13 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointUpdateParams(
 			Name:        m.Name.ValueString(),
 			Tags:        tags,
 		},
+		Spec: &storageapi.ObjectStorageEndpointUpdateSpec{IdentityPolicies: nil},
 	}
 
-	spec := storageapi.ObjectStorageEndpointUpdateSpec{}
 	if policies != nil {
-		policyList := storageapi.ObjectStorageIdentityPolicyList(policies)
-		spec.IdentityPolicies = &policyList
+		policyList := policies
+		update.Spec.IdentityPolicies = &policyList
 	}
-	update.Spec = &spec
 
 	return update, nil
 }

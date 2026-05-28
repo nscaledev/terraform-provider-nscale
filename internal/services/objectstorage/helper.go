@@ -34,6 +34,7 @@ func getObjectStorageEndpoint(
 	if err != nil {
 		return nil, nil, err
 	}
+	defer resp.Body.Close()
 
 	endpoint, err := nscale.ReadJSONResponsePointer[storageapi.ObjectStorageEndpointRead](resp)
 	if err != nil {
@@ -56,6 +57,7 @@ func getObjectStorageAccessKey(
 	if err != nil {
 		return nil, nil, err
 	}
+	defer resp.Body.Close()
 
 	accessKey, err := nscale.ReadJSONResponsePointer[storageapi.ObjectStorageAccessKeyRead](resp)
 	if err != nil {

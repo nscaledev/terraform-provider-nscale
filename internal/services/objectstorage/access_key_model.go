@@ -86,6 +86,7 @@ func (m *ObjectStorageAccessKeyModel) NscaleObjectStorageAccessKeyCreateParams()
 		Metadata: coreapi.ResourceWriteMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
+			Tags:        nil,
 		},
 		Spec: storageapi.ObjectStorageAccessKeyCreateSpec{
 			IdentityPolicy: m.IdentityPolicy.ValueString(),

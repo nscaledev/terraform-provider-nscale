@@ -26,20 +26,18 @@ import (
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 )
 
-func ptr[T any](v T) *T { return &v }
-
 func TestNewObjectStorageAccessKeyModel(t *testing.T) {
 	created := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	source := &storageapi.ObjectStorageAccessKeyRead{
 		Metadata: coreapi.ProjectScopedResourceReadMetadata{
 			Id:           "ak-123",
 			Name:         "writer",
-			Description:  ptr("ingest credential"),
+			Description:  new("ingest credential"),
 			ProjectId:    "proj-1",
 			CreationTime: created,
 		},
 		Spec: storageapi.ObjectStorageAccessKeySpec{
-			AccessKeyId:    ptr("AKIA000000000000"),
+			AccessKeyId:    new("AKIA000000000000"),
 			IdentityPolicy: "bucket-admin",
 		},
 	}

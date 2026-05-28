@@ -44,6 +44,7 @@ var (
 
 type ObjectStorageAccessKeyResourceModel struct {
 	ObjectStorageAccessKeyModel
+
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
@@ -210,6 +211,7 @@ func (r *ObjectStorageAccessKeyResource) Create(
 		)
 		return
 	}
+	defer createResponse.Body.Close()
 
 	created, err := nscale.ReadJSONResponsePointer[storageapi.ObjectStorageAccessKeyCreateResponseBody](createResponse)
 	if err != nil {
@@ -345,6 +347,7 @@ func (r *ObjectStorageAccessKeyResource) Delete(
 		)
 		return
 	}
+	defer deleteResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(deleteResponse); err != nil {
 		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
@@ -377,8 +380,9 @@ func (r *ObjectStorageAccessKeyResource) ImportState(
 	request resource.ImportStateRequest,
 	response *resource.ImportStateResponse,
 ) {
-	parts := strings.SplitN(request.ID, "/", 2)
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+	const importIDParts = 2
+	parts := strings.SplitN(request.ID, "/", importIDParts)
+	if len(parts) != importIDParts || parts[0] == "" || parts[1] == "" {
 		response.Diagnostics.AddError(
 			"Invalid Import ID",
 			"Import ID must be of the form '<endpoint_id>/<access_key_id>'.",

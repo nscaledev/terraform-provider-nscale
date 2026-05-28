@@ -55,7 +55,7 @@ func TestNewObjectStorageEndpointModel(t *testing.T) {
 		Metadata: coreapi.ProjectScopedResourceReadMetadata{
 			Id:           "ep-1",
 			Name:         "ml-artifacts",
-			Description:  ptr("ingest endpoint"),
+			Description:  new("ingest endpoint"),
 			ProjectId:    "proj-1",
 			CreationTime: created,
 			Tags:         &tags,

@@ -17,6 +17,7 @@ limitations under the License.
 package objectstorage_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -73,11 +74,11 @@ func TestAccObjectStorageAccessKeyResource_basic(t *testing.T) {
 				ImportStateIdFunc: func(state *terraform.State) (string, error) {
 					ak, ok := state.RootModule().Resources["nscale_object_storage_access_key.test"]
 					if !ok {
-						return "", fmt.Errorf("access key resource not found in state")
+						return "", errors.New("access key resource not found in state")
 					}
 					ep, ok := state.RootModule().Resources["nscale_object_storage_endpoint.parent"]
 					if !ok {
-						return "", fmt.Errorf("endpoint resource not found in state")
+						return "", errors.New("endpoint resource not found in state")
 					}
 					return fmt.Sprintf("%s/%s", ep.Primary.ID, ak.Primary.ID), nil
 				},
