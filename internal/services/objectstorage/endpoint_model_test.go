@@ -274,3 +274,176 @@ func TestNscaleObjectStorageEndpointCreateParams_InvalidPolicyJSON(t *testing.T)
 		t.Fatal("expected error diagnostic for invalid JSON policy document")
 	}
 }
+
+// TestNscaleObjectStorageEndpointUpdateParams_StripsOperationTags mirrors the
+// Create-side test for the Update path so the operation-tag stripping
+// invariant holds on rename / identity-policy swap flows too.
+func TestNscaleObjectStorageEndpointUpdateParams_StripsOperationTags(t *testing.T) {
+	ctx := context.Background()
+	tags := types.MapValueMust(types.StringType, map[string]attr.Value{
+		"team": types.StringValue("ingest"),
+		nscale.TerraformOperationTagPrefix + "leftover": types.StringValue("nope"),
+	})
+	m := &ObjectStorageEndpointModel{
+		Name:             types.StringValue("ml-artifacts-renamed"),
+		Description:      types.StringValue("post-update"),
+		EndpointClassID:  types.StringValue("class-1"),
+		ProjectID:        types.StringValue("proj-1"),
+		RegionID:         types.StringValue("region-1"),
+		Tags:             tags,
+		IdentityPolicies: types.ListNull(ObjectStorageEndpointIdentityPolicyAttributeType),
+	}
+
+	params, diags := m.NscaleObjectStorageEndpointUpdateParams(ctx)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if params.Metadata.Name != "ml-artifacts-renamed" {
+		t.Errorf("Metadata.Name = %q, want ml-artifacts-renamed", params.Metadata.Name)
+	}
+	if params.Metadata.Tags == nil {
+		t.Fatal("expected tags to survive when at least one user tag is configured")
+	}
+	for _, tag := range *params.Metadata.Tags {
+		if tag.Name == nscale.TerraformOperationTagPrefix+"leftover" {
+			t.Errorf("operation tag leaked into update params: %+v", tag)
+		}
+	}
+	// IdentityPolicies is null on the model; the update Spec must still be
+	// populated so the API call doesn't deref a nil pointer.
+	if params.Spec == nil {
+		t.Fatal("Spec must be non-nil even when IdentityPolicies is null")
+	}
+	if params.Spec.IdentityPolicies != nil {
+		t.Errorf("Spec.IdentityPolicies should be nil when model has null policies")
+	}
+}
+
+// TestNscaleObjectStorageEndpointUpdateParams_IdentityPoliciesRoundTrip
+// verifies the update payload carries the configured policies through.
+func TestNscaleObjectStorageEndpointUpdateParams_IdentityPoliciesRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	policyObj := types.ObjectValueMust(
+		ObjectStorageEndpointIdentityPolicyAttributeType.AttrTypes,
+		map[string]attr.Value{
+			"name": types.StringValue("readers"),
+			"document": types.StringValue(
+				`{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"*"}]}`,
+			),
+		},
+	)
+	m := &ObjectStorageEndpointModel{
+		Name:            types.StringValue("ml-artifacts"),
+		EndpointClassID: types.StringValue("class-1"),
+		ProjectID:       types.StringValue("proj-1"),
+		RegionID:        types.StringValue("region-1"),
+		Tags:            types.MapNull(types.StringType),
+		IdentityPolicies: types.ListValueMust(
+			ObjectStorageEndpointIdentityPolicyAttributeType,
+			[]attr.Value{policyObj},
+		),
+	}
+
+	params, diags := m.NscaleObjectStorageEndpointUpdateParams(ctx)
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if params.Spec == nil || params.Spec.IdentityPolicies == nil {
+		t.Fatalf("expected policies to survive into Update.Spec, got %+v", params.Spec)
+	}
+	if (*params.Spec.IdentityPolicies)[0].Name != "readers" {
+		t.Errorf("policy name = %q, want readers", (*params.Spec.IdentityPolicies)[0].Name)
+	}
+}
+
+// TestNscaleObjectStorageEndpointUpdateParams_InvalidPolicyJSON guarantees the
+// Update path errors out the same way Create does when a policy document is
+// not valid JSON, rather than silently shipping it to the API.
+func TestNscaleObjectStorageEndpointUpdateParams_InvalidPolicyJSON(t *testing.T) {
+	ctx := context.Background()
+	policyObj := types.ObjectValueMust(
+		ObjectStorageEndpointIdentityPolicyAttributeType.AttrTypes,
+		map[string]attr.Value{
+			"name":     types.StringValue("broken"),
+			"document": types.StringValue("not-json"),
+		},
+	)
+	m := &ObjectStorageEndpointModel{
+		Name:            types.StringValue("ml-artifacts"),
+		EndpointClassID: types.StringValue("class-1"),
+		ProjectID:       types.StringValue("proj-1"),
+		RegionID:        types.StringValue("region-1"),
+		Tags:            types.MapNull(types.StringType),
+		IdentityPolicies: types.ListValueMust(
+			ObjectStorageEndpointIdentityPolicyAttributeType,
+			[]attr.Value{policyObj},
+		),
+	}
+
+	_, diags := m.NscaleObjectStorageEndpointUpdateParams(ctx)
+	if !diags.HasError() {
+		t.Fatal("expected error diagnostic for invalid JSON policy document")
+	}
+}
+
+// TestNewExposureValue_NilPublic covers the half-populated branch: status.Exposure
+// is non-nil but no Public block — e.g. a private-only endpoint class. The
+// outer object must be set, the public attribute must be null.
+func TestNewExposureValue_NilPublic(t *testing.T) {
+	got := newExposureValue(&storageapi.ObjectStorageEndpointExposureStatus{Public: nil})
+	if got.IsNull() {
+		t.Fatal("outer exposure object should be non-null when status.Exposure is set")
+	}
+	publicObj, ok := got.Attributes()["public"].(types.Object)
+	if !ok {
+		t.Fatalf("public attribute should be a types.Object, got %T", got.Attributes()["public"])
+	}
+	if !publicObj.IsNull() {
+		t.Errorf("public attribute should be null when status.Public is nil")
+	}
+}
+
+// TestIdentityPoliciesAPI_NullList covers the early-return branch in
+// identityPoliciesAPI when the IdentityPolicies attribute is null.
+func TestIdentityPoliciesAPI_NullList(t *testing.T) {
+	m := &ObjectStorageEndpointModel{
+		IdentityPolicies: types.ListNull(ObjectStorageEndpointIdentityPolicyAttributeType),
+	}
+	policies, diags := m.identityPoliciesAPI(context.Background())
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if policies != nil {
+		t.Errorf("expected nil policies for null list, got %d", len(policies))
+	}
+}
+
+// TestIdentityPoliciesAPI_EmptyList covers the explicit-empty path — a
+// configured-but-empty list is also "no policies".
+func TestIdentityPoliciesAPI_EmptyList(t *testing.T) {
+	m := &ObjectStorageEndpointModel{
+		IdentityPolicies: types.ListValueMust(ObjectStorageEndpointIdentityPolicyAttributeType, []attr.Value{}),
+	}
+	policies, diags := m.identityPoliciesAPI(context.Background())
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if policies != nil {
+		t.Errorf("expected nil policies for empty list, got %d", len(policies))
+	}
+}
+
+// TestIdentityPoliciesAPI_UnknownList covers the early-return branch when the
+// attribute is unknown (e.g. during plan-time with computed values).
+func TestIdentityPoliciesAPI_UnknownList(t *testing.T) {
+	m := &ObjectStorageEndpointModel{
+		IdentityPolicies: types.ListUnknown(ObjectStorageEndpointIdentityPolicyAttributeType),
+	}
+	policies, diags := m.identityPoliciesAPI(context.Background())
+	if diags.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diags)
+	}
+	if policies != nil {
+		t.Errorf("expected nil policies for unknown list, got %d", len(policies))
+	}
+}
