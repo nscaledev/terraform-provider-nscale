@@ -22,8 +22,15 @@ import (
 	"io"
 	"net/http"
 
-	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
-	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+
+	// legacycomputeapi is the still-on-unikorn-cloud client used solely by the
+	// deprecated nscale_compute_cluster resource. The cluster surface was
+	// removed when the compute spec was regenerated for nscale-sdk-go, so
+	// until that resource is removed we keep a second client pointed at the
+	// legacy spec.
+	legacycomputeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 )
 
 type Client struct {
@@ -32,6 +39,7 @@ type Client struct {
 	ProjectID      string
 	Region         regionapi.ClientInterface
 	Compute        computeapi.ClientInterface
+	LegacyCompute  legacycomputeapi.ClientInterface
 }
 
 func NewClient(
@@ -49,12 +57,21 @@ func NewClient(
 		return nil, fmt.Errorf("failed to create Nscale compute API client: %w", err)
 	}
 
+	legacyCompute, err := legacycomputeapi.NewClient(
+		computeServiceBaseURL,
+		legacycomputeapi.WithHTTPClient(httpClient),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Nscale legacy compute API client: %w", err)
+	}
+
 	client := &Client{
 		RegionID:       regionID,
 		OrganizationID: organizationID,
 		ProjectID:      projectID,
 		Region:         region,
 		Compute:        compute,
+		LegacyCompute:  legacyCompute,
 	}
 
 	return client, nil

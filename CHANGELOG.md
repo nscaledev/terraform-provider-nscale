@@ -10,6 +10,11 @@ Categories used: `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 
 ## [Unreleased]
 
+### ENHANCEMENTS
+
+- Migrated to the public [`nscale-sdk-go`](https://github.com/nscaledev/nscale-sdk-go) SDK for compute (Instance API), region, and common types. The deprecated `nscale_compute_cluster` resource stays on the legacy client behind an in-package type-compat shim until its scheduled removal.
+- Removed the vendored dependency tree (`vendor/`). All dependencies now resolve via the public Go module proxy.
+
 ## [1.2.0] - 2026-05-27
 
 ### FEATURES

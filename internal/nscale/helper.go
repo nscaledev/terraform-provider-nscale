@@ -28,7 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
-	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
+	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 )
 
 const (

@@ -23,8 +23,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
-	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
@@ -78,9 +78,12 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 
 	tags = nscale.RemoveOperationTags(tags)
 
-	var dnsNameservers []string
+	dnsNameservers := []string{}
 	if diagnostics = m.DNSNameservers.ElementsAs(context.TODO(), &dnsNameservers, false); diagnostics.HasError() {
 		return regionapi.NetworkV2Create{}, diagnostics
+	}
+	if dnsNameservers == nil {
+		dnsNameservers = []string{}
 	}
 
 	var sourceRoutes []RouteModel
@@ -125,9 +128,12 @@ func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, d
 
 	tags = nscale.RemoveOperationTags(tags)
 
-	var dnsNameservers []string
+	dnsNameservers := []string{}
 	if diagnostics = m.DNSNameservers.ElementsAs(context.TODO(), &dnsNameservers, false); diagnostics.HasError() {
 		return regionapi.NetworkV2Update{}, diagnostics
+	}
+	if dnsNameservers == nil {
+		dnsNameservers = []string{}
 	}
 
 	var sourceRoutes []RouteModel

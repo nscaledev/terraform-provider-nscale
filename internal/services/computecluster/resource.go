@@ -36,8 +36,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	common "github.com/nscaledev/nscale-sdk-go/common"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
-	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -339,7 +339,7 @@ func (r *ComputeClusterResource) Create(
 	}
 
 	// REVIEW_ME: Should we retrieve the organization ID and project ID using the service token, or is that even possible?
-	computeClusterCreateResponse, err := r.client.Compute.PostApiV1OrganizationsOrganizationIDProjectsProjectIDClusters(
+	computeClusterCreateResponse, err := r.client.LegacyCompute.PostApiV1OrganizationsOrganizationIDProjectsProjectIDClusters(
 		ctx,
 		r.client.OrganizationID,
 		r.client.ProjectID,
@@ -373,7 +373,7 @@ func (r *ComputeClusterResource) Create(
 	stateWatcher := nscale.CreateStateWatcher[computeapi.ComputeClusterRead]{
 		ResourceTitle: "Compute Cluster",
 		ResourceName:  "compute cluster",
-		GetFunc: func(ctx context.Context) (*computeapi.ComputeClusterRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
+		GetFunc: func(ctx context.Context) (*computeapi.ComputeClusterRead, *common.ProjectScopedResourceReadMetadata, error) {
 			targetID := computeCluster.Metadata.Id
 			return getComputeCluster(ctx, r.client.OrganizationID, targetID, r.client)
 		},
@@ -406,7 +406,7 @@ func (r *ComputeClusterResource) Read(
 	resourceReader := nscale.ResourceReader[computeapi.ComputeClusterRead]{
 		ResourceTitle: "Compute Cluster",
 		ResourceName:  "compute cluster",
-		GetFunc: func(ctx context.Context, id string) (*computeapi.ComputeClusterRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
+		GetFunc: func(ctx context.Context, id string) (*computeapi.ComputeClusterRead, *common.ProjectScopedResourceReadMetadata, error) {
 			return getComputeCluster(ctx, r.client.OrganizationID, id, r.client)
 		},
 	}
@@ -442,9 +442,9 @@ func (r *ComputeClusterResource) Update(
 	}
 
 	id := data.ID.ValueString()
-	operationTagKey := nscale.WriteOperationTag(&requestData.Metadata)
+	operationTagKey := writeOperationTagLegacy(&requestData.Metadata)
 
-	computeClusterUpdateResponse, err := r.client.Compute.PutApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(
+	computeClusterUpdateResponse, err := r.client.LegacyCompute.PutApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(
 		ctx,
 		r.client.OrganizationID,
 		r.client.ProjectID,
@@ -472,7 +472,7 @@ func (r *ComputeClusterResource) Update(
 	stateWatcher := nscale.UpdateStateWatcher[computeapi.ComputeClusterRead]{
 		ResourceTitle: "Compute Cluster",
 		ResourceName:  "compute cluster",
-		GetFunc: func(ctx context.Context) (*computeapi.ComputeClusterRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
+		GetFunc: func(ctx context.Context) (*computeapi.ComputeClusterRead, *common.ProjectScopedResourceReadMetadata, error) {
 			return getComputeCluster(ctx, r.client.OrganizationID, id, r.client)
 		},
 	}
@@ -503,7 +503,7 @@ func (r *ComputeClusterResource) Delete(
 
 	id := data.ID.ValueString()
 
-	computeClusterDeleteResponse, err := r.client.Compute.DeleteApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(
+	computeClusterDeleteResponse, err := r.client.LegacyCompute.DeleteApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(
 		ctx,
 		r.client.OrganizationID,
 		r.client.ProjectID,
@@ -532,7 +532,7 @@ func (r *ComputeClusterResource) Delete(
 	stateWatcher := nscale.DeleteStateWatcher{
 		ResourceTitle: "Compute Cluster",
 		ResourceName:  "compute cluster",
-		GetFunc: func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error) {
+		GetFunc: func(ctx context.Context) (any, *common.ProjectScopedResourceReadMetadata, error) {
 			return getComputeCluster(ctx, r.client.OrganizationID, id, r.client)
 		},
 	}

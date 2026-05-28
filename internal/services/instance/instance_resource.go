@@ -32,8 +32,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
-	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
+	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"

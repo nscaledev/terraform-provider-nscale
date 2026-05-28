@@ -23,7 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
+	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 )
 
 func NullableListValueMust(elementType attr.Type, elements []attr.Value) basetypes.ListValue {

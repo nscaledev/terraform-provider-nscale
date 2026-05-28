@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
-	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 )
 
 type SSHCertificateAuthorityModel struct {
@@ -52,6 +52,7 @@ func (m *SSHCertificateAuthorityModel) NscaleSSHCACreateParams(
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
+			Tags:        nil,
 		},
 		Spec: regionapi.SshCertificateAuthorityV2CreateSpec{
 			OrganizationId: organizationID,

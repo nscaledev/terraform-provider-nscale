@@ -30,7 +30,7 @@ func TestAccSSHCertificateAuthorityResource_basic(t *testing.T) {
 			{
 				Config: testAccSSHCertificateAuthorityResourceConfig(
 					"test-ca",
-					"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForAcceptanceTests",
+					"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBlQZUlNyWHWN4oprIfjk69ucoWJgG3jhSH47OczrR3x tf-acc-ca-1",
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("nscale_ssh_certificate_authority.test", "id"),
@@ -38,7 +38,7 @@ func TestAccSSHCertificateAuthorityResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr(
 						"nscale_ssh_certificate_authority.test",
 						"public_key",
-						"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyForAcceptanceTests",
+						"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBlQZUlNyWHWN4oprIfjk69ucoWJgG3jhSH47OczrR3x tf-acc-ca-1",
 					),
 					resource.TestCheckResourceAttrSet("nscale_ssh_certificate_authority.test", "project_id"),
 					resource.TestCheckResourceAttrSet("nscale_ssh_certificate_authority.test", "creation_time"),
@@ -61,7 +61,7 @@ func TestAccSSHCertificateAuthorityResource_withDescription(t *testing.T) {
 				Config: testAccSSHCertificateAuthorityResourceConfigWithDescription(
 					"test-ca-desc",
 					"Team CA for testing",
-					"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestKeyWithDescription",
+					"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOe5Cvp8UxpVz0pC6SqI34msZMAgTrrWI2UmZwQyecoI tf-acc-ca-2",
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("nscale_ssh_certificate_authority.test", "name", "test-ca-desc"),

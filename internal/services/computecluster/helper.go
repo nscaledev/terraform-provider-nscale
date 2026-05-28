@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"net/http"
 
+	common "github.com/nscaledev/nscale-sdk-go/common"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
-	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -31,8 +31,8 @@ func getComputeCluster(
 	ctx context.Context,
 	organizationID, id string,
 	client *nscale.Client,
-) (*computeapi.ComputeClusterRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	computeClusterListResponse, err := client.Compute.GetApiV1OrganizationsOrganizationIDClusters(
+) (*computeapi.ComputeClusterRead, *common.ProjectScopedResourceReadMetadata, error) {
+	computeClusterListResponse, err := client.LegacyCompute.GetApiV1OrganizationsOrganizationIDClusters(
 		ctx,
 		organizationID,
 		nil,
@@ -49,7 +49,7 @@ func getComputeCluster(
 
 	for _, computeCluster := range computeClusters {
 		if computeCluster.Metadata.Id == id {
-			return &computeCluster, &computeCluster.Metadata, nil
+			return &computeCluster, commonReadMetadataFromLegacy(&computeCluster.Metadata), nil
 		}
 	}
 
