@@ -23,8 +23,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
-	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"

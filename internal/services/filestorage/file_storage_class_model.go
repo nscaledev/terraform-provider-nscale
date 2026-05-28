@@ -19,7 +19,7 @@ package filestorage
 import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	regionapi "github.com/unikorn-cloud/region/pkg/openapi"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
