@@ -148,22 +148,23 @@ func (r *GroupResource) Schema(
 				Computed:            true,
 			},
 			"subjects": schema.SetNestedAttribute{
-				MarkdownDescription: "The set of federated identity subjects that are members of this group.",
-				Optional:            true,
-				Computed:            true,
+				MarkdownDescription: "The set of identity subjects that are members of this group. " +
+					"This is read-only: the identity service derives it from `user_ids` " +
+					"(each member user produces a subject) and any federated identities. " +
+					"Manage membership through `user_ids`, not this attribute.",
+				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"issuer": schema.StringAttribute{
 							MarkdownDescription: "The OIDC issuer URL that asserts this subject.",
-							Required:            true,
+							Computed:            true,
 						},
 						"id": schema.StringAttribute{
 							MarkdownDescription: "The subject identifier issued by the issuer.",
-							Required:            true,
+							Computed:            true,
 						},
 						"email": schema.StringAttribute{
 							MarkdownDescription: "The email address for the subject, when supplied by the issuer.",
-							Optional:            true,
 							Computed:            true,
 						},
 					},

@@ -87,37 +87,6 @@ func TestAccGroupResource_update(t *testing.T) {
 	})
 }
 
-func TestAccGroupResource_subjects(t *testing.T) {
-	name := acctest.RandomWithPrefix("tf-acc-test")
-	roleID := os.Getenv("NSCALE_TEST_ROLE_ID")
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccGroupResourceConfigWithSubjects(name, roleID),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("nscale_identity_group.test", "subjects.#", "1"),
-					resource.TestCheckTypeSetElemNestedAttrs(
-						"nscale_identity_group.test",
-						"subjects.*",
-						map[string]string{
-							"issuer": "https://accounts.google.com",
-							"id":     "tf-acc-subject-1",
-						},
-					),
-				),
-			},
-			{
-				Config:             testAccGroupResourceConfigWithSubjects(name, roleID),
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: false,
-			},
-		},
-	})
-}
-
 func testAccGroupResourceConfig(name, roleID string) string {
 	// user_ids is set to an explicit empty list to guard the empty-set
 	// round-trip (the API returns [] not null; the model must preserve it).
@@ -140,22 +109,6 @@ resource "nscale_identity_group" "test" {
   tags = {
     team = "platform"
   }
-}
-`, name, roleID)
-}
-
-func testAccGroupResourceConfigWithSubjects(name, roleID string) string {
-	return fmt.Sprintf(`
-resource "nscale_identity_group" "test" {
-  name     = %q
-  role_ids = [%q]
-
-  subjects = [
-    {
-      issuer = "https://accounts.google.com"
-      id     = "tf-acc-subject-1"
-    },
-  ]
 }
 `, name, roleID)
 }

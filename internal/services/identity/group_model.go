@@ -144,6 +144,10 @@ func (m *GroupModel) NscaleGroupSpec() (identityapi.GroupSpec, diag.Diagnostics)
 		return identityapi.GroupSpec{}, diagnostics
 	}
 
+	// Subjects is intentionally not written: the identity service derives it
+	// from user_ids (and any federated identities), and supplying both user_ids
+	// and subjects in the same request is rejected server-side. It is a
+	// read-only (computed) attribute, so membership is driven through user_ids.
 	spec := identityapi.GroupSpec{
 		RoleIDs:           roleIDs,
 		ServiceAccountIDs: serviceAccountIDs,
@@ -157,19 +161,6 @@ func (m *GroupModel) NscaleGroupSpec() (identityapi.GroupSpec, diag.Diagnostics)
 			return identityapi.GroupSpec{}, userDiagnostics
 		}
 		spec.UserIDs = &userIDs
-	}
-
-	if !m.Subjects.IsNull() && !m.Subjects.IsUnknown() {
-		var sourceSubjects []SubjectModel
-		subjectDiagnostics := m.Subjects.ElementsAs(context.TODO(), &sourceSubjects, false)
-		if subjectDiagnostics.HasError() {
-			return identityapi.GroupSpec{}, subjectDiagnostics
-		}
-		subjects := make([]identityapi.Subject, 0, len(sourceSubjects))
-		for _, subject := range sourceSubjects {
-			subjects = append(subjects, subject.NscaleSubject())
-		}
-		spec.Subjects = &subjects
 	}
 
 	return spec, nil

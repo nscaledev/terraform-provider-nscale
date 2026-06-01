@@ -15,6 +15,16 @@ variable "role_id" {
   description = "The identifier of a pre-configured role to grant to the group."
 }
 
+# Users are provisioned by the external identity platform; there is no
+# nscale_identity_user resource. To add an existing user to a group, reference
+# them by their user-record UUID in user_ids. Defaults to empty so the example
+# runs without it.
+variable "user_ids" {
+  type        = list(string)
+  description = "UUIDs of existing users to add to the group."
+  default     = []
+}
+
 resource "nscale_identity_group" "engineers" {
   name        = "engineers"
   description = "Engineering staff."
@@ -23,8 +33,9 @@ resource "nscale_identity_group" "engineers" {
     var.role_id,
   ]
 
-  # UUIDs of users provisioned by the external identity platform.
-  user_ids = []
+  # Add existing users to the group by UUID. The group's read-only `subjects`
+  # attribute is derived from this by the identity service.
+  user_ids = var.user_ids
 
   tags = {
     team = "platform"
