@@ -113,7 +113,7 @@ func TestProjectCreateParamsRoundTrip(t *testing.T) {
 		GroupIDs:    setOf(t, "group-a", "group-b"),
 	}
 
-	params, diagnostics := model.NscaleProjectCreateParams()
+	params, diagnostics := model.NscaleProjectCreateParams(t.Context())
 	if diagnostics.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diagnostics)
 	}
@@ -134,7 +134,7 @@ func TestProjectCreateParamsNullGroupIDs(t *testing.T) {
 		GroupIDs: types.SetNull(types.StringType),
 	}
 
-	params, diagnostics := model.NscaleProjectCreateParams()
+	params, diagnostics := model.NscaleProjectCreateParams(t.Context())
 	if diagnostics.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diagnostics)
 	}

@@ -119,12 +119,12 @@ func NewGroupModel(source *identityapi.GroupRead) GroupModel {
 	}
 }
 
-func setToStrings(source types.Set) ([]string, diag.Diagnostics) {
+func setToStrings(ctx context.Context, source types.Set) ([]string, diag.Diagnostics) {
 	result := []string{}
 	if source.IsNull() || source.IsUnknown() {
 		return result, nil
 	}
-	if diagnostics := source.ElementsAs(context.TODO(), &result, false); diagnostics.HasError() {
+	if diagnostics := source.ElementsAs(ctx, &result, false); diagnostics.HasError() {
 		return nil, diagnostics
 	}
 	if result == nil {
@@ -133,13 +133,13 @@ func setToStrings(source types.Set) ([]string, diag.Diagnostics) {
 	return result, nil
 }
 
-func (m *GroupModel) NscaleGroupSpec() (identityapi.GroupSpec, diag.Diagnostics) {
-	roleIDs, diagnostics := setToStrings(m.RoleIDs)
+func (m *GroupModel) NscaleGroupSpec(ctx context.Context) (identityapi.GroupSpec, diag.Diagnostics) {
+	roleIDs, diagnostics := setToStrings(ctx, m.RoleIDs)
 	if diagnostics.HasError() {
 		return identityapi.GroupSpec{}, diagnostics
 	}
 
-	serviceAccountIDs, diagnostics := setToStrings(m.ServiceAccountIDs)
+	serviceAccountIDs, diagnostics := setToStrings(ctx, m.ServiceAccountIDs)
 	if diagnostics.HasError() {
 		return identityapi.GroupSpec{}, diagnostics
 	}
@@ -156,7 +156,7 @@ func (m *GroupModel) NscaleGroupSpec() (identityapi.GroupSpec, diag.Diagnostics)
 	}
 
 	if !m.UserIDs.IsNull() && !m.UserIDs.IsUnknown() {
-		userIDs, userDiagnostics := setToStrings(m.UserIDs)
+		userIDs, userDiagnostics := setToStrings(ctx, m.UserIDs)
 		if userDiagnostics.HasError() {
 			return identityapi.GroupSpec{}, userDiagnostics
 		}
@@ -166,14 +166,14 @@ func (m *GroupModel) NscaleGroupSpec() (identityapi.GroupSpec, diag.Diagnostics)
 	return spec, nil
 }
 
-func (m *GroupModel) NscaleGroupCreateParams() (identityapi.GroupWrite, diag.Diagnostics) {
+func (m *GroupModel) NscaleGroupCreateParams(ctx context.Context) (identityapi.GroupWrite, diag.Diagnostics) {
 	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return identityapi.GroupWrite{}, diagnostics
 	}
 	tags = nscale.RemoveOperationTags(tags)
 
-	spec, diagnostics := m.NscaleGroupSpec()
+	spec, diagnostics := m.NscaleGroupSpec(ctx)
 	if diagnostics.HasError() {
 		return identityapi.GroupWrite{}, diagnostics
 	}
@@ -190,6 +190,6 @@ func (m *GroupModel) NscaleGroupCreateParams() (identityapi.GroupWrite, diag.Dia
 
 // NscaleGroupUpdateParams produces the PUT body. The identity group API uses
 // the same GroupWrite shape for create and update.
-func (m *GroupModel) NscaleGroupUpdateParams() (identityapi.GroupWrite, diag.Diagnostics) {
-	return m.NscaleGroupCreateParams()
+func (m *GroupModel) NscaleGroupUpdateParams(ctx context.Context) (identityapi.GroupWrite, diag.Diagnostics) {
+	return m.NscaleGroupCreateParams(ctx)
 }

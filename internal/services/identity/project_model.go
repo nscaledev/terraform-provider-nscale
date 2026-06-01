@@ -61,9 +61,9 @@ func NewProjectModel(source *identityapi.ProjectRead) ProjectModel {
 	}
 }
 
-func (m *ProjectModel) groupIDs() ([]string, diag.Diagnostics) {
+func (m *ProjectModel) groupIDs(ctx context.Context) ([]string, diag.Diagnostics) {
 	groupIDs := []string{}
-	if diagnostics := m.GroupIDs.ElementsAs(context.TODO(), &groupIDs, false); diagnostics.HasError() {
+	if diagnostics := m.GroupIDs.ElementsAs(ctx, &groupIDs, false); diagnostics.HasError() {
 		return nil, diagnostics
 	}
 	if groupIDs == nil {
@@ -72,14 +72,14 @@ func (m *ProjectModel) groupIDs() ([]string, diag.Diagnostics) {
 	return groupIDs, nil
 }
 
-func (m *ProjectModel) NscaleProjectCreateParams() (identityapi.ProjectWrite, diag.Diagnostics) {
+func (m *ProjectModel) NscaleProjectCreateParams(ctx context.Context) (identityapi.ProjectWrite, diag.Diagnostics) {
 	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return identityapi.ProjectWrite{}, diagnostics
 	}
 	tags = nscale.RemoveOperationTags(tags)
 
-	groupIDs, diagnostics := m.groupIDs()
+	groupIDs, diagnostics := m.groupIDs(ctx)
 	if diagnostics.HasError() {
 		return identityapi.ProjectWrite{}, diagnostics
 	}
@@ -100,6 +100,6 @@ func (m *ProjectModel) NscaleProjectCreateParams() (identityapi.ProjectWrite, di
 // uses the same ProjectWrite shape for create and update, so this mirrors the
 // create path; it exists as its own method so the update flow can attach an
 // operation tag without disturbing create.
-func (m *ProjectModel) NscaleProjectUpdateParams() (identityapi.ProjectWrite, diag.Diagnostics) {
-	return m.NscaleProjectCreateParams()
+func (m *ProjectModel) NscaleProjectUpdateParams(ctx context.Context) (identityapi.ProjectWrite, diag.Diagnostics) {
+	return m.NscaleProjectCreateParams(ctx)
 }

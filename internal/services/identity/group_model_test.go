@@ -139,7 +139,7 @@ func TestGroupCreateParamsRoundTrip(t *testing.T) {
 		Subjects:          types.SetNull(SubjectModelAttributeType),
 	}
 
-	params, diagnostics := model.NscaleGroupCreateParams()
+	params, diagnostics := model.NscaleGroupCreateParams(t.Context())
 	if diagnostics.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diagnostics)
 	}
@@ -172,7 +172,7 @@ func TestGroupCreateParamsRequiredListsSerialized(t *testing.T) {
 		Subjects:          types.SetNull(SubjectModelAttributeType),
 	}
 
-	params, diagnostics := model.NscaleGroupCreateParams()
+	params, diagnostics := model.NscaleGroupCreateParams(t.Context())
 	if diagnostics.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diagnostics)
 	}

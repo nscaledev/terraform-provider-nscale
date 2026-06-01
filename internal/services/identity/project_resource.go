@@ -177,7 +177,7 @@ func (r *ProjectResource) Create(
 		return
 	}
 
-	params, diagnostics := data.NscaleProjectCreateParams()
+	params, diagnostics := data.NscaleProjectCreateParams(ctx)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -287,7 +287,7 @@ func (r *ProjectResource) Update(
 
 	id := data.ID.ValueString()
 
-	params, diagnostics := data.NscaleProjectUpdateParams()
+	params, diagnostics := data.NscaleProjectUpdateParams(ctx)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -317,12 +317,21 @@ func (r *ProjectResource) Update(
 		return
 	}
 
-	project, err := getProject(ctx, id, r.client)
+	// Updating group_ids can put the project back into a provisioning state, so
+	// wait for a terminal status rather than reading the (possibly stale)
+	// status straight after the PUT.
+	timeout, diagnostics := data.Timeouts.Update(ctx, defaultStateTimeout)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
+	project, err := waitForProvisioned(ctx, id, timeout, r.getProject, projectProvisioningStatus)
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
 			"Failed to Read Project After Update",
-			fmt.Sprintf("An error occurred while retrieving the project: %s", err),
+			fmt.Sprintf("An error occurred while waiting for the project to be provisioned: %s", err),
 		)
 		return
 	}
