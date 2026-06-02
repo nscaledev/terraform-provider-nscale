@@ -195,12 +195,6 @@ func (r *GroupResource) Schema(
 	}
 }
 
-// getGroup adapts the package-level getGroup to the generic watcher's getFunc
-// signature by binding the configured client.
-func (r *GroupResource) getGroup(ctx context.Context, id string) (*identityapi.GroupRead, error) {
-	return getGroup(ctx, id, r.client)
-}
-
 func (r *GroupResource) Create(
 	ctx context.Context,
 	request resource.CreateRequest,
@@ -251,19 +245,16 @@ func (r *GroupResource) Create(
 
 	// Groups provision synchronously today, but they expose a provisioning
 	// status, so wait for a terminal state for consistency and future-proofing.
-	timeout, diagnostics := data.Timeouts.Create(ctx, defaultStateTimeout)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
+	stateWatcher := nscale.CreateStateWatcher[identityapi.GroupRead]{
+		ResourceTitle: "Group",
+		ResourceName:  "group",
+		GetFunc: func(ctx context.Context) (*identityapi.GroupRead, nscale.ResourceStatus, error) {
+			return getGroupStatus(ctx, group.Metadata.Id, r.client)
+		},
 	}
 
-	group, err = waitForProvisioned(ctx, group.Metadata.Id, timeout, r.getGroup, groupProvisioningStatus)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Create Group",
-			fmt.Sprintf("An error occurred while waiting for the group to be provisioned: %s", err),
-		)
+	group, ok := stateWatcher.Wait(ctx, data.Timeouts, response)
+	if !ok {
 		return
 	}
 
@@ -282,27 +273,16 @@ func (r *GroupResource) Read(
 		return
 	}
 
-	id := data.ID.ValueString()
+	resourceReader := nscale.ResourceReader[identityapi.GroupRead]{
+		ResourceTitle: "Group",
+		ResourceName:  "group",
+		GetFunc: func(ctx context.Context, id string) (*identityapi.GroupRead, nscale.ResourceStatus, error) {
+			return getGroupStatus(ctx, id, r.client)
+		},
+	}
 
-	group, err := getGroup(ctx, id, r.client)
-	if err != nil {
-		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
-			response.Diagnostics.AddWarning(
-				"Group Not Found",
-				fmt.Sprintf(
-					"The group with ID %s was not found on the server and will be removed from the state file.",
-					id,
-				),
-			)
-			response.State.RemoveResource(ctx)
-			return
-		}
-
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Read Group",
-			fmt.Sprintf("An error occurred while retrieving the group: %s", err),
-		)
+	group, ok := resourceReader.Read(ctx, data.ID.ValueString(), response)
+	if !ok {
 		return
 	}
 
@@ -329,6 +309,10 @@ func (r *GroupResource) Update(
 		return
 	}
 
+	// Tag the update so the watcher can confirm the PUT has propagated through
+	// the cache-backed API before reading back a terminal status.
+	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+
 	updateResponse, err := r.client.Identity.PutApiV1OrganizationsOrganizationIDGroupsGroupid(
 		ctx,
 		r.client.OrganizationID,
@@ -353,22 +337,19 @@ func (r *GroupResource) Update(
 		return
 	}
 
-	// Mirror the create path: wait for a terminal provisioning status rather
-	// than reading the (possibly stale) status straight after the PUT, so a
-	// membership change cannot leave provisioning_status drifted in state.
-	timeout, diagnostics := data.Timeouts.Update(ctx, defaultStateTimeout)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
+	// Mirror the create path: wait for the operation tag to land (and a terminal
+	// status) rather than reading the possibly-stale status straight after the
+	// PUT, so a membership change cannot leave provisioning_status drifted.
+	stateWatcher := nscale.UpdateStateWatcher[identityapi.GroupRead]{
+		ResourceTitle: "Group",
+		ResourceName:  "group",
+		GetFunc: func(ctx context.Context) (*identityapi.GroupRead, nscale.ResourceStatus, error) {
+			return getGroupStatus(ctx, id, r.client)
+		},
 	}
 
-	group, err := waitForProvisioned(ctx, id, timeout, r.getGroup, groupProvisioningStatus)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Read Group After Update",
-			fmt.Sprintf("An error occurred while waiting for the group to be provisioned: %s", err),
-		)
+	group, ok := stateWatcher.Wait(ctx, operationTagKey, data.Timeouts, response)
+	if !ok {
 		return
 	}
 
@@ -417,18 +398,13 @@ func (r *GroupResource) Delete(
 	// Groups deprovision synchronously today, but wait for the API to report
 	// the group gone for consistency with the project resource and to guard
 	// against the operation becoming asynchronous.
-	timeout, diagnostics := data.Timeouts.Delete(ctx, defaultStateTimeout)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
+	stateWatcher := nscale.DeleteStateWatcher{
+		ResourceTitle: "Group",
+		ResourceName:  "group",
+		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
+			return getGroupStatus(ctx, id, r.client)
+		},
 	}
 
-	if err = waitForDeleted(ctx, id, timeout, r.getGroup); err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Delete Group",
-			fmt.Sprintf("An error occurred while waiting for the group to be deleted: %s", err),
-		)
-		return
-	}
+	stateWatcher.Wait(ctx, data.Timeouts, response)
 }

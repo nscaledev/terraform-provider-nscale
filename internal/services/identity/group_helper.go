@@ -19,7 +19,6 @@ package identity
 import (
 	"context"
 
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -48,6 +47,18 @@ func getGroup(
 	return group, nil
 }
 
-func groupProvisioningStatus(group *identityapi.GroupRead) coreapi.ResourceProvisioningStatus {
-	return group.Metadata.ProvisioningStatus
+// getGroupStatus reads a group and adapts it to the shared watchers'
+// (resource, ResourceStatus, error) shape. Identity reads are
+// organization-scoped, so it uses StatusFromOrgScoped.
+func getGroupStatus(
+	ctx context.Context,
+	id string,
+	client *nscale.Client,
+) (*identityapi.GroupRead, nscale.ResourceStatus, error) {
+	group, err := getGroup(ctx, id, client)
+	if err != nil {
+		return nil, nscale.ResourceStatus{}, err
+	}
+
+	return group, nscale.StatusFromOrgScoped(&group.Metadata), nil
 }
