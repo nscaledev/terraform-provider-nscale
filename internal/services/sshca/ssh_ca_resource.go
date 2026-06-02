@@ -19,11 +19,10 @@ package sshca
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
-	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -37,6 +36,7 @@ import (
 )
 
 var (
+	_ resource.Resource                = &SSHCertificateAuthorityResource{}
 	_ resource.ResourceWithConfigure   = &SSHCertificateAuthorityResource{}
 	_ resource.ResourceWithImportState = &SSHCertificateAuthorityResource{}
 )
@@ -47,52 +47,43 @@ type SSHCertificateAuthorityResourceModel struct {
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
+// SSHCertificateAuthorityResource embeds the generic CRUD base; only Schema and
+// the adapter wiring below are SSH-CA-specific.
 type SSHCertificateAuthorityResource struct {
-	client *nscale.Client
+	*nscale.GenericResource[SSHCertificateAuthorityResourceModel, regionapi.SshCertificateAuthorityV2Read]
 }
 
 func NewSSHCertificateAuthorityResource() resource.Resource {
-	return &SSHCertificateAuthorityResource{}
-}
-
-func (r *SSHCertificateAuthorityResource) Configure(
-	ctx context.Context,
-	request resource.ConfigureRequest,
-	response *resource.ConfigureResponse,
-) {
-	if request.ProviderData == nil {
-		return
+	return &SSHCertificateAuthorityResource{
+		GenericResource: nscale.NewGenericResource(sshCAAdapter()),
 	}
+}
 
-	client, ok := request.ProviderData.(*nscale.Client)
-	if !ok {
-		response.Diagnostics.AddError(
-			"Unexpected Resource Configuration Type",
-			fmt.Sprintf(
-				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
-				request.ProviderData,
-			),
-		)
-		return
+// sshCAAdapter wires the SSH-CA-specific SDK calls and model mapping into the
+// generic resource skeleton.
+func sshCAAdapter() nscale.ResourceAdapter[SSHCertificateAuthorityResourceModel, regionapi.SshCertificateAuthorityV2Read] {
+	return nscale.ResourceAdapter[SSHCertificateAuthorityResourceModel, regionapi.SshCertificateAuthorityV2Read]{
+		TypeNameSuffix: "_ssh_certificate_authority",
+		Title:          "SSH Certificate Authority",
+		Name:           "ssh_certificate_authority",
+		Create:         sshCACreate,
+		// SSH certificate authorities are immutable: a nil Update tells the base
+		// to reject in-place updates so every change forces a replacement.
+		Update: nil,
+		Delete: sshCADelete,
+		Get: func(
+			ctx context.Context,
+			client *nscale.Client,
+			id string,
+		) (*regionapi.SshCertificateAuthorityV2Read, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getSSHCA(ctx, id, client))
+		},
+		ToModel: func(api *regionapi.SshCertificateAuthorityV2Read, dst *SSHCertificateAuthorityResourceModel) {
+			dst.SSHCertificateAuthorityModel = NewSSHCertificateAuthorityModel(api)
+		},
+		IDFromModel:       func(m SSHCertificateAuthorityResourceModel) string { return m.ID.ValueString() },
+		TimeoutsFromModel: func(m SSHCertificateAuthorityResourceModel) tftimeouts.Value { return m.Timeouts },
 	}
-
-	r.client = client
-}
-
-func (r *SSHCertificateAuthorityResource) ImportState(
-	ctx context.Context,
-	request resource.ImportStateRequest,
-	response *resource.ImportStateResponse,
-) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), request, response)
-}
-
-func (r *SSHCertificateAuthorityResource) Metadata(
-	ctx context.Context,
-	request resource.MetadataRequest,
-	response *resource.MetadataResponse,
-) {
-	response.TypeName = request.ProviderTypeName + "_ssh_certificate_authority"
 }
 
 func (r *SSHCertificateAuthorityResource) Schema(
@@ -161,166 +152,52 @@ func (r *SSHCertificateAuthorityResource) Schema(
 	}
 }
 
-func (r *SSHCertificateAuthorityResource) setDefaultIDs(data *SSHCertificateAuthorityResourceModel) {
-	if data.ProjectID.ValueString() == "" {
-		data.ProjectID = types.StringValue(r.client.ProjectID)
-	}
-}
-
-func (r *SSHCertificateAuthorityResource) Create(
+func sshCACreate(
 	ctx context.Context,
-	request resource.CreateRequest,
-	response *resource.CreateResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[SSHCertificateAuthorityResourceModel](
-		ctx,
-		request.Plan.Get,
-		r.setDefaultIDs,
-	)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
+	client *nscale.Client,
+	plan SSHCertificateAuthorityResourceModel,
+) (*regionapi.SshCertificateAuthorityV2Read, diag.Diagnostics) {
+	var diagnostics diag.Diagnostics
+
+	// Default the project to the provider-configured project when the
+	// configuration omits one.
+	if plan.ProjectID.ValueString() == "" {
+		plan.ProjectID = types.StringValue(client.ProjectID)
 	}
 
-	plannedPublicKey := data.PublicKey
+	params := plan.NscaleSSHCACreateParams(client.OrganizationID)
 
-	params := data.NscaleSSHCACreateParams(r.client.OrganizationID)
-
-	createResponse, err := r.client.Region.PostApiV2Sshcertificateauthorities(ctx, params)
+	createResponse, err := client.Region.PostApiV2Sshcertificateauthorities(ctx, params)
 	if err != nil {
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Create SSH Certificate Authority",
 			fmt.Sprintf("An error occurred while creating the SSH certificate authority: %s", err),
 		)
-		return
+		return nil, diagnostics
 	}
 	defer createResponse.Body.Close()
 
 	sshCA, err := nscale.ReadJSONResponsePointer[regionapi.SshCertificateAuthorityV2Read](createResponse)
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Create SSH Certificate Authority",
 			fmt.Sprintf("An error occurred while creating the SSH certificate authority: %s", err),
 		)
-		return
+		return nil, diagnostics
 	}
 
-	data.SSHCertificateAuthorityModel = NewSSHCertificateAuthorityModel(sshCA)
-	data.PublicKey = plannedPublicKey
-	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	stateWatcher := nscale.CreateStateWatcher[regionapi.SshCertificateAuthorityV2Read]{
-		ResourceTitle: "SSH Certificate Authority",
-		ResourceName:  "ssh_certificate_authority",
-		GetFunc: func(ctx context.Context) (*regionapi.SshCertificateAuthorityV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSSHCA(ctx, sshCA.Metadata.Id, r.client))
-		},
-	}
-
-	sshCA, ok := stateWatcher.Wait(ctx, data.Timeouts, response)
-	if !ok {
-		return
-	}
-
-	data.SSHCertificateAuthorityModel = NewSSHCertificateAuthorityModel(sshCA)
-	data.PublicKey = plannedPublicKey
-	response.Diagnostics.Append(response.State.Set(ctx, data)...)
+	return sshCA, nil
 }
 
-func (r *SSHCertificateAuthorityResource) Read(
-	ctx context.Context,
-	request resource.ReadRequest,
-	response *resource.ReadResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[SSHCertificateAuthorityResourceModel](
-		ctx,
-		request.State.Get,
-		r.setDefaultIDs,
-	)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	resourceReader := nscale.ResourceReader[regionapi.SshCertificateAuthorityV2Read]{
-		ResourceTitle: "SSH Certificate Authority",
-		ResourceName:  "ssh_certificate_authority",
-		GetFunc: func(ctx context.Context, id string) (*regionapi.SshCertificateAuthorityV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSSHCA(ctx, id, r.client))
-		},
-	}
-
-	sshCA, ok := resourceReader.Read(ctx, data.ID.ValueString(), response)
-	if !ok {
-		return
-	}
-
-	data.SSHCertificateAuthorityModel = NewSSHCertificateAuthorityModel(sshCA)
-	response.Diagnostics.Append(response.State.Set(ctx, data)...)
-}
-
-func (r *SSHCertificateAuthorityResource) Update(
-	ctx context.Context,
-	request resource.UpdateRequest,
-	response *resource.UpdateResponse,
-) {
-	response.Diagnostics.AddError(
-		"Update Not Supported",
-		"SSH Certificate Authorities are immutable and cannot be updated in-place. All changes require resource replacement.",
-	)
-}
-
-func (r *SSHCertificateAuthorityResource) Delete(
-	ctx context.Context,
-	request resource.DeleteRequest,
-	response *resource.DeleteResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[SSHCertificateAuthorityResourceModel](
-		ctx,
-		request.State.Get,
-		r.setDefaultIDs,
-	)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	id := data.ID.ValueString()
-
-	deleteResponse, err := r.client.Region.DeleteApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, id)
+func sshCADelete(ctx context.Context, client *nscale.Client, id string) error {
+	deleteResponse, err := client.Region.DeleteApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, id)
 	if err != nil {
-		response.Diagnostics.AddError(
-			"Failed to Delete SSH Certificate Authority",
-			fmt.Sprintf("An error occurred while deleting the SSH certificate authority: %s", err),
-		)
-		return
+		return err
 	}
 	defer deleteResponse.Body.Close()
 
-	if err = nscale.ReadEmptyResponse(deleteResponse); err != nil {
-		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
-			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-			response.Diagnostics.AddError(
-				"Failed to Delete SSH Certificate Authority",
-				fmt.Sprintf("An error occurred while deleting the SSH certificate authority: %s", err),
-			)
-			return
-		}
-	}
-
-	stateWatcher := nscale.DeleteStateWatcher{
-		ResourceTitle: "SSH Certificate Authority",
-		ResourceName:  "ssh_certificate_authority",
-		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSSHCA(ctx, id, r.client))
-		},
-	}
-
-	stateWatcher.Wait(ctx, data.Timeouts, response)
+	return nscale.ReadEmptyResponse(deleteResponse)
 }
 
 // normalizeWhitespacePlanModifier sets the plan value to the state value when
