@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -251,9 +250,9 @@ func (r *NetworkResource) Create(
 	stateWatcher := nscale.CreateStateWatcher[regionapi.NetworkV2Read]{
 		ResourceTitle: "Network",
 		ResourceName:  "network",
-		GetFunc: func(ctx context.Context) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
+		GetFunc: func(ctx context.Context) (*regionapi.NetworkV2Read, nscale.ResourceStatus, error) {
 			targetID := network.Metadata.Id
-			return getNetwork(ctx, targetID, r.client)
+			return nscale.AdaptProjectScoped(getNetwork(ctx, targetID, r.client))
 		},
 	}
 
@@ -276,8 +275,8 @@ func (r *NetworkResource) Read(ctx context.Context, request resource.ReadRequest
 	resourceReader := nscale.ResourceReader[regionapi.NetworkV2Read]{
 		ResourceTitle: "Network",
 		ResourceName:  "network",
-		GetFunc: func(ctx context.Context, id string) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getNetwork(ctx, id, r.client)
+		GetFunc: func(ctx context.Context, id string) (*regionapi.NetworkV2Read, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getNetwork(ctx, id, r.client))
 		},
 	}
 
@@ -332,8 +331,8 @@ func (r *NetworkResource) Update(
 	stateWatcher := nscale.UpdateStateWatcher[regionapi.NetworkV2Read]{
 		ResourceTitle: "Network",
 		ResourceName:  "network",
-		GetFunc: func(ctx context.Context) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getNetwork(ctx, id, r.client)
+		GetFunc: func(ctx context.Context) (*regionapi.NetworkV2Read, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getNetwork(ctx, id, r.client))
 		},
 	}
 
@@ -383,8 +382,8 @@ func (r *NetworkResource) Delete(
 	stateWatcher := nscale.DeleteStateWatcher{
 		ResourceTitle: "Network",
 		ResourceName:  "network",
-		GetFunc: func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getNetwork(ctx, id, r.client)
+		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getNetwork(ctx, id, r.client))
 		},
 	}
 

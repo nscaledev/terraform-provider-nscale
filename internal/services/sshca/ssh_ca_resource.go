@@ -30,7 +30,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -217,8 +216,8 @@ func (r *SSHCertificateAuthorityResource) Create(
 	stateWatcher := nscale.CreateStateWatcher[regionapi.SshCertificateAuthorityV2Read]{
 		ResourceTitle: "SSH Certificate Authority",
 		ResourceName:  "ssh_certificate_authority",
-		GetFunc: func(ctx context.Context) (*regionapi.SshCertificateAuthorityV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getSSHCA(ctx, sshCA.Metadata.Id, r.client)
+		GetFunc: func(ctx context.Context) (*regionapi.SshCertificateAuthorityV2Read, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getSSHCA(ctx, sshCA.Metadata.Id, r.client))
 		},
 	}
 
@@ -250,8 +249,8 @@ func (r *SSHCertificateAuthorityResource) Read(
 	resourceReader := nscale.ResourceReader[regionapi.SshCertificateAuthorityV2Read]{
 		ResourceTitle: "SSH Certificate Authority",
 		ResourceName:  "ssh_certificate_authority",
-		GetFunc: func(ctx context.Context, id string) (*regionapi.SshCertificateAuthorityV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getSSHCA(ctx, id, r.client)
+		GetFunc: func(ctx context.Context, id string) (*regionapi.SshCertificateAuthorityV2Read, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getSSHCA(ctx, id, r.client))
 		},
 	}
 
@@ -316,8 +315,8 @@ func (r *SSHCertificateAuthorityResource) Delete(
 	stateWatcher := nscale.DeleteStateWatcher{
 		ResourceTitle: "SSH Certificate Authority",
 		ResourceName:  "ssh_certificate_authority",
-		GetFunc: func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getSSHCA(ctx, id, r.client)
+		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getSSHCA(ctx, id, r.client))
 		},
 	}
 

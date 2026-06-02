@@ -32,7 +32,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -292,9 +291,9 @@ func (r *InstanceResource) Create(
 	stateWatcher := nscale.CreateStateWatcher[computeapi.InstanceRead]{
 		ResourceTitle: "Instance",
 		ResourceName:  "instance",
-		GetFunc: func(ctx context.Context) (*computeapi.InstanceRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
+		GetFunc: func(ctx context.Context) (*computeapi.InstanceRead, nscale.ResourceStatus, error) {
 			targetID := instance.Metadata.Id
-			return getInstance(ctx, targetID, r.client)
+			return nscale.AdaptProjectScoped(getInstance(ctx, targetID, r.client))
 		},
 	}
 
@@ -317,8 +316,8 @@ func (r *InstanceResource) Read(ctx context.Context, request resource.ReadReques
 	resourceReader := nscale.ResourceReader[computeapi.InstanceRead]{
 		ResourceTitle: "Instance",
 		ResourceName:  "instance",
-		GetFunc: func(ctx context.Context, id string) (*computeapi.InstanceRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getInstance(ctx, id, r.client)
+		GetFunc: func(ctx context.Context, id string) (*computeapi.InstanceRead, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getInstance(ctx, id, r.client))
 		},
 	}
 
@@ -373,8 +372,8 @@ func (r *InstanceResource) Update(
 	stateWatcher := nscale.UpdateStateWatcher[computeapi.InstanceRead]{
 		ResourceTitle: "Instance",
 		ResourceName:  "instance",
-		GetFunc: func(ctx context.Context) (*computeapi.InstanceRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getInstance(ctx, id, r.client)
+		GetFunc: func(ctx context.Context) (*computeapi.InstanceRead, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getInstance(ctx, id, r.client))
 		},
 	}
 
@@ -424,8 +423,8 @@ func (r *InstanceResource) Delete(
 	stateWatcher := nscale.DeleteStateWatcher{
 		ResourceTitle: "Instance",
 		ResourceName:  "instance",
-		GetFunc: func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getInstance(ctx, id, r.client)
+		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getInstance(ctx, id, r.client))
 		},
 	}
 

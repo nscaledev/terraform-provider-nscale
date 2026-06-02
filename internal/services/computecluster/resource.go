@@ -36,7 +36,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	common "github.com/nscaledev/nscale-sdk-go/common"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -373,9 +372,9 @@ func (r *ComputeClusterResource) Create(
 	stateWatcher := nscale.CreateStateWatcher[computeapi.ComputeClusterRead]{
 		ResourceTitle: "Compute Cluster",
 		ResourceName:  "compute cluster",
-		GetFunc: func(ctx context.Context) (*computeapi.ComputeClusterRead, *common.ProjectScopedResourceReadMetadata, error) {
+		GetFunc: func(ctx context.Context) (*computeapi.ComputeClusterRead, nscale.ResourceStatus, error) {
 			targetID := computeCluster.Metadata.Id
-			return getComputeCluster(ctx, r.client.OrganizationID, targetID, r.client)
+			return nscale.AdaptProjectScoped(getComputeCluster(ctx, r.client.OrganizationID, targetID, r.client))
 		},
 	}
 
@@ -406,8 +405,8 @@ func (r *ComputeClusterResource) Read(
 	resourceReader := nscale.ResourceReader[computeapi.ComputeClusterRead]{
 		ResourceTitle: "Compute Cluster",
 		ResourceName:  "compute cluster",
-		GetFunc: func(ctx context.Context, id string) (*computeapi.ComputeClusterRead, *common.ProjectScopedResourceReadMetadata, error) {
-			return getComputeCluster(ctx, r.client.OrganizationID, id, r.client)
+		GetFunc: func(ctx context.Context, id string) (*computeapi.ComputeClusterRead, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getComputeCluster(ctx, r.client.OrganizationID, id, r.client))
 		},
 	}
 
@@ -472,8 +471,8 @@ func (r *ComputeClusterResource) Update(
 	stateWatcher := nscale.UpdateStateWatcher[computeapi.ComputeClusterRead]{
 		ResourceTitle: "Compute Cluster",
 		ResourceName:  "compute cluster",
-		GetFunc: func(ctx context.Context) (*computeapi.ComputeClusterRead, *common.ProjectScopedResourceReadMetadata, error) {
-			return getComputeCluster(ctx, r.client.OrganizationID, id, r.client)
+		GetFunc: func(ctx context.Context) (*computeapi.ComputeClusterRead, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getComputeCluster(ctx, r.client.OrganizationID, id, r.client))
 		},
 	}
 
@@ -532,8 +531,8 @@ func (r *ComputeClusterResource) Delete(
 	stateWatcher := nscale.DeleteStateWatcher{
 		ResourceTitle: "Compute Cluster",
 		ResourceName:  "compute cluster",
-		GetFunc: func(ctx context.Context) (any, *common.ProjectScopedResourceReadMetadata, error) {
-			return getComputeCluster(ctx, r.client.OrganizationID, id, r.client)
+		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getComputeCluster(ctx, r.client.OrganizationID, id, r.client))
 		},
 	}
 
