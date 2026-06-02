@@ -19,13 +19,12 @@ package instance
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -39,6 +38,7 @@ import (
 )
 
 var (
+	_ resource.Resource                = &InstanceResource{}
 	_ resource.ResourceWithConfigure   = &InstanceResource{}
 	_ resource.ResourceWithImportState = &InstanceResource{}
 )
@@ -49,52 +49,41 @@ type InstanceResourceModel struct {
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
+// InstanceResource embeds the generic CRUD base; only Schema and the adapter
+// wiring below are instance-specific.
 type InstanceResource struct {
-	client *nscale.Client
+	*nscale.GenericResource[InstanceResourceModel, computeapi.InstanceRead]
 }
 
 func NewInstanceResource() resource.Resource {
-	return &InstanceResource{}
-}
-
-func (r *InstanceResource) Configure(
-	ctx context.Context,
-	request resource.ConfigureRequest,
-	response *resource.ConfigureResponse,
-) {
-	if request.ProviderData == nil {
-		return
+	return &InstanceResource{
+		GenericResource: nscale.NewGenericResource(instanceAdapter()),
 	}
+}
 
-	client, ok := request.ProviderData.(*nscale.Client)
-	if !ok {
-		response.Diagnostics.AddError(
-			"Unexpected Resource Configuration Type",
-			fmt.Sprintf(
-				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
-				request.ProviderData,
-			),
-		)
-		return
+// instanceAdapter wires the instance-specific SDK calls and model mapping into
+// the generic resource skeleton.
+func instanceAdapter() nscale.ResourceAdapter[InstanceResourceModel, computeapi.InstanceRead] {
+	return nscale.ResourceAdapter[InstanceResourceModel, computeapi.InstanceRead]{
+		TypeNameSuffix: "_instance",
+		Title:          "Instance",
+		Name:           "instance",
+		Create:         instanceCreate,
+		Update:         instanceUpdate,
+		Delete:         instanceDelete,
+		Get: func(
+			ctx context.Context,
+			client *nscale.Client,
+			id string,
+		) (*computeapi.InstanceRead, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getInstance(ctx, id, client))
+		},
+		ToModel: func(api *computeapi.InstanceRead, dst *InstanceResourceModel) {
+			dst.InstanceModel = NewInstanceModel(api)
+		},
+		IDFromModel:       func(m InstanceResourceModel) string { return m.ID.ValueString() },
+		TimeoutsFromModel: func(m InstanceResourceModel) tftimeouts.Value { return m.Timeouts },
 	}
-
-	r.client = client
-}
-
-func (r *InstanceResource) ImportState(
-	ctx context.Context,
-	request resource.ImportStateRequest,
-	response *resource.ImportStateResponse,
-) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), request, response)
-}
-
-func (r *InstanceResource) Metadata(
-	ctx context.Context,
-	request resource.MetadataRequest,
-	response *resource.MetadataResponse,
-) {
-	response.TypeName = request.ProviderTypeName + "_instance"
 }
 
 func (r *InstanceResource) Schema(
@@ -239,194 +228,88 @@ func (r *InstanceResource) Schema(
 	}
 }
 
-func (r *InstanceResource) setDefaultIDs(data *InstanceResourceModel) {
-	if data.ProjectID.ValueString() == "" {
-		data.ProjectID = types.StringValue(r.client.ProjectID)
-	}
-}
-
-func (r *InstanceResource) Create(
+func instanceCreate(
 	ctx context.Context,
-	request resource.CreateRequest,
-	response *resource.CreateResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[InstanceResourceModel](ctx, request.Plan.Get, r.setDefaultIDs)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
+	client *nscale.Client,
+	plan InstanceResourceModel,
+) (*computeapi.InstanceRead, diag.Diagnostics) {
+	// Default the project ID from the provider configuration when the plan
+	// leaves it empty. This is only meaningful at create time.
+	if plan.ProjectID.ValueString() == "" {
+		plan.ProjectID = types.StringValue(client.ProjectID)
 	}
 
-	params, diagnostics := data.NscaleInstanceCreateParams(r.client.OrganizationID)
+	params, diagnostics := plan.NscaleInstanceCreateParams(client.OrganizationID)
 	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
+		return nil, diagnostics
 	}
 
-	instanceCreateResponse, err := r.client.Compute.PostApiV2Instances(ctx, params)
+	createResponse, err := client.Compute.PostApiV2Instances(ctx, params)
 	if err != nil {
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Create Instance",
 			fmt.Sprintf("An error occurred while creating the instance: %s", err),
 		)
-		return
+		return nil, diagnostics
 	}
-	defer instanceCreateResponse.Body.Close()
+	defer createResponse.Body.Close()
 
-	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceCreateResponse)
+	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](createResponse)
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Create Instance",
 			fmt.Sprintf("An error occurred while creating the instance: %s", err),
 		)
-		return
+		return nil, diagnostics
 	}
 
-	data.InstanceModel = NewInstanceModel(instance)
-	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	stateWatcher := nscale.CreateStateWatcher[computeapi.InstanceRead]{
-		ResourceTitle: "Instance",
-		ResourceName:  "instance",
-		GetFunc: func(ctx context.Context) (*computeapi.InstanceRead, nscale.ResourceStatus, error) {
-			targetID := instance.Metadata.Id
-			return nscale.AdaptProjectScoped(getInstance(ctx, targetID, r.client))
-		},
-	}
-
-	instance, ok := stateWatcher.Wait(ctx, data.Timeouts, response)
-	if !ok {
-		return
-	}
-
-	data.InstanceModel = NewInstanceModel(instance)
-	response.Diagnostics.Append(response.State.Set(ctx, data)...)
+	return instance, nil
 }
 
-func (r *InstanceResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[InstanceResourceModel](ctx, request.State.Get, r.setDefaultIDs)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	resourceReader := nscale.ResourceReader[computeapi.InstanceRead]{
-		ResourceTitle: "Instance",
-		ResourceName:  "instance",
-		GetFunc: func(ctx context.Context, id string) (*computeapi.InstanceRead, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getInstance(ctx, id, r.client))
-		},
-	}
-
-	instance, ok := resourceReader.Read(ctx, data.ID.ValueString(), response)
-	if !ok {
-		return
-	}
-
-	data.InstanceModel = NewInstanceModel(instance)
-	response.Diagnostics.Append(response.State.Set(ctx, data)...)
-}
-
-func (r *InstanceResource) Update(
+func instanceUpdate(
 	ctx context.Context,
-	request resource.UpdateRequest,
-	response *resource.UpdateResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[InstanceResourceModel](ctx, request.Plan.Get, r.setDefaultIDs)
+	client *nscale.Client,
+	id string,
+	plan InstanceResourceModel,
+) (string, diag.Diagnostics) {
+	params, diagnostics := plan.NscaleInstanceUpdateParams()
 	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
+		return "", diagnostics
 	}
 
-	params, diagnostics := data.NscaleInstanceUpdateParams()
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	id := data.ID.ValueString()
+	// Tag the update so the watcher can confirm the PUT has propagated through
+	// the cache-backed API before reading back a terminal status.
 	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
 
-	instanceUpdateResponse, err := r.client.Compute.PutApiV2InstancesInstanceID(ctx, id, params)
+	updateResponse, err := client.Compute.PutApiV2InstancesInstanceID(ctx, id, params)
 	if err != nil {
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Update Instance",
 			fmt.Sprintf("An error occurred while updating the instance: %s", err),
 		)
-		return
+		return "", diagnostics
 	}
-	defer instanceUpdateResponse.Body.Close()
+	defer updateResponse.Body.Close()
 
-	if _, readErr := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceUpdateResponse); readErr != nil {
+	if _, readErr := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](updateResponse); readErr != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Update Instance",
 			fmt.Sprintf("An error occurred while updating the instance: %s", readErr),
 		)
-		return
+		return "", diagnostics
 	}
 
-	stateWatcher := nscale.UpdateStateWatcher[computeapi.InstanceRead]{
-		ResourceTitle: "Instance",
-		ResourceName:  "instance",
-		GetFunc: func(ctx context.Context) (*computeapi.InstanceRead, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getInstance(ctx, id, r.client))
-		},
-	}
-
-	instance, ok := stateWatcher.Wait(ctx, operationTagKey, data.Timeouts, response)
-	if !ok {
-		return
-	}
-
-	data.InstanceModel = NewInstanceModel(instance)
-	response.Diagnostics.Append(response.State.Set(ctx, data)...)
+	return operationTagKey, nil
 }
 
-func (r *InstanceResource) Delete(
-	ctx context.Context,
-	request resource.DeleteRequest,
-	response *resource.DeleteResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[InstanceResourceModel](ctx, request.State.Get, r.setDefaultIDs)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	id := data.ID.ValueString()
-
-	instanceDeleteResponse, err := r.client.Compute.DeleteApiV2InstancesInstanceID(ctx, id)
+func instanceDelete(ctx context.Context, client *nscale.Client, id string) error {
+	deleteResponse, err := client.Compute.DeleteApiV2InstancesInstanceID(ctx, id)
 	if err != nil {
-		response.Diagnostics.AddError(
-			"Failed to Delete Instance",
-			fmt.Sprintf("An error occurred while deleting the instance: %s", err),
-		)
-		return
+		return err
 	}
-	defer instanceDeleteResponse.Body.Close()
+	defer deleteResponse.Body.Close()
 
-	if err = nscale.ReadEmptyResponse(instanceDeleteResponse); err != nil {
-		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
-			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-			response.Diagnostics.AddError(
-				"Failed to Delete Instance",
-				fmt.Sprintf("An error occurred while deleting the instance: %s", err),
-			)
-			return
-		}
-	}
-
-	stateWatcher := nscale.DeleteStateWatcher{
-		ResourceTitle: "Instance",
-		ResourceName:  "instance",
-		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getInstance(ctx, id, r.client))
-		},
-	}
-
-	stateWatcher.Wait(ctx, data.Timeouts, response)
+	return nscale.ReadEmptyResponse(deleteResponse)
 }
