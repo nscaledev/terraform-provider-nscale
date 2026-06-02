@@ -18,55 +18,39 @@ package instance
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &InstanceDataSource{}
 
+// InstanceDataSource embeds the generic read+map base; only Schema and the
+// adapter wiring below are instance-specific.
 type InstanceDataSource struct {
-	client *nscale.Client
+	*nscale.GenericDataSource[InstanceModel, computeapi.InstanceRead]
 }
 
 func NewInstanceDataSource() datasource.DataSource {
-	return &InstanceDataSource{}
-}
-
-func (s *InstanceDataSource) Configure(
-	ctx context.Context,
-	request datasource.ConfigureRequest,
-	response *datasource.ConfigureResponse,
-) {
-	if request.ProviderData == nil {
-		return
+	return &InstanceDataSource{
+		GenericDataSource: nscale.NewGenericDataSource(
+			nscale.DataSourceAdapter[InstanceModel, computeapi.InstanceRead]{
+				TypeNameSuffix: "_instance",
+				Title:          "Instance",
+				Name:           "instance",
+				Get: func(ctx context.Context, client *nscale.Client, id string) (*computeapi.InstanceRead, error) {
+					instance, _, err := getInstance(ctx, id, client)
+					return instance, err
+				},
+				ToModel:     NewInstanceModel,
+				IDFromModel: func(m InstanceModel) string { return m.ID.ValueString() },
+			},
+		),
 	}
-
-	client, ok := request.ProviderData.(*nscale.Client)
-	if !ok {
-		response.Diagnostics.AddError(
-			"Unexpected Resource Configuration Type",
-			fmt.Sprintf(
-				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
-				request.ProviderData,
-			),
-		)
-		return
-	}
-
-	s.client = client
-}
-
-func (s *InstanceDataSource) Metadata(
-	ctx context.Context,
-	request datasource.MetadataRequest,
-	response *datasource.MetadataResponse,
-) {
-	response.TypeName = request.ProviderTypeName + "_instance"
 }
 
 func (s *InstanceDataSource) Schema(
@@ -161,29 +145,4 @@ func (s *InstanceDataSource) Schema(
 			},
 		},
 	}
-}
-
-func (s *InstanceDataSource) Read(
-	ctx context.Context,
-	request datasource.ReadRequest,
-	response *datasource.ReadResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[InstanceModel](ctx, request.Config.Get)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	instance, _, err := getInstance(ctx, data.ID.ValueString(), s.client)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Read Instance",
-			fmt.Sprintf("An error occurred while retrieving the instance: %s", err),
-		)
-		return
-	}
-
-	data = NewInstanceModel(instance)
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

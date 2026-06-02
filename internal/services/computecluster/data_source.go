@@ -18,55 +18,39 @@ package computecluster
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &ComputeClusterDataSource{}
 
+// ComputeClusterDataSource embeds the generic read+map base; only Schema and
+// the adapter wiring below are compute-cluster-specific.
 type ComputeClusterDataSource struct {
-	client *nscale.Client
+	*nscale.GenericDataSource[ComputeClusterModel, computeapi.ComputeClusterRead]
 }
 
 func NewComputeClusterDataSource() datasource.DataSource {
-	return &ComputeClusterDataSource{}
-}
-
-func (s *ComputeClusterDataSource) Configure(
-	ctx context.Context,
-	request datasource.ConfigureRequest,
-	response *datasource.ConfigureResponse,
-) {
-	if request.ProviderData == nil {
-		return
+	return &ComputeClusterDataSource{
+		GenericDataSource: nscale.NewGenericDataSource(
+			nscale.DataSourceAdapter[ComputeClusterModel, computeapi.ComputeClusterRead]{
+				TypeNameSuffix: "_compute_cluster",
+				Title:          "Compute Cluster",
+				Name:           "compute cluster",
+				Get: func(ctx context.Context, client *nscale.Client, id string) (*computeapi.ComputeClusterRead, error) {
+					cluster, _, err := getComputeCluster(ctx, client.OrganizationID, id, client)
+					return cluster, err
+				},
+				ToModel:     NewComputeClusterModel,
+				IDFromModel: func(m ComputeClusterModel) string { return m.ID.ValueString() },
+			},
+		),
 	}
-
-	client, ok := request.ProviderData.(*nscale.Client)
-	if !ok {
-		response.Diagnostics.AddError(
-			"Unexpected Resource Configuration Type",
-			fmt.Sprintf(
-				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
-				request.ProviderData,
-			),
-		)
-		return
-	}
-
-	s.client = client
-}
-
-func (s *ComputeClusterDataSource) Metadata(
-	ctx context.Context,
-	request datasource.MetadataRequest,
-	response *datasource.MetadataResponse,
-) {
-	response.TypeName = request.ProviderTypeName + "_compute_cluster"
 }
 
 func (s *ComputeClusterDataSource) Schema(
@@ -195,29 +179,4 @@ func (s *ComputeClusterDataSource) Schema(
 			},
 		},
 	}
-}
-
-func (s *ComputeClusterDataSource) Read(
-	ctx context.Context,
-	request datasource.ReadRequest,
-	response *datasource.ReadResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[ComputeClusterModel](ctx, request.Config.Get)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	computeCluster, _, err := getComputeCluster(ctx, s.client.OrganizationID, data.ID.ValueString(), s.client)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Read Compute Cluster",
-			fmt.Sprintf("An error occurred while retrieving the compute cluster: %s", err),
-		)
-		return
-	}
-
-	data = NewComputeClusterModel(computeCluster)
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

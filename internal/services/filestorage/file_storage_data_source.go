@@ -18,55 +18,39 @@ package filestorage
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &FileStorageDataSource{}
 
+// FileStorageDataSource embeds the generic read+map base; only Schema and the
+// adapter wiring below are file-storage-specific.
 type FileStorageDataSource struct {
-	client *nscale.Client
+	*nscale.GenericDataSource[FileStorageModel, regionapi.StorageV2Read]
 }
 
 func NewFileStorageDataSource() datasource.DataSource {
-	return &FileStorageDataSource{}
-}
-
-func (s *FileStorageDataSource) Configure(
-	ctx context.Context,
-	request datasource.ConfigureRequest,
-	response *datasource.ConfigureResponse,
-) {
-	if request.ProviderData == nil {
-		return
+	return &FileStorageDataSource{
+		GenericDataSource: nscale.NewGenericDataSource(
+			nscale.DataSourceAdapter[FileStorageModel, regionapi.StorageV2Read]{
+				TypeNameSuffix: "_file_storage",
+				Title:          "File Storage",
+				Name:           "file storage",
+				Get: func(ctx context.Context, client *nscale.Client, id string) (*regionapi.StorageV2Read, error) {
+					fs, _, err := getFileStorage(ctx, id, client)
+					return fs, err
+				},
+				ToModel:     NewFileStorageModel,
+				IDFromModel: func(m FileStorageModel) string { return m.ID.ValueString() },
+			},
+		),
 	}
-
-	client, ok := request.ProviderData.(*nscale.Client)
-	if !ok {
-		response.Diagnostics.AddError(
-			"Unexpected Resource Configuration Type",
-			fmt.Sprintf(
-				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
-				request.ProviderData,
-			),
-		)
-		return
-	}
-
-	s.client = client
-}
-
-func (s *FileStorageDataSource) Metadata(
-	ctx context.Context,
-	request datasource.MetadataRequest,
-	response *datasource.MetadataResponse,
-) {
-	response.TypeName = request.ProviderTypeName + "_file_storage"
 }
 
 func (s *FileStorageDataSource) Schema(
@@ -141,29 +125,4 @@ func (s *FileStorageDataSource) Schema(
 			},
 		},
 	}
-}
-
-func (s *FileStorageDataSource) Read(
-	ctx context.Context,
-	request datasource.ReadRequest,
-	response *datasource.ReadResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[FileStorageModel](ctx, request.Config.Get)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	fileStorage, _, err := getFileStorage(ctx, data.ID.ValueString(), s.client)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Read File Storage",
-			fmt.Sprintf("An error occurred while retrieving the file storage: %s", err),
-		)
-		return
-	}
-
-	data = NewFileStorageModel(fileStorage)
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
