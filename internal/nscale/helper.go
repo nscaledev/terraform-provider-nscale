@@ -33,7 +33,6 @@ import (
 
 const (
 	TerraformOperationTagPrefix = "terraform.nscale.com/"
-	defaultOperationTagMaxAge   = 12 * time.Hour
 	defaultStateWatcherTimeout  = 30 * time.Minute
 )
 
@@ -235,13 +234,15 @@ func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
 		return nil
 	}
 
+	// Operation tags are internal bookkeeping written by the update watcher to
+	// confirm a write propagated. They must never surface in Terraform state (the
+	// schema forbids users from setting reserved-prefix tags), otherwise an update
+	// that wrote one produces an "inconsistent result after apply" on the tags
+	// attribute. Strip every operation tag regardless of age.
 	var filtered []coreapi.Tag
 	for _, tag := range *tags {
 		if strings.HasPrefix(tag.Name, TerraformOperationTagPrefix) {
-			writtenAt, err := time.Parse(time.RFC3339, tag.Value)
-			if err != nil || time.Since(writtenAt) > defaultOperationTagMaxAge {
-				continue
-			}
+			continue
 		}
 		filtered = append(filtered, tag)
 	}
