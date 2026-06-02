@@ -8,24 +8,30 @@ terraform {
 
 provider "nscale" {}
 
-data "nscale_region" "glo1" {
-  id = "<glo1-region-id>"
+# Flavor and image are pre-configured platform resources; supply existing IDs.
+# region_id defaults to the provider's configured region (NSCALE_REGION_ID).
+variable "flavor_id" {
+  type        = string
+  description = "The identifier of an existing instance flavor."
+}
+
+variable "image_id" {
+  type        = string
+  description = "The identifier of an existing image."
 }
 
 data "nscale_instance_flavor" "g_4_standard_40s" {
-  id        = "<g-4-standard-40s-flavor-id>"
-  region_id = data.nscale_region.glo1.id
+  id = var.flavor_id
 }
 
 resource "nscale_compute_cluster" "example" {
-  name      = "example"
-  region_id = data.nscale_region.glo1.id
+  name = "example"
 
   workload_pools = [
     {
       name             = "default"
       replicas         = 1
-      image_id         = "<image-id>"
+      image_id         = var.image_id
       flavor_id        = data.nscale_instance_flavor.g_4_standard_40s.id
       enable_public_ip = true
 
