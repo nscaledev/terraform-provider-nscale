@@ -18,55 +18,38 @@ package identity
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &ProjectDataSource{}
 
+// ProjectDataSource embeds the generic read+map base; only Schema and the
+// adapter wiring below are project-specific.
 type ProjectDataSource struct {
-	client *nscale.Client
+	*nscale.GenericDataSource[ProjectModel, identityapi.ProjectRead]
 }
 
 func NewProjectDataSource() datasource.DataSource {
-	return &ProjectDataSource{}
-}
-
-func (s *ProjectDataSource) Configure(
-	ctx context.Context,
-	request datasource.ConfigureRequest,
-	response *datasource.ConfigureResponse,
-) {
-	if request.ProviderData == nil {
-		return
+	return &ProjectDataSource{
+		GenericDataSource: nscale.NewGenericDataSource(
+			nscale.DataSourceAdapter[ProjectModel, identityapi.ProjectRead]{
+				TypeNameSuffix: "_identity_project",
+				Title:          "Project",
+				Name:           "project",
+				Get: func(ctx context.Context, client *nscale.Client, id string) (*identityapi.ProjectRead, error) {
+					return getProject(ctx, id, client)
+				},
+				ToModel:     NewProjectModel,
+				IDFromModel: func(m ProjectModel) string { return m.ID.ValueString() },
+			},
+		),
 	}
-
-	client, ok := request.ProviderData.(*nscale.Client)
-	if !ok {
-		response.Diagnostics.AddError(
-			"Unexpected Resource Configuration Type",
-			fmt.Sprintf(
-				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
-				request.ProviderData,
-			),
-		)
-		return
-	}
-
-	s.client = client
-}
-
-func (s *ProjectDataSource) Metadata(
-	ctx context.Context,
-	request datasource.MetadataRequest,
-	response *datasource.MetadataResponse,
-) {
-	response.TypeName = request.ProviderTypeName + "_identity_project"
 }
 
 func (s *ProjectDataSource) Schema(
@@ -109,29 +92,4 @@ func (s *ProjectDataSource) Schema(
 			},
 		},
 	}
-}
-
-func (s *ProjectDataSource) Read(
-	ctx context.Context,
-	request datasource.ReadRequest,
-	response *datasource.ReadResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[ProjectModel](ctx, request.Config.Get)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	project, err := getProject(ctx, data.ID.ValueString(), s.client)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Read Project",
-			fmt.Sprintf("An error occurred while retrieving the project: %s", err),
-		)
-		return
-	}
-
-	data = NewProjectModel(project)
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

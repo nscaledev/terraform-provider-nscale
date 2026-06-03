@@ -19,11 +19,10 @@ package identity
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -37,6 +36,7 @@ import (
 )
 
 var (
+	_ resource.Resource                = &ProjectResource{}
 	_ resource.ResourceWithConfigure   = &ProjectResource{}
 	_ resource.ResourceWithImportState = &ProjectResource{}
 )
@@ -47,52 +47,41 @@ type ProjectResourceModel struct {
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
+// ProjectResource embeds the generic CRUD base; only Schema and the adapter
+// wiring below are project-specific.
 type ProjectResource struct {
-	client *nscale.Client
+	*nscale.GenericResource[ProjectResourceModel, identityapi.ProjectRead]
 }
 
 func NewProjectResource() resource.Resource {
-	return &ProjectResource{}
-}
-
-func (r *ProjectResource) Configure(
-	ctx context.Context,
-	request resource.ConfigureRequest,
-	response *resource.ConfigureResponse,
-) {
-	if request.ProviderData == nil {
-		return
+	return &ProjectResource{
+		GenericResource: nscale.NewGenericResource(projectAdapter()),
 	}
+}
 
-	client, ok := request.ProviderData.(*nscale.Client)
-	if !ok {
-		response.Diagnostics.AddError(
-			"Unexpected Resource Configuration Type",
-			fmt.Sprintf(
-				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
-				request.ProviderData,
-			),
-		)
-		return
+// projectAdapter wires the project-specific SDK calls and model mapping into the
+// generic resource skeleton.
+func projectAdapter() nscale.ResourceAdapter[ProjectResourceModel, identityapi.ProjectRead] {
+	return nscale.ResourceAdapter[ProjectResourceModel, identityapi.ProjectRead]{
+		TypeNameSuffix: "_identity_project",
+		Title:          "Project",
+		Name:           "project",
+		Create:         projectCreate,
+		Update:         projectUpdate,
+		Delete:         projectDelete,
+		Get: func(
+			ctx context.Context,
+			client *nscale.Client,
+			id string,
+		) (*identityapi.ProjectRead, nscale.ResourceStatus, error) {
+			return getProjectStatus(ctx, id, client)
+		},
+		ToModel: func(api *identityapi.ProjectRead, dst *ProjectResourceModel) {
+			dst.ProjectModel = NewProjectModel(api)
+		},
+		IDFromModel:       func(m ProjectResourceModel) string { return m.ID.ValueString() },
+		TimeoutsFromModel: func(m ProjectResourceModel) tftimeouts.Value { return m.Timeouts },
 	}
-
-	r.client = client
-}
-
-func (r *ProjectResource) ImportState(
-	ctx context.Context,
-	request resource.ImportStateRequest,
-	response *resource.ImportStateResponse,
-) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), request, response)
-}
-
-func (r *ProjectResource) Metadata(
-	ctx context.Context,
-	request resource.MetadataRequest,
-	response *resource.MetadataResponse,
-) {
-	response.TypeName = request.ProviderTypeName + "_identity_project"
 }
 
 func (r *ProjectResource) Schema(
@@ -160,239 +149,95 @@ func (r *ProjectResource) Schema(
 	}
 }
 
-// getProject adapts the package-level getProject to the generic watcher's
-// getFunc signature by binding the configured client.
-func (r *ProjectResource) getProject(ctx context.Context, id string) (*identityapi.ProjectRead, error) {
-	return getProject(ctx, id, r.client)
-}
-
-func (r *ProjectResource) Create(
+func projectCreate(
 	ctx context.Context,
-	request resource.CreateRequest,
-	response *resource.CreateResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[ProjectResourceModel](ctx, request.Plan.Get)
+	client *nscale.Client,
+	plan ProjectResourceModel,
+) (*identityapi.ProjectRead, diag.Diagnostics) {
+	params, diagnostics := plan.NscaleProjectCreateParams(ctx)
 	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
+		return nil, diagnostics
 	}
 
-	params, diagnostics := data.NscaleProjectCreateParams(ctx)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	createResponse, err := r.client.Identity.PostApiV1OrganizationsOrganizationIDProjects(
+	createResponse, err := client.Identity.PostApiV1OrganizationsOrganizationIDProjects(
 		ctx,
-		r.client.OrganizationID,
+		client.OrganizationID,
 		params,
 	)
 	if err != nil {
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Create Project",
 			fmt.Sprintf("An error occurred while creating the project: %s", err),
 		)
-		return
+		return nil, diagnostics
 	}
 	defer createResponse.Body.Close()
 
 	project, err := nscale.ReadJSONResponsePointer[identityapi.ProjectRead](createResponse)
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Create Project",
 			fmt.Sprintf("An error occurred while creating the project: %s", err),
 		)
-		return
+		return nil, diagnostics
 	}
 
-	// Record the ID before waiting so a timeout does not orphan the resource.
-	data.ProjectModel = NewProjectModel(project)
-	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	// Project creation is asynchronous (the create response returns "pending").
-	timeout, diagnostics := data.Timeouts.Create(ctx, defaultStateTimeout)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	project, err = waitForProvisioned(ctx, project.Metadata.Id, timeout, r.getProject, projectProvisioningStatus)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Create Project",
-			fmt.Sprintf("An error occurred while waiting for the project to be provisioned: %s", err),
-		)
-		return
-	}
-
-	data.ProjectModel = NewProjectModel(project)
-	response.Diagnostics.Append(response.State.Set(ctx, data)...)
+	return project, nil
 }
 
-func (r *ProjectResource) Read(
+func projectUpdate(
 	ctx context.Context,
-	request resource.ReadRequest,
-	response *resource.ReadResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[ProjectResourceModel](ctx, request.State.Get)
+	client *nscale.Client,
+	id string,
+	plan ProjectResourceModel,
+) (string, diag.Diagnostics) {
+	params, diagnostics := plan.NscaleProjectUpdateParams(ctx)
 	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
+		return "", diagnostics
 	}
 
-	id := data.ID.ValueString()
+	// Tag the update so the watcher can confirm the PUT has propagated through
+	// the cache-backed API before reading back a terminal status.
+	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
 
-	project, err := getProject(ctx, id, r.client)
-	if err != nil {
-		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
-			response.Diagnostics.AddWarning(
-				"Project Not Found",
-				fmt.Sprintf(
-					"The project with ID %s was not found on the server and will be removed from the state file.",
-					id,
-				),
-			)
-			response.State.RemoveResource(ctx)
-			return
-		}
-
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Read Project",
-			fmt.Sprintf("An error occurred while retrieving the project: %s", err),
-		)
-		return
-	}
-
-	data.ProjectModel = NewProjectModel(project)
-	response.Diagnostics.Append(response.State.Set(ctx, data)...)
-}
-
-func (r *ProjectResource) Update(
-	ctx context.Context,
-	request resource.UpdateRequest,
-	response *resource.UpdateResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[ProjectResourceModel](ctx, request.Plan.Get)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	id := data.ID.ValueString()
-
-	params, diagnostics := data.NscaleProjectUpdateParams(ctx)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	updateResponse, err := r.client.Identity.PutApiV1OrganizationsOrganizationIDProjectsProjectID(
+	updateResponse, err := client.Identity.PutApiV1OrganizationsOrganizationIDProjectsProjectID(
 		ctx,
-		r.client.OrganizationID,
+		client.OrganizationID,
 		id,
 		params,
 	)
 	if err != nil {
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Update Project",
 			fmt.Sprintf("An error occurred while updating the project: %s", err),
 		)
-		return
+		return "", diagnostics
 	}
 	defer updateResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(updateResponse); err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Update Project",
 			fmt.Sprintf("An error occurred while updating the project: %s", err),
 		)
-		return
+		return "", diagnostics
 	}
 
-	// Updating group_ids can put the project back into a provisioning state, so
-	// wait for a terminal status rather than reading the (possibly stale)
-	// status straight after the PUT.
-	timeout, diagnostics := data.Timeouts.Update(ctx, defaultStateTimeout)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	project, err := waitForProvisioned(ctx, id, timeout, r.getProject, projectProvisioningStatus)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Read Project After Update",
-			fmt.Sprintf("An error occurred while waiting for the project to be provisioned: %s", err),
-		)
-		return
-	}
-
-	data.ProjectModel = NewProjectModel(project)
-	response.Diagnostics.Append(response.State.Set(ctx, data)...)
+	return operationTagKey, nil
 }
 
-func (r *ProjectResource) Delete(
-	ctx context.Context,
-	request resource.DeleteRequest,
-	response *resource.DeleteResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[ProjectResourceModel](ctx, request.State.Get)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	id := data.ID.ValueString()
-
-	deleteResponse, err := r.client.Identity.DeleteApiV1OrganizationsOrganizationIDProjectsProjectID(
+func projectDelete(ctx context.Context, client *nscale.Client, id string) error {
+	deleteResponse, err := client.Identity.DeleteApiV1OrganizationsOrganizationIDProjectsProjectID(
 		ctx,
-		r.client.OrganizationID,
+		client.OrganizationID,
 		id,
 	)
 	if err != nil {
-		response.Diagnostics.AddError(
-			"Failed to Delete Project",
-			fmt.Sprintf("An error occurred while deleting the project: %s", err),
-		)
-		return
+		return err
 	}
 	defer deleteResponse.Body.Close()
 
-	if err = nscale.ReadEmptyResponse(deleteResponse); err != nil {
-		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
-			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-			response.Diagnostics.AddError(
-				"Failed to Delete Project",
-				fmt.Sprintf("An error occurred while deleting the project: %s", err),
-			)
-			return
-		}
-	}
-
-	// Project deletion is asynchronous (DELETE returns 202 and the project
-	// lingers in "deprovisioning"). Wait until it is actually gone so the
-	// resource does not leak and a same-name recreate does not race.
-	timeout, diagnostics := data.Timeouts.Delete(ctx, defaultStateTimeout)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	if err = waitForDeleted(ctx, id, timeout, r.getProject); err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Delete Project",
-			fmt.Sprintf("An error occurred while waiting for the project to be deleted: %s", err),
-		)
-		return
-	}
+	return nscale.ReadEmptyResponse(deleteResponse)
 }

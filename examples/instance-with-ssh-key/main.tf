@@ -8,15 +8,28 @@ terraform {
 
 provider "nscale" {}
 
-data "nscale_region" "glo1" {
-  id = "<glo1-region-id>"
+# Flavor and image are pre-configured platform resources; supply existing IDs.
+# region_id defaults to the provider's configured region (NSCALE_REGION_ID), so
+# it does not need to be set on the resources below.
+variable "flavor_id" {
+  type        = string
+  description = "The identifier of an existing instance flavor."
+}
+
+variable "image_id" {
+  type        = string
+  description = "The identifier of an existing image."
+}
+
+variable "ssh_ca_public_key" {
+  type        = string
+  description = "The SSH CA public key in OpenSSH format (e.g. ssh-ed25519 AAAA...)."
 }
 
 resource "nscale_network" "example" {
   name            = "example"
   cidr_block      = "192.168.0.0/24"
   dns_nameservers = ["8.8.8.8", "8.8.4.4"]
-  region_id       = data.nscale_region.glo1.id
 }
 
 resource "nscale_security_group" "example" {
@@ -34,13 +47,12 @@ resource "nscale_security_group" "example" {
 }
 
 data "nscale_instance_flavor" "g_4_standard_40s" {
-  id        = "<g-4-standard-40s-flavor-id>"
-  region_id = data.nscale_region.glo1.id
+  id = var.flavor_id
 }
 
 resource "nscale_ssh_certificate_authority" "example" {
   name       = "example-ca"
-  public_key = file("/tmp/test_ca.pub")
+  public_key = var.ssh_ca_public_key
 }
 
 resource "nscale_instance" "example" {
@@ -52,7 +64,7 @@ resource "nscale_instance" "example" {
     security_group_ids = [nscale_security_group.example.id]
   }
 
-  image_id                     = "<image-id>"
+  image_id                     = var.image_id
   flavor_id                    = data.nscale_instance_flavor.g_4_standard_40s.id
   ssh_certificate_authority_id = nscale_ssh_certificate_authority.example.id
 }

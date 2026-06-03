@@ -3,19 +3,17 @@ package network
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -23,6 +21,7 @@ import (
 )
 
 var (
+	_ resource.Resource                = &NetworkResource{}
 	_ resource.ResourceWithConfigure   = &NetworkResource{}
 	_ resource.ResourceWithImportState = &NetworkResource{}
 )
@@ -33,52 +32,41 @@ type NetworkResourceModel struct {
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
+// NetworkResource embeds the generic CRUD base; only Schema and the adapter
+// wiring below are network-specific.
 type NetworkResource struct {
-	client *nscale.Client
+	*nscale.GenericResource[NetworkResourceModel, regionapi.NetworkV2Read]
 }
 
 func NewNetworkResource() resource.Resource {
-	return &NetworkResource{}
-}
-
-func (r *NetworkResource) Configure(
-	ctx context.Context,
-	request resource.ConfigureRequest,
-	response *resource.ConfigureResponse,
-) {
-	if request.ProviderData == nil {
-		return
+	return &NetworkResource{
+		GenericResource: nscale.NewGenericResource(networkAdapter()),
 	}
+}
 
-	client, ok := request.ProviderData.(*nscale.Client)
-	if !ok {
-		response.Diagnostics.AddError(
-			"Unexpected Resource Configuration Type",
-			fmt.Sprintf(
-				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
-				request.ProviderData,
-			),
-		)
-		return
+// networkAdapter wires the network-specific SDK calls and model mapping into the
+// generic resource skeleton.
+func networkAdapter() nscale.ResourceAdapter[NetworkResourceModel, regionapi.NetworkV2Read] {
+	return nscale.ResourceAdapter[NetworkResourceModel, regionapi.NetworkV2Read]{
+		TypeNameSuffix: "_network",
+		Title:          "Network",
+		Name:           "network",
+		Create:         networkCreate,
+		Update:         networkUpdate,
+		Delete:         networkDelete,
+		Get: func(
+			ctx context.Context,
+			client *nscale.Client,
+			id string,
+		) (*regionapi.NetworkV2Read, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getNetwork(ctx, id, client))
+		},
+		ToModel: func(api *regionapi.NetworkV2Read, dst *NetworkResourceModel) {
+			dst.NetworkModel = NewNetworkModel(api)
+		},
+		IDFromModel:       func(m NetworkResourceModel) string { return m.ID.ValueString() },
+		TimeoutsFromModel: func(m NetworkResourceModel) tftimeouts.Value { return m.Timeouts },
 	}
-
-	r.client = client
-}
-
-func (r *NetworkResource) ImportState(
-	ctx context.Context,
-	request resource.ImportStateRequest,
-	response *resource.ImportStateResponse,
-) {
-	resource.ImportStatePassthroughID(ctx, path.Root("id"), request, response)
-}
-
-func (r *NetworkResource) Metadata(
-	ctx context.Context,
-	request resource.MetadataRequest,
-	response *resource.MetadataResponse,
-) {
-	response.TypeName = request.ProviderTypeName + "_network"
 }
 
 func (r *NetworkResource) Schema(
@@ -196,197 +184,95 @@ func (r *NetworkResource) Schema(
 	}
 }
 
-func (r *NetworkResource) setDefaultIDs(data *NetworkResourceModel) {
+// setDefaultIDs fills the project and region IDs from the provider configuration
+// when the plan leaves them empty.
+func setDefaultIDs(client *nscale.Client, data *NetworkResourceModel) {
 	if data.ProjectID.ValueString() == "" {
-		data.ProjectID = types.StringValue(r.client.ProjectID)
+		data.ProjectID = types.StringValue(client.ProjectID)
 	}
 	if data.RegionID.ValueString() == "" {
-		data.RegionID = types.StringValue(r.client.RegionID)
+		data.RegionID = types.StringValue(client.RegionID)
 	}
 }
 
-func (r *NetworkResource) Create(
+func networkCreate(
 	ctx context.Context,
-	request resource.CreateRequest,
-	response *resource.CreateResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.Plan.Get, r.setDefaultIDs)
+	client *nscale.Client,
+	plan NetworkResourceModel,
+) (*regionapi.NetworkV2Read, diag.Diagnostics) {
+	setDefaultIDs(client, &plan)
+
+	params, diagnostics := plan.NscaleNetworkCreateParams(client.OrganizationID)
 	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
+		return nil, diagnostics
 	}
 
-	params, diagnostics := data.NscaleNetworkCreateParams(r.client.OrganizationID)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	networkCreateResponse, err := r.client.Region.PostApiV2Networks(ctx, params)
+	createResponse, err := client.Region.PostApiV2Networks(ctx, params)
 	if err != nil {
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Create Network",
 			fmt.Sprintf("An error occurred while creating the network: %s", err),
 		)
-		return
+		return nil, diagnostics
 	}
-	defer networkCreateResponse.Body.Close()
+	defer createResponse.Body.Close()
 
-	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkCreateResponse)
+	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](createResponse)
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Create Network",
 			fmt.Sprintf("An error occurred while creating the network: %s", err),
 		)
-		return
+		return nil, diagnostics
 	}
 
-	data.NetworkModel = NewNetworkModel(network)
-	if diagnostics = response.State.Set(ctx, data); diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	stateWatcher := nscale.CreateStateWatcher[regionapi.NetworkV2Read]{
-		ResourceTitle: "Network",
-		ResourceName:  "network",
-		GetFunc: func(ctx context.Context) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			targetID := network.Metadata.Id
-			return getNetwork(ctx, targetID, r.client)
-		},
-	}
-
-	network, ok := stateWatcher.Wait(ctx, data.Timeouts, response)
-	if !ok {
-		return
-	}
-
-	data.NetworkModel = NewNetworkModel(network)
-	response.Diagnostics.Append(response.State.Set(ctx, data)...)
+	return network, nil
 }
 
-func (r *NetworkResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.State.Get, r.setDefaultIDs)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	resourceReader := nscale.ResourceReader[regionapi.NetworkV2Read]{
-		ResourceTitle: "Network",
-		ResourceName:  "network",
-		GetFunc: func(ctx context.Context, id string) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getNetwork(ctx, id, r.client)
-		},
-	}
-
-	network, ok := resourceReader.Read(ctx, data.ID.ValueString(), response)
-	if !ok {
-		return
-	}
-
-	data.NetworkModel = NewNetworkModel(network)
-	response.Diagnostics.Append(response.State.Set(ctx, data)...)
-}
-
-func (r *NetworkResource) Update(
+func networkUpdate(
 	ctx context.Context,
-	request resource.UpdateRequest,
-	response *resource.UpdateResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.Plan.Get, r.setDefaultIDs)
+	client *nscale.Client,
+	id string,
+	plan NetworkResourceModel,
+) (string, diag.Diagnostics) {
+	params, diagnostics := plan.NscaleNetworkUpdateParams()
 	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
+		return "", diagnostics
 	}
 
-	params, diagnostics := data.NscaleNetworkUpdateParams()
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	id := data.ID.ValueString()
+	// Tag the update so the watcher can confirm the PUT has propagated through
+	// the cache-backed API before reading back a terminal status.
 	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
 
-	networkUpdateResponse, err := r.client.Region.PutApiV2NetworksNetworkID(ctx, id, params)
+	updateResponse, err := client.Region.PutApiV2NetworksNetworkID(ctx, id, params)
 	if err != nil {
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Update Network",
 			fmt.Sprintf("An error occurred while updating the network: %s", err),
 		)
-		return
+		return "", diagnostics
 	}
-	defer networkUpdateResponse.Body.Close()
+	defer updateResponse.Body.Close()
 
-	if _, readErr := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkUpdateResponse); readErr != nil {
+	if _, readErr := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](updateResponse); readErr != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
-		response.Diagnostics.AddError(
+		diagnostics.AddError(
 			"Failed to Update Network",
 			fmt.Sprintf("An error occurred while updating the network: %s", readErr),
 		)
-		return
+		return "", diagnostics
 	}
 
-	stateWatcher := nscale.UpdateStateWatcher[regionapi.NetworkV2Read]{
-		ResourceTitle: "Network",
-		ResourceName:  "network",
-		GetFunc: func(ctx context.Context) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getNetwork(ctx, id, r.client)
-		},
-	}
-
-	network, ok := stateWatcher.Wait(ctx, operationTagKey, data.Timeouts, response)
-	if !ok {
-		return
-	}
-
-	data.NetworkModel = NewNetworkModel(network)
-	response.Diagnostics.Append(response.State.Set(ctx, data)...)
+	return operationTagKey, nil
 }
 
-func (r *NetworkResource) Delete(
-	ctx context.Context,
-	request resource.DeleteRequest,
-	response *resource.DeleteResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkResourceModel](ctx, request.State.Get, r.setDefaultIDs)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	id := data.ID.ValueString()
-
-	networkDeleteResponse, err := r.client.Region.DeleteApiV2NetworksNetworkID(ctx, id)
+func networkDelete(ctx context.Context, client *nscale.Client, id string) error {
+	deleteResponse, err := client.Region.DeleteApiV2NetworksNetworkID(ctx, id)
 	if err != nil {
-		response.Diagnostics.AddError(
-			"Failed to Delete Network",
-			fmt.Sprintf("An error occurred while deleting the network: %s", err),
-		)
-		return
+		return err
 	}
-	defer networkDeleteResponse.Body.Close()
+	defer deleteResponse.Body.Close()
 
-	if err = nscale.ReadEmptyResponse(networkDeleteResponse); err != nil {
-		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
-			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-			response.Diagnostics.AddError(
-				"Failed to Delete Network",
-				fmt.Sprintf("An error occurred while deleting the network: %s", err),
-			)
-			return
-		}
-	}
-
-	stateWatcher := nscale.DeleteStateWatcher{
-		ResourceTitle: "Network",
-		ResourceName:  "network",
-		GetFunc: func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getNetwork(ctx, id, r.client)
-		},
-	}
-
-	stateWatcher.Wait(ctx, data.Timeouts, response)
+	return nscale.ReadEmptyResponse(deleteResponse)
 }

@@ -19,7 +19,6 @@ package identity
 import (
 	"context"
 
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -48,6 +47,18 @@ func getProject(
 	return project, nil
 }
 
-func projectProvisioningStatus(project *identityapi.ProjectRead) coreapi.ResourceProvisioningStatus {
-	return project.Metadata.ProvisioningStatus
+// getProjectStatus reads a project and adapts it to the shared watchers'
+// (resource, ResourceStatus, error) shape. Identity reads are
+// organization-scoped, so it uses StatusFromOrgScoped.
+func getProjectStatus(
+	ctx context.Context,
+	id string,
+	client *nscale.Client,
+) (*identityapi.ProjectRead, nscale.ResourceStatus, error) {
+	project, err := getProject(ctx, id, client)
+	if err != nil {
+		return nil, nscale.ResourceStatus{}, err
+	}
+
+	return project, nscale.StatusFromOrgScoped(&project.Metadata), nil
 }
