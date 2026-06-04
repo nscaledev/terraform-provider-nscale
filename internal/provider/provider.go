@@ -34,27 +34,30 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/instance"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/region"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/reservation"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/securitygroup"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/sshca"
 	"github.com/nscaledev/terraform-provider-nscale/version"
 )
 
 const (
-	DefaultNscaleRegionServiceAPIEndpoint   = "https://region.unikorn.nscale.com"
-	DefaultNscaleComputeServiceAPIEndpoint  = "https://compute.unikorn.nscale.com"
-	DefaultNscaleIdentityServiceAPIEndpoint = "https://identity.unikorn.nscale.com"
+	DefaultNscaleRegionServiceAPIEndpoint      = "https://region.unikorn.nscale.com"
+	DefaultNscaleComputeServiceAPIEndpoint     = "https://compute.unikorn.nscale.com"
+	DefaultNscaleIdentityServiceAPIEndpoint    = "https://identity.unikorn.nscale.com"
+	DefaultNscaleReservationServiceAPIEndpoint = "https://reservation.unikorn.nscale.com"
 )
 
 var _ provider.Provider = NscaleProvider{}
 
 type NscaleProviderModel struct {
-	RegionServiceAPIEndpoint   types.String `tfsdk:"region_service_api_endpoint"`
-	ComputeServiceAPIEndpoint  types.String `tfsdk:"compute_service_api_endpoint"`
-	IdentityServiceAPIEndpoint types.String `tfsdk:"identity_service_api_endpoint"`
-	ServiceToken               types.String `tfsdk:"service_token"`
-	RegionID                   types.String `tfsdk:"region_id"`
-	OrganizationID             types.String `tfsdk:"organization_id"`
-	ProjectID                  types.String `tfsdk:"project_id"`
+	RegionServiceAPIEndpoint      types.String `tfsdk:"region_service_api_endpoint"`
+	ComputeServiceAPIEndpoint     types.String `tfsdk:"compute_service_api_endpoint"`
+	IdentityServiceAPIEndpoint    types.String `tfsdk:"identity_service_api_endpoint"`
+	ReservationServiceAPIEndpoint types.String `tfsdk:"reservation_service_api_endpoint"`
+	ServiceToken                  types.String `tfsdk:"service_token"`
+	RegionID                      types.String `tfsdk:"region_id"`
+	OrganizationID                types.String `tfsdk:"organization_id"`
+	ProjectID                     types.String `tfsdk:"project_id"`
 }
 
 type NscaleProvider struct{}
@@ -85,6 +88,10 @@ func (p NscaleProvider) Schema(ctx context.Context, request provider.SchemaReque
 			},
 			"identity_service_api_endpoint": schema.StringAttribute{
 				MarkdownDescription: "The endpoint of the Nscale Identity Service API server.",
+				Optional:            true,
+			},
+			"reservation_service_api_endpoint": schema.StringAttribute{
+				MarkdownDescription: "The endpoint of the Nscale Reservation Service API server.",
 				Optional:            true,
 			},
 			"service_token": schema.StringAttribute{
@@ -149,6 +156,11 @@ func (p NscaleProvider) Configure(
 		"NSCALE_IDENTITY_SERVICE_API_ENDPOINT",
 		DefaultNscaleIdentityServiceAPIEndpoint,
 	)
+	reservationServiceAPIEndpoint := resolveValue(
+		data.ReservationServiceAPIEndpoint.ValueString(),
+		"NSCALE_RESERVATION_SERVICE_API_ENDPOINT",
+		DefaultNscaleReservationServiceAPIEndpoint,
+	)
 
 	serviceToken := resolveValue(data.ServiceToken.ValueString(), "NSCALE_SERVICE_TOKEN", "")
 	if serviceToken == "" {
@@ -196,6 +208,7 @@ func (p NscaleProvider) Configure(
 		regionServiceAPIEndpoint,
 		computeServiceAPIEndpoint,
 		identityServiceAPIEndpoint,
+		reservationServiceAPIEndpoint,
 		serviceToken,
 		organizationID,
 		projectID,
@@ -228,6 +241,8 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		computecluster.NewComputeClusterDataSource,
 		identity.NewProjectDataSource,
 		identity.NewGroupDataSource,
+		reservation.NewReservationDataSource,
+		reservation.NewPlacementDataSource,
 	}
 }
 
@@ -241,5 +256,7 @@ func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resourc
 		computecluster.NewComputeClusterResource,
 		identity.NewProjectResource,
 		identity.NewGroupResource,
+		reservation.NewReservationResource,
+		reservation.NewPlacementResource,
 	}
 }

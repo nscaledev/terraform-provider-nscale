@@ -511,7 +511,7 @@ linters:
       # on the service helpers/resources that thinly wrap those calls.
       - path: 'internal/services/.+/(helper|resource)\.go$'
         linters: [wrapcheck]
-      - path: 'internal/services/.+/(ssh_ca|file_storage|instance|compute_cluster|project|group)_(helper|resource)\.go$'
+      - path: 'internal/services/.+/(ssh_ca|file_storage|instance|compute_cluster|project|group|reservation|placement)_(helper|resource)\.go$'
         linters: [wrapcheck]
       # Same rationale for the small retryablehttp / terraform-plugin-sdk shims in internal/nscale.
       - path: 'internal/nscale/(http_client|retry)\.go$'
