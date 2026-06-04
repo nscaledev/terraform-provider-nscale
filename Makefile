@@ -18,7 +18,9 @@ fmt:
 test:
 	go test -v -cover -timeout=120s -parallel=10 ./...
 
+# -p 1 serializes packages: acceptance tests share one project, and the API can
+# fail to provision resources (e.g. networks) created concurrently across them.
 testacc:
-	TF_ACC=1 go test -v -cover -timeout 120m ./...
+	TF_ACC=1 go test -v -cover -p 1 -timeout 120m ./...
 
 .PHONY: fmt lint test testacc build install generate
