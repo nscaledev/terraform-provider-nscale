@@ -31,7 +31,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -275,9 +274,9 @@ func (r *FileStorageResource) Create(
 	stateWatcher := nscale.CreateStateWatcher[regionapi.StorageV2Read]{
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
-		GetFunc: func(ctx context.Context) (*regionapi.StorageV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
+		GetFunc: func(ctx context.Context) (*regionapi.StorageV2Read, nscale.ResourceStatus, error) {
 			targetID := fileStorage.Metadata.Id
-			return getFileStorage(ctx, targetID, r.client)
+			return nscale.AdaptProjectScoped(getFileStorage(ctx, targetID, r.client))
 		},
 	}
 
@@ -301,8 +300,8 @@ func (r *FileStorageResource) Read(ctx context.Context, request resource.ReadReq
 	resourceReader := nscale.ResourceReader[regionapi.StorageV2Read]{
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
-		GetFunc: func(ctx context.Context, id string) (*regionapi.StorageV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getFileStorage(ctx, id, r.client)
+		GetFunc: func(ctx context.Context, id string) (*regionapi.StorageV2Read, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getFileStorage(ctx, id, r.client))
 		},
 	}
 
@@ -370,8 +369,8 @@ func (r *FileStorageResource) Update(
 	stateWatcher := nscale.UpdateStateWatcher[regionapi.StorageV2Read]{
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
-		GetFunc: func(ctx context.Context) (*regionapi.StorageV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getFileStorage(ctx, id, r.client)
+		GetFunc: func(ctx context.Context) (*regionapi.StorageV2Read, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getFileStorage(ctx, id, r.client))
 		},
 	}
 
@@ -422,8 +421,8 @@ func (r *FileStorageResource) Delete(
 	stateWatcher := nscale.DeleteStateWatcher{
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
-		GetFunc: func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getFileStorage(ctx, id, r.client)
+		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getFileStorage(ctx, id, r.client))
 		},
 	}
 

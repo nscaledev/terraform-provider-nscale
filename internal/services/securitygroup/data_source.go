@@ -18,55 +18,39 @@ package securitygroup
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &SecurityGroupDataSource{}
 
+// SecurityGroupDataSource embeds the generic read+map base; only Schema and the
+// adapter wiring below are security-group-specific.
 type SecurityGroupDataSource struct {
-	client *nscale.Client
+	*nscale.GenericDataSource[SecurityGroupModel, regionapi.SecurityGroupV2Read]
 }
 
 func NewSecurityGroupDataSource() datasource.DataSource {
-	return &SecurityGroupDataSource{}
-}
-
-func (s *SecurityGroupDataSource) Configure(
-	ctx context.Context,
-	request datasource.ConfigureRequest,
-	response *datasource.ConfigureResponse,
-) {
-	if request.ProviderData == nil {
-		return
+	return &SecurityGroupDataSource{
+		GenericDataSource: nscale.NewGenericDataSource(
+			nscale.DataSourceAdapter[SecurityGroupModel, regionapi.SecurityGroupV2Read]{
+				TypeNameSuffix: "_security_group",
+				Title:          "Security Group",
+				Name:           "security group",
+				Get: func(ctx context.Context, client *nscale.Client, id string) (*regionapi.SecurityGroupV2Read, error) {
+					sg, _, err := getSecurityGroup(ctx, id, client)
+					return sg, err
+				},
+				ToModel:     NewSecurityGroupModel,
+				IDFromModel: func(m SecurityGroupModel) string { return m.ID.ValueString() },
+			},
+		),
 	}
-
-	client, ok := request.ProviderData.(*nscale.Client)
-	if !ok {
-		response.Diagnostics.AddError(
-			"Unexpected Resource Configuration Type",
-			fmt.Sprintf(
-				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
-				request.ProviderData,
-			),
-		)
-		return
-	}
-
-	s.client = client
-}
-
-func (s *SecurityGroupDataSource) Metadata(
-	ctx context.Context,
-	request datasource.MetadataRequest,
-	response *datasource.MetadataResponse,
-) {
-	response.TypeName = request.ProviderTypeName + "_security_group"
 }
 
 func (s *SecurityGroupDataSource) Schema(
@@ -136,29 +120,4 @@ func (s *SecurityGroupDataSource) Schema(
 			},
 		},
 	}
-}
-
-func (s *SecurityGroupDataSource) Read(
-	ctx context.Context,
-	request datasource.ReadRequest,
-	response *datasource.ReadResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[SecurityGroupModel](ctx, request.Config.Get)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	securityGroup, _, err := getSecurityGroup(ctx, data.ID.ValueString(), s.client)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Read Security Group",
-			fmt.Sprintf("An error occurred while retrieving the security group: %s", err),
-		)
-		return
-	}
-
-	data = NewSecurityGroupModel(securityGroup)
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

@@ -32,7 +32,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -252,9 +251,9 @@ func (r *SecurityGroupResource) Create(
 	stateWatcher := nscale.CreateStateWatcher[regionapi.SecurityGroupV2Read]{
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
-		GetFunc: func(ctx context.Context) (*regionapi.SecurityGroupV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
+		GetFunc: func(ctx context.Context) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
 			targetID := securityGroup.Metadata.Id
-			return getSecurityGroup(ctx, targetID, r.client)
+			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, targetID, r.client))
 		},
 	}
 
@@ -281,8 +280,8 @@ func (r *SecurityGroupResource) Read(
 	resourceReader := nscale.ResourceReader[regionapi.SecurityGroupV2Read]{
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
-		GetFunc: func(ctx context.Context, id string) (*regionapi.SecurityGroupV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getSecurityGroup(ctx, id, r.client)
+		GetFunc: func(ctx context.Context, id string) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
 		},
 	}
 
@@ -338,8 +337,8 @@ func (r *SecurityGroupResource) Update(
 	stateWatcher := nscale.UpdateStateWatcher[regionapi.SecurityGroupV2Read]{
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
-		GetFunc: func(ctx context.Context) (*regionapi.SecurityGroupV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getSecurityGroup(ctx, id, r.client)
+		GetFunc: func(ctx context.Context) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
 		},
 	}
 
@@ -398,8 +397,8 @@ func (r *SecurityGroupResource) Delete(
 	stateWatcher := nscale.DeleteStateWatcher{
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
-		GetFunc: func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getSecurityGroup(ctx, id, r.client)
+		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
 		},
 	}
 

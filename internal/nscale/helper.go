@@ -33,7 +33,6 @@ import (
 
 const (
 	TerraformOperationTagPrefix = "terraform.nscale.com/"
-	defaultOperationTagMaxAge   = 12 * time.Hour
 	defaultStateWatcherTimeout  = 30 * time.Minute
 )
 
@@ -71,16 +70,17 @@ func assertState[T any](state any, diagnostics *diag.Diagnostics) (*T, bool) {
 func addProvisioningErrorDiagnostic(
 	diagnostics *diag.Diagnostics,
 	resourceTitle string,
-	metadata *coreapi.ProjectScopedResourceReadMetadata,
+	status ResourceStatus,
+	found bool,
 	detail string,
 ) bool {
-	if metadata == nil || metadata.ProvisioningStatus != coreapi.ResourceProvisioningStatusError {
+	if !found || status.ProvisioningStatus != coreapi.ResourceProvisioningStatusError {
 		return false
 	}
 
 	diagnostics.AddError(
 		fmt.Sprintf("%s Entered Error State", resourceTitle),
-		fmt.Sprintf("%s %s (name %s) %s", resourceTitle, metadata.Id, metadata.Name, detail),
+		fmt.Sprintf("%s %s (name %s) %s", resourceTitle, status.ID, status.Name, detail),
 	)
 
 	return true
@@ -89,7 +89,7 @@ func addProvisioningErrorDiagnostic(
 type CreateStateWatcher[T any] struct {
 	ResourceTitle string
 	ResourceName  string
-	GetFunc       func(ctx context.Context) (*T, *coreapi.ProjectScopedResourceReadMetadata, error)
+	GetFunc       func(ctx context.Context) (*T, ResourceStatus, error)
 }
 
 func (w *CreateStateWatcher[T]) Wait(
@@ -103,7 +103,8 @@ func (w *CreateStateWatcher[T]) Wait(
 		return nil, false
 	}
 
-	var lastMetadata *coreapi.ProjectScopedResourceReadMetadata
+	var lastStatus ResourceStatus
+	var haveStatus bool
 
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
@@ -117,7 +118,7 @@ func (w *CreateStateWatcher[T]) Wait(
 			string(coreapi.ResourceProvisioningStatusError),
 		},
 		Refresh: func() (any, string, error) {
-			result, metadata, err := w.GetFunc(ctx)
+			result, status, err := w.GetFunc(ctx)
 			if err != nil {
 				if e, ok := AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 					// FIXME: Temporary workaround for resources that might not yet be visible in the cache-backed client. Should be revisited once API consistency is guaranteed.
@@ -125,8 +126,9 @@ func (w *CreateStateWatcher[T]) Wait(
 				}
 				return nil, "", err
 			}
-			lastMetadata = metadata
-			return result, string(metadata.ProvisioningStatus), nil
+			lastStatus = status
+			haveStatus = true
+			return result, string(status.ProvisioningStatus), nil
 		},
 	}
 
@@ -150,7 +152,8 @@ func (w *CreateStateWatcher[T]) Wait(
 	if addProvisioningErrorDiagnostic(
 		&response.Diagnostics,
 		w.ResourceTitle,
-		lastMetadata,
+		lastStatus,
+		haveStatus,
 		"was created but transitioned to 'error' instead of 'provisioned'. Run 'terraform apply' to try again, or reach out to support.",
 	) {
 		return result, false
@@ -162,7 +165,7 @@ func (w *CreateStateWatcher[T]) Wait(
 type ResourceReader[T any] struct {
 	ResourceTitle string
 	ResourceName  string
-	GetFunc       func(ctx context.Context, id string) (*T, *coreapi.ProjectScopedResourceReadMetadata, error)
+	GetFunc       func(ctx context.Context, id string) (*T, ResourceStatus, error)
 }
 
 func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resource.ReadResponse) (*T, bool) {
@@ -231,13 +234,15 @@ func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
 		return nil
 	}
 
+	// Operation tags are internal bookkeeping written by the update watcher to
+	// confirm a write propagated. They must never surface in Terraform state (the
+	// schema forbids users from setting reserved-prefix tags), otherwise an update
+	// that wrote one produces an "inconsistent result after apply" on the tags
+	// attribute. Strip every operation tag regardless of age.
 	var filtered []coreapi.Tag
 	for _, tag := range *tags {
 		if strings.HasPrefix(tag.Name, TerraformOperationTagPrefix) {
-			writtenAt, err := time.Parse(time.RFC3339, tag.Value)
-			if err != nil || time.Since(writtenAt) > defaultOperationTagMaxAge {
-				continue
-			}
+			continue
 		}
 		filtered = append(filtered, tag)
 	}
@@ -255,7 +260,7 @@ const (
 type UpdateStateWatcher[T any] struct {
 	ResourceTitle string
 	ResourceName  string
-	GetFunc       func(ctx context.Context) (*T, *coreapi.ProjectScopedResourceReadMetadata, error)
+	GetFunc       func(ctx context.Context) (*T, ResourceStatus, error)
 }
 
 func (w *UpdateStateWatcher[T]) Wait(
@@ -270,25 +275,27 @@ func (w *UpdateStateWatcher[T]) Wait(
 		return nil, false
 	}
 
-	var lastMetadata *coreapi.ProjectScopedResourceReadMetadata
+	var lastStatus ResourceStatus
+	var haveStatus bool
 
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
 		Pending: []string{UpdateStateUpdating},
 		Target:  []string{UpdateStateUpdated, UpdateStateProvisioningError},
 		Refresh: func() (any, string, error) {
-			result, metadata, err := w.GetFunc(ctx)
+			result, status, err := w.GetFunc(ctx)
 			if err != nil {
 				return nil, UpdateStateErrored, err
 			}
 
-			lastMetadata = metadata
+			lastStatus = status
+			haveStatus = true
 
-			if metadata.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+			if status.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
 				return result, UpdateStateProvisioningError, nil
 			}
 
-			if HasOperationTag(metadata.Tags, operationTagKey) {
+			if HasOperationTag(status.Tags, operationTagKey) {
 				return result, UpdateStateUpdated, nil
 			}
 
@@ -313,7 +320,7 @@ func (w *UpdateStateWatcher[T]) Wait(
 		return zero, false
 	}
 
-	if addProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastMetadata,
+	if addProvisioningErrorDiagnostic(&response.Diagnostics, w.ResourceTitle, lastStatus, haveStatus,
 		"transitioned to 'error' during update. Run 'terraform apply' to try again, or reach out to support.") {
 		return result, false
 	}
@@ -331,7 +338,7 @@ const (
 type DeleteStateWatcher struct {
 	ResourceTitle string
 	ResourceName  string
-	GetFunc       func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error)
+	GetFunc       func(ctx context.Context) (any, ResourceStatus, error)
 }
 
 func (w *DeleteStateWatcher) Wait(
@@ -345,17 +352,19 @@ func (w *DeleteStateWatcher) Wait(
 		return false
 	}
 
-	var lastMetadata *coreapi.ProjectScopedResourceReadMetadata
+	var lastStatus ResourceStatus
+	var haveStatus bool
 
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
 		Pending: []string{DeleteStateDeleting},
 		Target:  []string{DeleteStateDeleted, DeleteStateProvisioningError},
 		Refresh: func() (any, string, error) {
-			_, metadata, err := w.GetFunc(ctx)
+			_, status, err := w.GetFunc(ctx)
 			if err == nil {
-				lastMetadata = metadata
-				if metadata != nil && metadata.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+				lastStatus = status
+				haveStatus = true
+				if status.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
 					return struct{}{}, DeleteStateProvisioningError, nil
 				}
 				return struct{}{}, DeleteStateDeleting, nil
@@ -381,7 +390,8 @@ func (w *DeleteStateWatcher) Wait(
 	if addProvisioningErrorDiagnostic(
 		&response.Diagnostics,
 		w.ResourceTitle,
-		lastMetadata,
+		lastStatus,
+		haveStatus,
 		"transitioned to 'error' during deprovisioning instead of being removed. Re-run 'terraform destroy' to try again, or reach out to support.",
 	) {
 		return false

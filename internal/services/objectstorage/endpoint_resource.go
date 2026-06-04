@@ -33,7 +33,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -280,8 +279,8 @@ func (r *ObjectStorageEndpointResource) Create(
 	stateWatcher := nscale.CreateStateWatcher[storageapi.ObjectStorageEndpointRead]{
 		ResourceTitle: "Object Storage Endpoint",
 		ResourceName:  "object_storage_endpoint",
-		GetFunc: func(ctx context.Context) (*storageapi.ObjectStorageEndpointRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getObjectStorageEndpoint(ctx, endpoint.Metadata.Id, r.client)
+		GetFunc: func(ctx context.Context) (*storageapi.ObjectStorageEndpointRead, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getObjectStorageEndpoint(ctx, endpoint.Metadata.Id, r.client))
 		},
 	}
 
@@ -317,8 +316,8 @@ func (r *ObjectStorageEndpointResource) Read(
 	resourceReader := nscale.ResourceReader[storageapi.ObjectStorageEndpointRead]{
 		ResourceTitle: "Object Storage Endpoint",
 		ResourceName:  "object_storage_endpoint",
-		GetFunc: func(ctx context.Context, id string) (*storageapi.ObjectStorageEndpointRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getObjectStorageEndpoint(ctx, id, r.client)
+		GetFunc: func(ctx context.Context, id string) (*storageapi.ObjectStorageEndpointRead, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getObjectStorageEndpoint(ctx, id, r.client))
 		},
 	}
 
@@ -384,8 +383,8 @@ func (r *ObjectStorageEndpointResource) Update(
 	stateWatcher := nscale.UpdateStateWatcher[storageapi.ObjectStorageEndpointRead]{
 		ResourceTitle: "Object Storage Endpoint",
 		ResourceName:  "object_storage_endpoint",
-		GetFunc: func(ctx context.Context) (*storageapi.ObjectStorageEndpointRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getObjectStorageEndpoint(ctx, id, r.client)
+		GetFunc: func(ctx context.Context) (*storageapi.ObjectStorageEndpointRead, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getObjectStorageEndpoint(ctx, id, r.client))
 		},
 	}
 
@@ -444,8 +443,8 @@ func (r *ObjectStorageEndpointResource) Delete(
 	stateWatcher := nscale.DeleteStateWatcher{
 		ResourceTitle: "Object Storage Endpoint",
 		ResourceName:  "object_storage_endpoint",
-		GetFunc: func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getObjectStorageEndpoint(ctx, id, r.client)
+		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getObjectStorageEndpoint(ctx, id, r.client))
 		},
 	}
 

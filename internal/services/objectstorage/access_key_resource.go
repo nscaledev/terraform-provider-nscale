@@ -30,7 +30,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -245,8 +244,8 @@ func (r *ObjectStorageAccessKeyResource) Create(
 	stateWatcher := nscale.CreateStateWatcher[storageapi.ObjectStorageAccessKeyRead]{
 		ResourceTitle: "Object Storage Access Key",
 		ResourceName:  "object_storage_access_key",
-		GetFunc: func(ctx context.Context) (*storageapi.ObjectStorageAccessKeyRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getObjectStorageAccessKey(ctx, endpointID, created.Metadata.Id, r.client)
+		GetFunc: func(ctx context.Context) (*storageapi.ObjectStorageAccessKeyRead, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getObjectStorageAccessKey(ctx, endpointID, created.Metadata.Id, r.client))
 		},
 	}
 
@@ -286,8 +285,9 @@ func (r *ObjectStorageAccessKeyResource) Read(
 	resourceReader := nscale.ResourceReader[storageapi.ObjectStorageAccessKeyRead]{
 		ResourceTitle: "Object Storage Access Key",
 		ResourceName:  "object_storage_access_key",
-		GetFunc: func(ctx context.Context, id string) (*storageapi.ObjectStorageAccessKeyRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getObjectStorageAccessKey(ctx, preservedEndpointID.ValueString(), id, r.client)
+		GetFunc: func(ctx context.Context, id string) (*storageapi.ObjectStorageAccessKeyRead, nscale.ResourceStatus, error) {
+			endpointID := preservedEndpointID.ValueString()
+			return nscale.AdaptProjectScoped(getObjectStorageAccessKey(ctx, endpointID, id, r.client))
 		},
 	}
 
@@ -363,8 +363,8 @@ func (r *ObjectStorageAccessKeyResource) Delete(
 	stateWatcher := nscale.DeleteStateWatcher{
 		ResourceTitle: "Object Storage Access Key",
 		ResourceName:  "object_storage_access_key",
-		GetFunc: func(ctx context.Context) (any, *coreapi.ProjectScopedResourceReadMetadata, error) {
-			return getObjectStorageAccessKey(ctx, endpointID, id, r.client)
+		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
+			return nscale.AdaptProjectScoped(getObjectStorageAccessKey(ctx, endpointID, id, r.client))
 		},
 	}
 

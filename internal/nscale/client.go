@@ -23,6 +23,7 @@ import (
 	"net/http"
 
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
+	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 
@@ -40,12 +41,13 @@ type Client struct {
 	ProjectID      string
 	Region         regionapi.ClientInterface
 	Compute        computeapi.ClientInterface
+	Identity       identityapi.ClientInterface
 	LegacyCompute  legacycomputeapi.ClientInterface
 	Storage        storageapi.ClientInterface
 }
 
 func NewClient(
-	regionServiceBaseURL, computeServiceBaseURL, storageServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string,
+	regionServiceBaseURL, computeServiceBaseURL, identityServiceBaseURL, storageServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string,
 ) (*Client, error) {
 	httpClient := NewHTTPClient(userAgent, serviceToken)
 
@@ -57,6 +59,11 @@ func NewClient(
 	compute, err := computeapi.NewClient(computeServiceBaseURL, computeapi.WithHTTPClient(httpClient))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Nscale compute API client: %w", err)
+	}
+
+	identity, err := identityapi.NewClient(identityServiceBaseURL, identityapi.WithHTTPClient(httpClient))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Nscale identity API client: %w", err)
 	}
 
 	legacyCompute, err := legacycomputeapi.NewClient(
@@ -78,6 +85,7 @@ func NewClient(
 		ProjectID:      projectID,
 		Region:         region,
 		Compute:        compute,
+		Identity:       identity,
 		LegacyCompute:  legacyCompute,
 		Storage:        storage,
 	}

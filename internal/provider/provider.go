@@ -30,6 +30,7 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/computecluster"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/filestorage"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/identity"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/instance"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/objectstorage"
@@ -40,21 +41,23 @@ import (
 )
 
 const (
-	DefaultNscaleRegionServiceAPIEndpoint  = "https://region.unikorn.nscale.com"
-	DefaultNscaleComputeServiceAPIEndpoint = "https://compute.unikorn.nscale.com"
-	DefaultNscaleStorageServiceAPIEndpoint = "https://storage.unikorn.nscale.com"
+	DefaultNscaleRegionServiceAPIEndpoint   = "https://region.unikorn.nscale.com"
+	DefaultNscaleComputeServiceAPIEndpoint  = "https://compute.unikorn.nscale.com"
+	DefaultNscaleIdentityServiceAPIEndpoint = "https://identity.unikorn.nscale.com"
+	DefaultNscaleStorageServiceAPIEndpoint  = "https://storage.unikorn.nscale.com"
 )
 
 var _ provider.Provider = NscaleProvider{}
 
 type NscaleProviderModel struct {
-	RegionServiceAPIEndpoint  types.String `tfsdk:"region_service_api_endpoint"`
-	ComputeServiceAPIEndpoint types.String `tfsdk:"compute_service_api_endpoint"`
-	StorageServiceAPIEndpoint types.String `tfsdk:"storage_service_api_endpoint"`
-	ServiceToken              types.String `tfsdk:"service_token"`
-	RegionID                  types.String `tfsdk:"region_id"`
-	OrganizationID            types.String `tfsdk:"organization_id"`
-	ProjectID                 types.String `tfsdk:"project_id"`
+	RegionServiceAPIEndpoint   types.String `tfsdk:"region_service_api_endpoint"`
+	ComputeServiceAPIEndpoint  types.String `tfsdk:"compute_service_api_endpoint"`
+	IdentityServiceAPIEndpoint types.String `tfsdk:"identity_service_api_endpoint"`
+	StorageServiceAPIEndpoint  types.String `tfsdk:"storage_service_api_endpoint"`
+	ServiceToken               types.String `tfsdk:"service_token"`
+	RegionID                   types.String `tfsdk:"region_id"`
+	OrganizationID             types.String `tfsdk:"organization_id"`
+	ProjectID                  types.String `tfsdk:"project_id"`
 }
 
 type NscaleProvider struct{}
@@ -83,6 +86,10 @@ func (p NscaleProvider) Schema(ctx context.Context, request provider.SchemaReque
 				MarkdownDescription: "The endpoint of the Nscale Compute Service API server.",
 				Optional:            true,
 			},
+			"identity_service_api_endpoint": schema.StringAttribute{
+				MarkdownDescription: "The endpoint of the Nscale Identity Service API server.",
+				Optional:            true,
+			},
 			"storage_service_api_endpoint": schema.StringAttribute{
 				MarkdownDescription: "The endpoint of the Nscale Storage Service API server.",
 				Optional:            true,
@@ -108,7 +115,20 @@ func (p NscaleProvider) Schema(ctx context.Context, request provider.SchemaReque
 	}
 }
 
-//nolint:funlen // Configure is a flat sequence of "resolve env-or-config" + diagnostic-emit pairs; refactoring obscures more than it helps.
+// resolveValue picks a provider setting from, in order of precedence: the named
+// environment variable, the provider configuration value, then the supplied
+// fallback (which may be empty for required values that have no default).
+func resolveValue(configValue, envVar, fallback string) string {
+	value := configValue
+	if envValue, ok := os.LookupEnv(envVar); ok {
+		value = envValue
+	}
+	if value == "" {
+		value = fallback
+	}
+	return value
+}
+
 func (p NscaleProvider) Configure(
 	ctx context.Context,
 	request provider.ConfigureRequest,
@@ -121,34 +141,29 @@ func (p NscaleProvider) Configure(
 		return
 	}
 
-	regionServiceAPIEndpoint := data.RegionServiceAPIEndpoint.ValueString()
-	if value, ok := os.LookupEnv("NSCALE_REGION_SERVICE_API_ENDPOINT"); ok {
-		regionServiceAPIEndpoint = value
-	}
-	if regionServiceAPIEndpoint == "" {
-		regionServiceAPIEndpoint = DefaultNscaleRegionServiceAPIEndpoint
-	}
+	regionServiceAPIEndpoint := resolveValue(
+		data.RegionServiceAPIEndpoint.ValueString(),
+		"NSCALE_REGION_SERVICE_API_ENDPOINT",
+		DefaultNscaleRegionServiceAPIEndpoint,
+	)
+	computeServiceAPIEndpoint := resolveValue(
+		data.ComputeServiceAPIEndpoint.ValueString(),
+		"NSCALE_COMPUTE_SERVICE_API_ENDPOINT",
+		DefaultNscaleComputeServiceAPIEndpoint,
+	)
+	identityServiceAPIEndpoint := resolveValue(
+		data.IdentityServiceAPIEndpoint.ValueString(),
+		"NSCALE_IDENTITY_SERVICE_API_ENDPOINT",
+		DefaultNscaleIdentityServiceAPIEndpoint,
+	)
 
-	computeServiceAPIEndpoint := data.ComputeServiceAPIEndpoint.ValueString()
-	if value, ok := os.LookupEnv("NSCALE_COMPUTE_SERVICE_API_ENDPOINT"); ok {
-		computeServiceAPIEndpoint = value
-	}
-	if computeServiceAPIEndpoint == "" {
-		computeServiceAPIEndpoint = DefaultNscaleComputeServiceAPIEndpoint
-	}
+	storageServiceAPIEndpoint := resolveValue(
+		data.StorageServiceAPIEndpoint.ValueString(),
+		"NSCALE_STORAGE_SERVICE_API_ENDPOINT",
+		DefaultNscaleStorageServiceAPIEndpoint,
+	)
 
-	storageServiceAPIEndpoint := data.StorageServiceAPIEndpoint.ValueString()
-	if value, ok := os.LookupEnv("NSCALE_STORAGE_SERVICE_API_ENDPOINT"); ok {
-		storageServiceAPIEndpoint = value
-	}
-	if storageServiceAPIEndpoint == "" {
-		storageServiceAPIEndpoint = DefaultNscaleStorageServiceAPIEndpoint
-	}
-
-	serviceToken := data.ServiceToken.ValueString()
-	if value, ok := os.LookupEnv("NSCALE_SERVICE_TOKEN"); ok {
-		serviceToken = value
-	}
+	serviceToken := resolveValue(data.ServiceToken.ValueString(), "NSCALE_SERVICE_TOKEN", "")
 	if serviceToken == "" {
 		response.Diagnostics.AddError(
 			"Missing Service Token",
@@ -157,10 +172,7 @@ func (p NscaleProvider) Configure(
 		return
 	}
 
-	regionID := data.RegionID.ValueString()
-	if value, ok := os.LookupEnv("NSCALE_REGION_ID"); ok {
-		regionID = value
-	}
+	regionID := resolveValue(data.RegionID.ValueString(), "NSCALE_REGION_ID", "")
 	if regionID == "" {
 		response.Diagnostics.AddWarning(
 			"Missing Region ID",
@@ -169,10 +181,7 @@ func (p NscaleProvider) Configure(
 		return
 	}
 
-	organizationID := data.OrganizationID.ValueString()
-	if value, ok := os.LookupEnv("NSCALE_ORGANIZATION_ID"); ok {
-		organizationID = value
-	}
+	organizationID := resolveValue(data.OrganizationID.ValueString(), "NSCALE_ORGANIZATION_ID", "")
 	if organizationID == "" {
 		response.Diagnostics.AddError(
 			"Missing Organization ID",
@@ -181,10 +190,7 @@ func (p NscaleProvider) Configure(
 		return
 	}
 
-	projectID := data.ProjectID.ValueString()
-	if value, ok := os.LookupEnv("NSCALE_PROJECT_ID"); ok {
-		projectID = value
-	}
+	projectID := resolveValue(data.ProjectID.ValueString(), "NSCALE_PROJECT_ID", "")
 	if projectID == "" {
 		response.Diagnostics.AddError(
 			"Missing Project ID",
@@ -202,6 +208,7 @@ func (p NscaleProvider) Configure(
 	client, err := nscale.NewClient(
 		regionServiceAPIEndpoint,
 		computeServiceAPIEndpoint,
+		identityServiceAPIEndpoint,
 		storageServiceAPIEndpoint,
 		serviceToken,
 		organizationID,
@@ -236,6 +243,8 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		objectstorage.NewObjectStorageEndpointClassDataSource,
 		objectstorage.NewObjectStorageEndpointDataSource,
 		objectstorage.NewObjectStorageAccessKeyDataSource,
+		identity.NewProjectDataSource,
+		identity.NewGroupDataSource,
 	}
 }
 
@@ -249,5 +258,7 @@ func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resourc
 		computecluster.NewComputeClusterResource,
 		objectstorage.NewObjectStorageEndpointResource,
 		objectstorage.NewObjectStorageAccessKeyResource,
+		identity.NewProjectResource,
+		identity.NewGroupResource,
 	}
 }

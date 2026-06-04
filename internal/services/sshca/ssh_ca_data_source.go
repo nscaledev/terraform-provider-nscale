@@ -18,54 +18,38 @@ package sshca
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &SSHCertificateAuthorityDataSource{}
 
+// SSHCertificateAuthorityDataSource embeds the generic read+map base; only
+// Schema and the adapter wiring below are SSH-certificate-authority-specific.
 type SSHCertificateAuthorityDataSource struct {
-	client *nscale.Client
+	*nscale.GenericDataSource[SSHCertificateAuthorityModel, regionapi.SshCertificateAuthorityV2Read]
 }
 
 func NewSSHCertificateAuthorityDataSource() datasource.DataSource {
-	return &SSHCertificateAuthorityDataSource{}
-}
-
-func (s *SSHCertificateAuthorityDataSource) Configure(
-	ctx context.Context,
-	request datasource.ConfigureRequest,
-	response *datasource.ConfigureResponse,
-) {
-	if request.ProviderData == nil {
-		return
+	return &SSHCertificateAuthorityDataSource{
+		GenericDataSource: nscale.NewGenericDataSource(
+			nscale.DataSourceAdapter[SSHCertificateAuthorityModel, regionapi.SshCertificateAuthorityV2Read]{
+				TypeNameSuffix: "_ssh_certificate_authority",
+				Title:          "SSH Certificate Authority",
+				Name:           "ssh_certificate_authority",
+				Get: func(ctx context.Context, client *nscale.Client, id string) (*regionapi.SshCertificateAuthorityV2Read, error) {
+					sshCA, _, err := getSSHCA(ctx, id, client)
+					return sshCA, err
+				},
+				ToModel:     NewSSHCertificateAuthorityModel,
+				IDFromModel: func(m SSHCertificateAuthorityModel) string { return m.ID.ValueString() },
+			},
+		),
 	}
-
-	client, ok := request.ProviderData.(*nscale.Client)
-	if !ok {
-		response.Diagnostics.AddError(
-			"Unexpected Resource Configuration Type",
-			fmt.Sprintf(
-				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
-				request.ProviderData,
-			),
-		)
-		return
-	}
-
-	s.client = client
-}
-
-func (s *SSHCertificateAuthorityDataSource) Metadata(
-	ctx context.Context,
-	request datasource.MetadataRequest,
-	response *datasource.MetadataResponse,
-) {
-	response.TypeName = request.ProviderTypeName + "_ssh_certificate_authority"
 }
 
 func (s *SSHCertificateAuthorityDataSource) Schema(
@@ -102,29 +86,4 @@ func (s *SSHCertificateAuthorityDataSource) Schema(
 			},
 		},
 	}
-}
-
-func (s *SSHCertificateAuthorityDataSource) Read(
-	ctx context.Context,
-	request datasource.ReadRequest,
-	response *datasource.ReadResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[SSHCertificateAuthorityModel](ctx, request.Config.Get)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	sshCA, _, err := getSSHCA(ctx, data.ID.ValueString(), s.client)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Read SSH Certificate Authority",
-			fmt.Sprintf("An error occurred while retrieving the SSH certificate authority: %s", err),
-		)
-		return
-	}
-
-	data = NewSSHCertificateAuthorityModel(sshCA)
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

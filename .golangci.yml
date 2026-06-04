@@ -490,6 +490,14 @@ linters:
       - source: "FIXME"
         linters: [godox]
 
+      # The identity project and group resources are both plain synchronous CRUD
+      # over the org-scoped identity API, so their Create/Read/Update/Delete
+      # bodies are structurally identical (only the wrapped types differ). The
+      # codebase convention is explicit per-resource CRUD rather than a shared
+      # generic, so dupl's clone detection is expected here.
+      - path: 'internal/services/identity/(project|group)_resource\.go$'
+        linters: [dupl]
+
       # Inline structs in *_model.go files must mirror the openapi-generated *.Spec
       # layouts exactly — including their `Id` (not `ID`) field names — or Go's
       # structural typing rejects the assignment.
@@ -503,7 +511,7 @@ linters:
       # on the service helpers/resources that thinly wrap those calls.
       - path: 'internal/services/.+/(helper|resource)\.go$'
         linters: [wrapcheck]
-      - path: 'internal/services/.+/(ssh_ca|file_storage|instance|compute_cluster|endpoint|access_key|endpoint_class)_(helper|resource|data_source)\.go$'
+      - path: 'internal/services/.+/(ssh_ca|file_storage|instance|compute_cluster|endpoint|access_key|endpoint_class|project|group)_(helper|resource|data_source)\.go$'
         linters: [wrapcheck]
       # Same rationale for the small retryablehttp / terraform-plugin-sdk shims in internal/nscale.
       - path: 'internal/nscale/(http_client|retry)\.go$'

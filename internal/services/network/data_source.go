@@ -18,55 +18,39 @@ package network
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 var _ datasource.DataSourceWithConfigure = &NetworkDataSource{}
 
+// NetworkDataSource embeds the generic read+map base; only Schema and the
+// adapter wiring below are network-specific.
 type NetworkDataSource struct {
-	client *nscale.Client
+	*nscale.GenericDataSource[NetworkModel, regionapi.NetworkV2Read]
 }
 
 func NewNetworkDataSource() datasource.DataSource {
-	return &NetworkDataSource{}
-}
-
-func (s *NetworkDataSource) Configure(
-	ctx context.Context,
-	request datasource.ConfigureRequest,
-	response *datasource.ConfigureResponse,
-) {
-	if request.ProviderData == nil {
-		return
+	return &NetworkDataSource{
+		GenericDataSource: nscale.NewGenericDataSource(
+			nscale.DataSourceAdapter[NetworkModel, regionapi.NetworkV2Read]{
+				TypeNameSuffix: "_network",
+				Title:          "Network",
+				Name:           "network",
+				Get: func(ctx context.Context, client *nscale.Client, id string) (*regionapi.NetworkV2Read, error) {
+					network, _, err := getNetwork(ctx, id, client)
+					return network, err
+				},
+				ToModel:     NewNetworkModel,
+				IDFromModel: func(m NetworkModel) string { return m.ID.ValueString() },
+			},
+		),
 	}
-
-	client, ok := request.ProviderData.(*nscale.Client)
-	if !ok {
-		response.Diagnostics.AddError(
-			"Unexpected Resource Configuration Type",
-			fmt.Sprintf(
-				"Expected *nscale.Client, got: %T. Please contact the Nscale team for support.",
-				request.ProviderData,
-			),
-		)
-		return
-	}
-
-	s.client = client
-}
-
-func (s *NetworkDataSource) Metadata(
-	ctx context.Context,
-	request datasource.MetadataRequest,
-	response *datasource.MetadataResponse,
-) {
-	response.TypeName = request.ProviderTypeName + "_network"
 }
 
 func (s *NetworkDataSource) Schema(
@@ -133,29 +117,4 @@ func (s *NetworkDataSource) Schema(
 			},
 		},
 	}
-}
-
-func (s *NetworkDataSource) Read(
-	ctx context.Context,
-	request datasource.ReadRequest,
-	response *datasource.ReadResponse,
-) {
-	data, diagnostics := nscale.ReadTerraformState[NetworkModel](ctx, request.Config.Get)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
-	network, _, err := getNetwork(ctx, data.ID.ValueString(), s.client)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Read Network",
-			fmt.Sprintf("An error occurred while retrieving the network: %s", err),
-		)
-		return
-	}
-
-	data = NewNetworkModel(network)
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
