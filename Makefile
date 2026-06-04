@@ -18,8 +18,10 @@ fmt:
 test:
 	go test -v -cover -timeout=120s -parallel=10 ./...
 
+# -p 1 serializes packages: acceptance tests share one project, and the API can
+# fail to provision resources (e.g. networks) created concurrently across them.
 testacc:
-	TF_ACC=1 go test -v -cover -timeout 120m ./...
+	TF_ACC=1 go test -v -cover -p 1 -timeout 120m ./...
 
 # testacc-env is the developer-facing wrapper: source NSCALE_* and TF_ACC env
 # vars from a local .env (gitignored) and then run testacc. Use this rather
