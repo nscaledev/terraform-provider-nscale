@@ -498,10 +498,10 @@ linters:
       - path: 'internal/services/identity/(project|group)_resource\.go$'
         linters: [dupl]
 
-      # An inline struct in file_storage_model.go must mirror the openapi-generated
-      # StorageV2Create.Spec layout exactly — including its `Id` (not `ID`) field names —
-      # or Go's structural typing rejects the assignment.
-      - path: 'file_storage_model\.go$'
+      # Inline structs in *_model.go files must mirror the openapi-generated *.Spec
+      # layouts exactly — including their `Id` (not `ID`) field names — or Go's
+      # structural typing rejects the assignment.
+      - path: '(file_storage|endpoint)_model\.go$'
         text: 'struct field \w+Id should be'
         linters: [revive, staticcheck]
 
@@ -511,7 +511,7 @@ linters:
       # on the service helpers/resources that thinly wrap those calls.
       - path: 'internal/services/.+/(helper|resource)\.go$'
         linters: [wrapcheck]
-      - path: 'internal/services/.+/(ssh_ca|file_storage|instance|compute_cluster|project|group|reservation|placement)_(helper|resource)\.go$'
+      - path: 'internal/services/.+/(ssh_ca|file_storage|instance|compute_cluster|endpoint|access_key|endpoint_class|project|group|reservation|placement)_(helper|resource|data_source)\.go$'
         linters: [wrapcheck]
       # Same rationale for the small retryablehttp / terraform-plugin-sdk shims in internal/nscale.
       - path: 'internal/nscale/(http_client|retry)\.go$'
