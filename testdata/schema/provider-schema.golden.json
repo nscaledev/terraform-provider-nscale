@@ -1,0 +1,2558 @@
+{
+  "format_version": "1.0",
+  "provider_schemas": {
+    "registry.terraform.io/nscaledev/nscale": {
+      "data_source_schemas": {
+        "nscale_compute_cluster": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the compute cluster was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the compute cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "description": "A unique identifier for the compute cluster.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the compute cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning status of the compute cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the compute cluster is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "ssh_private_key": {
+                "computed": true,
+                "description": "The SSH private key for accessing the compute cluster.",
+                "description_kind": "markdown",
+                "sensitive": true,
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the compute cluster.",
+                "description_kind": "markdown",
+                "type": [
+                  "map",
+                  "string"
+                ]
+              },
+              "workload_pools": {
+                "computed": true,
+                "description": "A list of pools of workload nodes in the compute cluster.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "enable_public_ip": {
+                      "computed": true,
+                      "description": "Whether to assign a public IP address to each VM in this workload pool.",
+                      "description_kind": "markdown",
+                      "type": "bool"
+                    },
+                    "firewall_rules": {
+                      "computed": true,
+                      "description": "A list of firewall rules applied to the VMs in this workload pool.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "direction": {
+                            "computed": true,
+                            "description": "The direction of the traffic to which this firewall rule applies.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          },
+                          "ports": {
+                            "computed": true,
+                            "description": "The ports to which this firewall rule applies. This can be a single port, or a range of ports.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          },
+                          "prefixes": {
+                            "computed": true,
+                            "description": "A set of CIDR prefixes to which this firewall rule applies.",
+                            "description_kind": "markdown",
+                            "type": [
+                              "set",
+                              "string"
+                            ]
+                          },
+                          "protocol": {
+                            "computed": true,
+                            "description": "The IP protocol to which this firewall rule applies.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "list"
+                      }
+                    },
+                    "flavor_id": {
+                      "computed": true,
+                      "description": "The identifier of the flavor (machine type) used for the workload pool VMs.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "image_id": {
+                      "computed": true,
+                      "description": "The identifier of the image used for initializing the boot disk of the workload pool VMs.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "machines": {
+                      "computed": true,
+                      "description": "A list of machines in this workload pool.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "hostname": {
+                            "computed": true,
+                            "description": "The hostname of the machine.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          },
+                          "private_ip": {
+                            "computed": true,
+                            "description": "The private IP address of the machine.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          },
+                          "public_ip": {
+                            "computed": true,
+                            "description": "The public IP address of the machine, if assigned.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "list"
+                      }
+                    },
+                    "name": {
+                      "computed": true,
+                      "description": "The name of the workload pool.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "replicas": {
+                      "computed": true,
+                      "description": "The number of replicas (VMs) to provision in this workload pool.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    },
+                    "user_data": {
+                      "computed": true,
+                      "description": "The data to pass to the VMs at boot time.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "list"
+                }
+              }
+            },
+            "deprecated": true,
+            "description": "Nscale Compute Cluster",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_file_storage": {
+          "block": {
+            "attributes": {
+              "capacity": {
+                "computed": true,
+                "description": "The total capacity of the file storage, in gibibytes.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the file storage was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the file storage.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "description": "A unique identifier for the file storage.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the file storage.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project where the file storage is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the file storage is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "root_squash": {
+                "computed": true,
+                "description": "Indicates whether root squashing is enabled for the file storage.",
+                "description_kind": "markdown",
+                "type": "bool"
+              },
+              "size": {
+                "computed": true,
+                "description": "The amount of storage currently used, in gibibytes.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
+              "storage_class_id": {
+                "computed": true,
+                "description": "The identifier of the storage class assigned to the file storage.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the file storage.",
+                "description_kind": "markdown",
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "block_types": {
+              "network": {
+                "block": {
+                  "attributes": {
+                    "id": {
+                      "computed": true,
+                      "description": "The identifier of the network to which the file storage is attached.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "mount_source": {
+                      "computed": true,
+                      "description": "The network path for mounting the file storage.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "description": "The network to which the file storage is attached.",
+                  "description_kind": "markdown"
+                },
+                "nesting_mode": "list"
+              }
+            },
+            "description": "Nscale File Storage",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_file_storage_class": {
+          "block": {
+            "attributes": {
+              "description": {
+                "computed": true,
+                "description": "The description of the file storage class.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "description": "A unique identifier for the file storage class.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the file storage class.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "protocols": {
+                "computed": true,
+                "description": "A list of protocols supported by the file storage class.",
+                "description_kind": "markdown",
+                "type": [
+                  "list",
+                  "string"
+                ]
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the file storage class is available. If not specified, this defaults to the region ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              }
+            },
+            "description": "Nscale File Storage Class",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_identity_group": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the group was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the group.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "description": "A unique identifier for the group.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the group.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning status of the group.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "role_ids": {
+                "computed": true,
+                "description": "The set of role identifiers granted to members of this group.",
+                "description_kind": "markdown",
+                "type": [
+                  "set",
+                  "string"
+                ]
+              },
+              "service_account_ids": {
+                "computed": true,
+                "description": "The set of service account identifiers that are members of this group.",
+                "description_kind": "markdown",
+                "type": [
+                  "set",
+                  "string"
+                ]
+              },
+              "subjects": {
+                "computed": true,
+                "description": "The set of federated identity subjects that are members of this group.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "email": {
+                      "computed": true,
+                      "description": "The email address for the subject, when supplied by the issuer.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "id": {
+                      "computed": true,
+                      "description": "The subject identifier issued by the issuer.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "issuer": {
+                      "computed": true,
+                      "description": "The OIDC issuer URL that asserts this subject.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "set"
+                }
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the group.",
+                "description_kind": "markdown",
+                "type": [
+                  "map",
+                  "string"
+                ]
+              },
+              "user_ids": {
+                "computed": true,
+                "description": "The set of user identifiers that are members of this group.",
+                "description_kind": "markdown",
+                "type": [
+                  "set",
+                  "string"
+                ]
+              }
+            },
+            "description": "Nscale Identity Group",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_identity_project": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the project was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the project.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "group_ids": {
+                "computed": true,
+                "description": "The set of group identifiers that are granted access to the project.",
+                "description_kind": "markdown",
+                "type": [
+                  "set",
+                  "string"
+                ]
+              },
+              "id": {
+                "description": "A unique identifier for the project.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the project.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning status of the project.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the project.",
+                "description_kind": "markdown",
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "description": "Nscale Identity Project",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_instance": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the instance was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the instance.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "flavor_id": {
+                "computed": true,
+                "description": "The identifier of the flavor used for the instance.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "description": "A unique identifier for the instance.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "image_id": {
+                "computed": true,
+                "description": "The identifier of the image used for the instance.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the instance.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "power_state": {
+                "computed": true,
+                "description": "The power state of the instance.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "private_ip": {
+                "computed": true,
+                "description": "The private IP address assigned to the instance.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project where the instance is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "public_ip": {
+                "computed": true,
+                "description": "The public IP address assigned to the instance.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the instance is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "ssh_certificate_authority_id": {
+                "computed": true,
+                "description": "The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the instance.",
+                "description_kind": "markdown",
+                "type": [
+                  "map",
+                  "string"
+                ]
+              },
+              "user_data": {
+                "computed": true,
+                "description": "The data to pass to the instance at boot time.",
+                "description_kind": "markdown",
+                "type": "string"
+              }
+            },
+            "block_types": {
+              "network_interface": {
+                "block": {
+                  "attributes": {
+                    "allowed_destinations": {
+                      "computed": true,
+                      "description": "A list of CIDR blocks that are allowed to egress from the instance without SNAT.",
+                      "description_kind": "markdown",
+                      "type": [
+                        "list",
+                        "string"
+                      ]
+                    },
+                    "enable_public_ip": {
+                      "computed": true,
+                      "description": "Indicates whether the instance has a public IP.",
+                      "description_kind": "markdown",
+                      "type": "bool"
+                    },
+                    "network_id": {
+                      "computed": true,
+                      "description": "The identifier of the network where the instance is provisioned.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "security_group_ids": {
+                      "computed": true,
+                      "description": "A list of security group identifiers associated with the instance.",
+                      "description_kind": "markdown",
+                      "type": [
+                        "list",
+                        "string"
+                      ]
+                    }
+                  },
+                  "description": "The network interface configuration of the instance.",
+                  "description_kind": "markdown"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale Instance",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_instance_flavor": {
+          "block": {
+            "attributes": {
+              "cpus": {
+                "computed": true,
+                "description": "The number of CPUs allocated to the instance flavor.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the instance flavor.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "disk_size": {
+                "computed": true,
+                "description": "The disk storage allocated to the instance flavor, in gigabytes.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
+              "id": {
+                "description": "A unique identifier for the instance flavor.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "memory_size": {
+                "computed": true,
+                "description": "The memory allocated to the instance flavor, in gibibytes.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the instance flavor.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the instance flavor is available. If not specified, this defaults to the region ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              }
+            },
+            "block_types": {
+              "gpu": {
+                "block": {
+                  "attributes": {
+                    "logical_count": {
+                      "computed": true,
+                      "description": "The total number of logical GPU units available for use.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    },
+                    "memory_size": {
+                      "computed": true,
+                      "description": "The memory available on the GPU, in gibibytes.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    },
+                    "model": {
+                      "computed": true,
+                      "description": "The model name of the GPU.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "physical_count": {
+                      "computed": true,
+                      "description": "The number of physical GPU devices available in the instance flavor.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    },
+                    "vendor": {
+                      "computed": true,
+                      "description": "The manufacturer of the GPU.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "description": "The GPU configuration for the instance flavor, if available.",
+                  "description_kind": "markdown"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale Instance Flavor",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_instance_ssh_key": {
+          "block": {
+            "attributes": {
+              "instance_id": {
+                "description": "The identifier of the instance associated with the SSH key.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "private_key": {
+                "computed": true,
+                "description": "The private SSH key for accessing the instance.",
+                "description_kind": "markdown",
+                "sensitive": true,
+                "type": "string"
+              }
+            },
+            "description": "Nscale Instance SSH Key",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_network": {
+          "block": {
+            "attributes": {
+              "cidr_block": {
+                "computed": true,
+                "description": "The CIDR block assigned to the network.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the network was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the network.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "dns_nameservers": {
+                "computed": true,
+                "description": "A list of DNS nameservers associated with the network.",
+                "description_kind": "markdown",
+                "type": [
+                  "list",
+                  "string"
+                ]
+              },
+              "id": {
+                "description": "A unique identifier for the network.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the network.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project where the network is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the network is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "routes": {
+                "computed": true,
+                "description": "A list of routes associated with the network.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "destination": {
+                      "computed": true,
+                      "description": "The destination CIDR block for the route.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "nexthop": {
+                      "computed": true,
+                      "description": "The next-hop address for the route.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "list"
+                }
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the network.",
+                "description_kind": "markdown",
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "description": "Nscale Network",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_object_storage_access_key": {
+          "block": {
+            "attributes": {
+              "access_key_id": {
+                "computed": true,
+                "description": "The S3 access key identifier.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the access key was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the access key.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "endpoint_id": {
+                "description": "The identifier of the object storage endpoint this access key belongs to.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "id": {
+                "description": "A unique identifier for the access key.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "identity_policy": {
+                "computed": true,
+                "description": "The identity policy name the access key is bound to.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the access key.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project the access key belongs to.",
+                "description_kind": "markdown",
+                "type": "string"
+              }
+            },
+            "description": "Retrieves information about an existing object storage access key. The S3 secret is intentionally not exposed by this data source — it is only available at creation time. Use the resource (and protect Terraform state) to manage it.",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_object_storage_endpoint": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the object storage endpoint was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the object storage endpoint.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "endpoint_class_id": {
+                "computed": true,
+                "description": "The identifier of the endpoint class the endpoint was created with.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "exposure": {
+                "computed": true,
+                "description": "The externally reachable endpoints for the object storage endpoint.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "public": {
+                      "computed": true,
+                      "description": "Connection details for the public exposure mode.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "dns_name": {
+                            "computed": true,
+                            "description": "The DNS hostname clients use to reach the endpoint over the public network.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      }
+                    }
+                  },
+                  "nesting_mode": "single"
+                }
+              },
+              "id": {
+                "description": "A unique identifier for the object storage endpoint.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "identity_policies": {
+                "computed": true,
+                "description": "Identity policies configured on the endpoint.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "document": {
+                      "computed": true,
+                      "description": "The identity policy document encoded as a JSON object string.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "name": {
+                      "computed": true,
+                      "description": "The identity policy name.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "list"
+                }
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the object storage endpoint.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project where the object storage endpoint is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the object storage endpoint is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the object storage endpoint.",
+                "description_kind": "markdown",
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "description": "Retrieves information about an existing object storage endpoint by its unique identifier.",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_object_storage_endpoint_class": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the endpoint class was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the endpoint class.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "description": "A unique identifier for the endpoint class.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the endpoint class.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the endpoint class is available. If not specified, this defaults to the region ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "supported_endpoint_types": {
+                "computed": true,
+                "description": "Endpoint exposure types supported by this class. Possible values are `public` and `private`.",
+                "description_kind": "markdown",
+                "type": [
+                  "list",
+                  "string"
+                ]
+              }
+            },
+            "description": "Retrieves an object storage endpoint class by its unique identifier. Endpoint classes determine an endpoint's exposure type (public/private) and regional availability.",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_region": {
+          "block": {
+            "attributes": {
+              "description": {
+                "computed": true,
+                "description": "The description of the region.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the region.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the region.",
+                "description_kind": "markdown",
+                "type": "string"
+              }
+            },
+            "description": "Nscale Region",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_security_group": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the security group was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the security group.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "description": "A unique identifier for the security group.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the security group.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "network_id": {
+                "computed": true,
+                "description": "The identifier of the network to which the security group is attached.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the security group is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "rules": {
+                "computed": true,
+                "description": "A list of rules associated with the security group.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "cidr_block": {
+                      "computed": true,
+                      "description": "The CIDR block for the security group rule.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "from_port": {
+                      "computed": true,
+                      "description": "The starting port of the port range for the security group rule.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    },
+                    "protocol": {
+                      "computed": true,
+                      "description": "The protocol for the security group rule.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "to_port": {
+                      "computed": true,
+                      "description": "The ending port of the port range for the security group rule.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    },
+                    "type": {
+                      "computed": true,
+                      "description": "The type of the security group rule.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "list"
+                }
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the security group.",
+                "description_kind": "markdown",
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "description": "Nscale Security Group",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_ssh_certificate_authority": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the SSH certificate authority was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the SSH certificate authority.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "description": "A unique identifier for the SSH certificate authority.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the SSH certificate authority.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project where the SSH certificate authority is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "public_key": {
+                "computed": true,
+                "description": "The SSH CA public key in OpenSSH format.",
+                "description_kind": "markdown",
+                "type": "string"
+              }
+            },
+            "description": "Nscale SSH Certificate Authority",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        }
+      },
+      "provider": {
+        "block": {
+          "attributes": {
+            "compute_service_api_endpoint": {
+              "description": "The endpoint of the Nscale Compute Service API server.",
+              "description_kind": "markdown",
+              "optional": true,
+              "type": "string"
+            },
+            "identity_service_api_endpoint": {
+              "description": "The endpoint of the Nscale Identity Service API server.",
+              "description_kind": "markdown",
+              "optional": true,
+              "type": "string"
+            },
+            "organization_id": {
+              "description": "The identifier of the organization for which resources are managed.",
+              "description_kind": "markdown",
+              "optional": true,
+              "type": "string"
+            },
+            "project_id": {
+              "description": "The identifier of the project for which resources are managed.",
+              "description_kind": "markdown",
+              "optional": true,
+              "type": "string"
+            },
+            "region_id": {
+              "description": "The identifier of the region for which resources are managed. Regional resources include a top-level region_id field, allowing the region to be explicitly specified and to override the default region when provided.",
+              "description_kind": "markdown",
+              "optional": true,
+              "type": "string"
+            },
+            "region_service_api_endpoint": {
+              "description": "The endpoint of the Nscale Region Service API server.",
+              "description_kind": "markdown",
+              "optional": true,
+              "type": "string"
+            },
+            "service_token": {
+              "description": "The service token for authenticating with the Nscale API server.",
+              "description_kind": "markdown",
+              "optional": true,
+              "sensitive": true,
+              "type": "string"
+            },
+            "storage_service_api_endpoint": {
+              "description": "The endpoint of the Nscale Storage Service API server.",
+              "description_kind": "markdown",
+              "optional": true,
+              "type": "string"
+            }
+          },
+          "description_kind": "plain"
+        },
+        "version": 0
+      },
+      "resource_schemas": {
+        "nscale_compute_cluster": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the compute cluster was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the compute cluster.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the compute cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the compute cluster.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning status of the compute cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the compute cluster is provisioned. If not specified, this defaults to the region ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "ssh_private_key": {
+                "computed": true,
+                "description": "The SSH private key for accessing the compute cluster.",
+                "description_kind": "markdown",
+                "sensitive": true,
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the compute cluster.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "map",
+                  "string"
+                ]
+              },
+              "workload_pools": {
+                "description": "A list of pools of workload nodes in the compute cluster.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "allowed_address_pairs": {
+                      "description": "Allowed addresses that can pass through this workload pool's network ports. Each pair specifies a CIDR prefix and optionally a MAC address. Typically required when the machine is operating as a router.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "cidr": {
+                            "description": "The CIDR prefix to allow.",
+                            "description_kind": "markdown",
+                            "required": true,
+                            "type": "string"
+                          },
+                          "mac_address": {
+                            "description": "The MAC address to allow. Optional.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "set"
+                      },
+                      "optional": true
+                    },
+                    "enable_public_ip": {
+                      "computed": true,
+                      "description": "Whether to assign a public IP address to each VM in this workload pool. Default is `true`.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "bool"
+                    },
+                    "firewall_rules": {
+                      "description": "A list of firewall rules for the VMs in this workload pool.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "direction": {
+                            "computed": true,
+                            "description": "The direction of the traffic to which this firewall rule applies. Default is `ingress`.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "string"
+                          },
+                          "ports": {
+                            "description": "The ports to which this firewall rule applies. This can be a single port, or a range of ports. For example: `22`, `80-443`.",
+                            "description_kind": "markdown",
+                            "required": true,
+                            "type": "string"
+                          },
+                          "prefixes": {
+                            "description": "A set of CIDR prefixes to which this firewall rule applies.",
+                            "description_kind": "markdown",
+                            "required": true,
+                            "type": [
+                              "set",
+                              "string"
+                            ]
+                          },
+                          "protocol": {
+                            "description": "The IP protocol to which this firewall rule applies. Valid values are `tcp` or `udp`.",
+                            "description_kind": "markdown",
+                            "required": true,
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "list"
+                      },
+                      "optional": true
+                    },
+                    "flavor_id": {
+                      "description": "The identifier of the flavor (machine type) used for the workload pool VMs.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "image_id": {
+                      "description": "The identifier of the image used for initializing the boot disk of the workload pool VMs.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "machines": {
+                      "computed": true,
+                      "description": "A list of machines in this workload pool.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "hostname": {
+                            "computed": true,
+                            "description": "The hostname of the machine.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          },
+                          "private_ip": {
+                            "computed": true,
+                            "description": "The private IP address of the machine.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          },
+                          "public_ip": {
+                            "computed": true,
+                            "description": "The public IP address of the machine, if assigned.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "list"
+                      }
+                    },
+                    "name": {
+                      "description": "The name of the workload pool.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "replicas": {
+                      "description": "The number of replicas (VMs) to provision in this workload pool.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "number"
+                    },
+                    "user_data": {
+                      "description": "The data to pass to the VMs at boot time.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "list"
+                },
+                "required": true
+              }
+            },
+            "block_types": {
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "update": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "deprecated": true,
+            "description": "Nscale Compute Cluster",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_file_storage": {
+          "block": {
+            "attributes": {
+              "capacity": {
+                "description": "The total capacity requested for the file storage, in gibibytes.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "number"
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the file storage was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the file storage.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the file storage.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the file storage.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project where the file storage is provisioned. If not specified, this defaults to the project ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "refresh_usage": {
+                "computed": true,
+                "description": "Whether to refresh the computed `size` usage value from the Nscale API. Set to `false` to keep `size` stable in Terraform state and avoid plan noise from file usage changes.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "bool"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the file storage is provisioned. If not specified, this defaults to the region ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "root_squash": {
+                "description": "Whether root squashing is applied to the file storage to restrict root access for clients.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "bool"
+              },
+              "size": {
+                "computed": true,
+                "description": "The amount of storage currently used, in gibibytes.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
+              "storage_class_id": {
+                "description": "The identifier of the storage class used for the file storage.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the file storage.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "block_types": {
+              "network": {
+                "block": {
+                  "attributes": {
+                    "id": {
+                      "description": "The unique identifier of the network to attach the file storage to.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "mount_source": {
+                      "computed": true,
+                      "description": "The network path used to mount the file storage.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "description": "The network to which the file storage is attached.",
+                  "description_kind": "markdown"
+                },
+                "nesting_mode": "list"
+              },
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "update": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale File Storage",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_identity_group": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the group was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the group.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the group.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the group.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning status of the group.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "role_ids": {
+                "description": "The set of role identifiers granted to members of this group. Roles are pre-configured platform resources referenced by their identifier.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": [
+                  "set",
+                  "string"
+                ]
+              },
+              "service_account_ids": {
+                "computed": true,
+                "description": "The set of service account identifiers that are members of this group.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "set",
+                  "string"
+                ]
+              },
+              "subjects": {
+                "computed": true,
+                "description": "The set of identity subjects that are members of this group. This is read-only: the identity service derives it from `user_ids` (each member user produces a subject) and any federated identities. Manage membership through `user_ids`, not this attribute.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "email": {
+                      "computed": true,
+                      "description": "The email address for the subject, when supplied by the issuer.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "id": {
+                      "computed": true,
+                      "description": "The subject identifier issued by the issuer.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "issuer": {
+                      "computed": true,
+                      "description": "The OIDC issuer URL that asserts this subject.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "set"
+                }
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the group.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "map",
+                  "string"
+                ]
+              },
+              "user_ids": {
+                "computed": true,
+                "description": "The set of user identifiers that are members of this group. Users are provisioned by the external identity platform and referenced here by their identifier.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "set",
+                  "string"
+                ]
+              }
+            },
+            "block_types": {
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "update": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale Identity Group",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_identity_project": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the project was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the project.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "group_ids": {
+                "description": "The set of group identifiers that are granted access to the project.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": [
+                  "set",
+                  "string"
+                ]
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the project.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the project.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning status of the project.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the project.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "block_types": {
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "update": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale Identity Project",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_instance": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the instance was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the instance.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "flavor_id": {
+                "description": "The identifier of the flavor used for the instance.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the instance.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "image_id": {
+                "description": "The identifier of the image used for the instance.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the instance.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "power_state": {
+                "computed": true,
+                "description": "The power state of the instance.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "private_ip": {
+                "computed": true,
+                "description": "The private IP address assigned to the instance.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project where the instance is provisioned. If not specified, this defaults to the project ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "public_ip": {
+                "computed": true,
+                "description": "The public IP address assigned to the instance.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the instance is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "ssh_certificate_authority_id": {
+                "description": "The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created. Changing this value forces the instance to be replaced because the CA is installed by cloud-init on first boot and cannot be rotated on a running server.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the instance.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "map",
+                  "string"
+                ]
+              },
+              "user_data": {
+                "description": "The data to pass to the instance at boot time.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              }
+            },
+            "block_types": {
+              "network_interface": {
+                "block": {
+                  "attributes": {
+                    "allowed_destinations": {
+                      "description": "A list of CIDR blocks that are allowed to egress from the instance without SNAT.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": [
+                        "list",
+                        "string"
+                      ]
+                    },
+                    "enable_public_ip": {
+                      "description": "Whether the instance should have a public IP.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "bool"
+                    },
+                    "network_id": {
+                      "description": "The identifier of the network where the instance is provisioned.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "security_group_ids": {
+                      "description": "A list of security group identifiers to associate with the instance.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": [
+                        "list",
+                        "string"
+                      ]
+                    }
+                  },
+                  "description": "The network interface configuration of the instance.",
+                  "description_kind": "markdown"
+                },
+                "nesting_mode": "single"
+              },
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "update": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale Instance",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_network": {
+          "block": {
+            "attributes": {
+              "cidr_block": {
+                "description": "The CIDR block assigned to the network.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the network was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the network.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "dns_nameservers": {
+                "description": "A list of DNS nameservers to configure for the network.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "list",
+                  "string"
+                ]
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the network.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the network.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project where the network is provisioned. If not specified, this defaults to the project ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the network is provisioned. If not specified, this defaults to the region ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "routes": {
+                "description": "A list of routes for the network.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "destination": {
+                      "description": "The destination CIDR block for the route.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "nexthop": {
+                      "description": "The next-hop address for the route.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "list"
+                },
+                "optional": true
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the network.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "block_types": {
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "update": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale Network",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_object_storage_access_key": {
+          "block": {
+            "attributes": {
+              "access_key_id": {
+                "computed": true,
+                "description": "The S3 access key identifier.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the access key was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the access key.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "endpoint_id": {
+                "description": "The identifier of the object storage endpoint this access key belongs to. The endpoint is immutable for an access key — changing it forces replacement.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the access key.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "identity_policy": {
+                "description": "The name of an identity policy configured on the parent endpoint that this key is bound to.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the access key.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project where the access key is provisioned. If not specified, this defaults to the project ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "secret": {
+                "computed": true,
+                "description": "The S3 secret access key. Returned only when the access key is created and never re-read from the API. Treat as write-once: store it in a secret manager, or replace the resource (`terraform apply -replace=...`) to obtain a new value.",
+                "description_kind": "markdown",
+                "sensitive": true,
+                "type": "string"
+              }
+            },
+            "block_types": {
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "An S3-compatible access key bound to an object storage endpoint. The access key's secret is returned only at creation; protect Terraform state accordingly. The resource is immutable — any change forces replacement, which generates a fresh secret.",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_object_storage_endpoint": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the object storage endpoint was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the object storage endpoint.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "endpoint_class_id": {
+                "description": "The identifier of the endpoint class that determines the endpoint's exposure type and regional availability. The endpoint class is immutable after creation.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "exposure": {
+                "computed": true,
+                "description": "The externally reachable endpoints for the object storage endpoint, populated once provisioning completes.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "public": {
+                      "computed": true,
+                      "description": "Connection details for the public exposure mode, when the endpoint class supports it.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "dns_name": {
+                            "computed": true,
+                            "description": "The DNS hostname clients use to reach the endpoint over the public network.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      }
+                    }
+                  },
+                  "nesting_mode": "single"
+                }
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the object storage endpoint.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "identity_policies": {
+                "computed": true,
+                "description": "Identity policies configured on the endpoint. Policy names must be unique within the endpoint. Updating this attribute replaces the full set of configured policies.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "document": {
+                      "description": "A provider-specific identity policy document encoded as a JSON object string. Use Terraform's `jsonencode()` to construct it. Whitespace and key ordering are normalised so equivalent documents do not produce diffs.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "name": {
+                      "description": "The identity policy name. Must be unique within this endpoint.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "list"
+                },
+                "optional": true
+              },
+              "name": {
+                "description": "The name of the object storage endpoint.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project where the object storage endpoint is provisioned. If not specified, this defaults to the project ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the object storage endpoint is provisioned. If not specified, this defaults to the region ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the object storage endpoint.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "block_types": {
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "update": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "An S3-compatible object storage endpoint provisioned in an Nscale project. The endpoint exposes a chosen endpoint class's connectivity (public DNS today; private may be added in future) and carries one or more identity policies that govern what its access keys are allowed to do.",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_security_group": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the security group was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the security group.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the security group.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the security group.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "network_id": {
+                "description": "The identifier of the network to which the security group is attached.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region where the security group is provisioned.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "rules": {
+                "description": "A list of rules for the security group.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "cidr_block": {
+                      "description": "The CIDR block for the security group rule. Default is `0.0.0.0/0`, which allows traffic from any IP address.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "from_port": {
+                      "description": "The starting port of the port range for the security group rule.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "number"
+                    },
+                    "protocol": {
+                      "description": "The protocol for the security group rule. Valid values are `any`, `tcp`, `udp`, `icmp`, or `vrrp`.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "to_port": {
+                      "description": "The ending port of the port range for the security group rule.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "number"
+                    },
+                    "type": {
+                      "description": "The type of the security group rule. Valid values are `ingress` or `egress`.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "list"
+                },
+                "optional": true
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the security group.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "block_types": {
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "update": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale Security Group",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_ssh_certificate_authority": {
+          "block": {
+            "attributes": {
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the SSH certificate authority was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the SSH certificate authority.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the SSH certificate authority.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the SSH certificate authority.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project where the SSH certificate authority is provisioned. If not specified, this defaults to the project ID configured in the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "public_key": {
+                "description": "The SSH CA public key in OpenSSH format (e.g. ssh-ed25519 AAAA...).",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              }
+            },
+            "block_types": {
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale SSH Certificate Authority",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        }
+      }
+    }
+  }
+}
