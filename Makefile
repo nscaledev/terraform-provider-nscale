@@ -15,8 +15,13 @@ generate:
 fmt:
 	gofmt -s -w -e .
 
+# -race runs the unit suite under Go's data-race detector; it pairs with
+# -parallel=10 (parallelism is what surfaces races) and is cheap on the unit
+# suite. -coverprofile writes a merged profile for CI to publish; -race forces
+# atomic cover mode, which we set explicitly for clarity.
 test:
-	go test -v -cover -timeout=120s -parallel=10 ./...
+	go test -v -race -covermode=atomic -coverprofile=coverage.out -timeout=120s -parallel=10 ./...
+	@go tool cover -func=coverage.out | tail -1
 
 # -p 1 serializes packages: acceptance tests share one project, and the API can
 # fail to provision resources (e.g. networks) created concurrently across them.
