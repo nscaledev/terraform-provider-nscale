@@ -72,4 +72,4 @@ jobs:
         with:
           terraform_wrapper: false
       - run: go mod download
-      - run: make schemacheck
+      - run: make schema-check

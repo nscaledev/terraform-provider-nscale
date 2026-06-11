@@ -52,7 +52,7 @@ A golden-file diff of `terraform providers schema -json` against a committed bas
 
 **Catches well:** accidental field renames, removals, required→optional flips, dropped resources, registration omissions, silent `MarkdownDescription` edits. The entire user-facing API surface, without the maintainer having to remember to update a registry list.
 
-**Today:** ✅ Present (DX-1250). `make schemacheck` (`scripts/check-provider-schema.sh`) renders `terraform providers schema -json | jq -S` via a `dev_overrides` `.terraformrc` and diffs it against `testdata/schema/provider-schema.golden.json`. Runs as a credential-free `schema` job in CI on every PR. After an intentional schema change, run `make schema-update` (`./scripts/regenerate-schema.sh`) and commit the regenerated baseline — its diff is the user-facing API change, the same way we treat `make generate` output for docs.
+**Today:** ✅ Present (DX-1250). `make schema-check` (`scripts/check-provider-schema.sh`) renders `terraform providers schema -json | jq -S` via a `dev_overrides` `.terraformrc` and diffs it against `testdata/schema/provider-schema.golden.json`. Runs as a credential-free `schema` job in CI on every PR. After an intentional schema change, run `make schema-update` (`./scripts/regenerate-schema.sh`) and commit the regenerated baseline — its diff is the user-facing API change, the same way we treat `make generate` output for docs.
 
 ### Layer 3 — Replay / contract tests
 
@@ -113,7 +113,7 @@ All gate behind `TF_ACC=1`; without env vars, `make test` runs them as `SKIP`.
 | Perpetual diff regressions (missing `UseStateForUnknown`) | Layer 4 (via `PlanOnly: true` step) | 1, 2 |
 | `model ↔ API` converter bugs | Layer 1 (if written) | 4 only catches *if* the bug surfaces as user-visible drift |
 | `omitempty` bool round-trip | Layer 1 (JSON marshal test) + Layer 4 (`false` apply + `PlanOnly`) | Layer 2 or 3 alone won't catch it |
-| Schema rename / removal / required-flip | Layer 2 (`make schemacheck`) | 1, 4 — neither would notice an unused field disappearing |
+| Schema rename / removal / required-flip | Layer 2 (`make schema-check`) | 1, 4 — neither would notice an unused field disappearing |
 | Provider-config env-var precedence | Layer 1 (with `resolveConfig`-style helper) or Layer 3 | 4 catches it via auth failures only |
 | Async state watcher timing | Layer 4 | 1, 3 unless replay encodes the polling sequence |
 | Sensitive-value leakage to logs | Manual code review + Layer 4 with `TF_LOG=DEBUG` | 1, 2, 3 |
@@ -276,7 +276,7 @@ If you must exercise the HTTP client without a live API, use `httptest.NewServer
 
 Priority order:
 
-1. ✅ **Done (DX-1250) — Layer 2 (schema snapshot).** `make schemacheck`, one CI job. Catches drift across every service.
+1. ✅ **Done (DX-1250) — Layer 2 (schema snapshot).** `make schema-check`, one CI job. Catches drift across every service.
 2. **Layer 1 model-converter unit tests for `objectstorage`** as a pattern. Then propagate to the other services gradually.
 3. **Layer 3 replay tests** for at least the access-key happy path — most subtle resource in the repo (create-once secret, composite import).
 4. **CI split.** Today everything runs serially in `make test`. Split into `unit + schema (every PR)`, `replay (every PR once corpus exists)`, `acceptance (nightly + label-gated)` to keep PR feedback fast.

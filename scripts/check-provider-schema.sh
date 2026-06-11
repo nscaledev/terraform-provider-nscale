@@ -2,7 +2,7 @@
 #
 # Diffs the provider's live schema against the committed baseline at
 # testdata/schema/provider-schema.golden.json and fails (non-zero exit) on any
-# drift. Run by `make schemacheck` and in CI on every PR.
+# drift. Run by `make schema-check` and in CI on every PR.
 #
 # If this fails because you intentionally changed the schema, run
 # `./scripts/regenerate-schema.sh` and commit the updated baseline.

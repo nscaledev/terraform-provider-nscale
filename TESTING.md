@@ -66,7 +66,7 @@ edits. Catches the entire user-facing API surface without the maintainer having
 to remember to update a registry list.
 
 **Today:** ✅ Present (DX-1250). `scripts/check-provider-schema.sh` (wired as
-`make schemacheck`) renders `terraform providers schema -json | jq -S` via a
+`make schema-check`) renders `terraform providers schema -json | jq -S` via a
 `dev_overrides` `.terraformrc` and diffs it against the committed baseline at
 `testdata/schema/provider-schema.golden.json`. It runs as a credential-free
 `schema` job in CI on every PR. Updating the baseline is a deliberate review
@@ -163,7 +163,7 @@ These all gate behind `TF_ACC=1` and the env vars listed below; without them,
 | Plan/apply lifecycle bugs against real API | Layer 4 | 1, 2, 3 |
 | Perpetual diff regressions (e.g. a missing `UseStateForUnknown`) | Layer 4 (via `PlanOnly: true` step) | 1, 2 |
 | `model ↔ API` converter bugs | Layer 1 (if written) | 4 only catches *if* the bug surfaces as user-visible drift |
-| Schema rename / removal / required-flip | Layer 2 (`make schemacheck`) | 1, 4 — neither would notice an unused field disappearing |
+| Schema rename / removal / required-flip | Layer 2 (`make schema-check`) | 1, 4 — neither would notice an unused field disappearing |
 | Provider-config env-var precedence | Layer 1 (if `resolveConfig`-style helper extracted) or Layer 3 | 4 catches it via auth failures only |
 | Async state watcher timing | Layer 4 | 1, 3 unless replay encodes the polling sequence |
 | Sensitive-value leakage to logs | Manual code review + Layer 4 with `TF_LOG=DEBUG` | 1, 2, 3 |
@@ -242,7 +242,7 @@ Out of scope for individual resource PRs (would be its own piece of work):
 Roughly in priority order, none of which are part of DX-958 but each has
 clear value.
 
-1. ✅ **Done (DX-1250) — Layer 2 schema snapshot.** `make schemacheck` diffs
+1. ✅ **Done (DX-1250) — Layer 2 schema snapshot.** `make schema-check` diffs
    `terraform providers schema -json | jq -S` against
    `testdata/schema/provider-schema.golden.json`; runs in CI on every PR.
    Catches drift across every service for the cost of one shell script.
