@@ -18,6 +18,7 @@ package computecluster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -306,13 +307,22 @@ func computeClusterCreate(
 	client *nscale.Client,
 	plan ComputeClusterResourceModel,
 ) (*computeapi.ComputeClusterRead, diag.Diagnostics) {
+	// The compute cluster is always provisioned into the provider-configured
+	// project, so it must be set. Resolve it (erroring when absent) before issuing
+	// the create.
+	projectID, diagnostics := client.ResolveProjectID("")
+	if diagnostics.HasError() {
+		return nil, diagnostics
+	}
+
 	// Default the region ID from the provider configuration when the plan
 	// leaves it empty. This is only meaningful at create time.
 	if plan.RegionID.ValueString() == "" {
 		plan.RegionID = types.StringValue(client.RegionID)
 	}
 
-	requestData, diagnostics := plan.NscaleComputeCluster()
+	requestData, paramDiagnostics := plan.NscaleComputeCluster()
+	diagnostics.Append(paramDiagnostics...)
 	if diagnostics.HasError() {
 		return nil, diagnostics
 	}
@@ -320,7 +330,7 @@ func computeClusterCreate(
 	createResponse, err := client.LegacyCompute.PostApiV1OrganizationsOrganizationIDProjectsProjectIDClusters(
 		ctx,
 		client.OrganizationID,
-		client.ProjectID,
+		projectID,
 		requestData,
 	)
 	if err != nil {
@@ -351,7 +361,13 @@ func computeClusterUpdate(
 	id string,
 	plan ComputeClusterResourceModel,
 ) (string, diag.Diagnostics) {
-	requestData, diagnostics := plan.NscaleComputeCluster()
+	projectID, diagnostics := client.ResolveProjectID("")
+	if diagnostics.HasError() {
+		return "", diagnostics
+	}
+
+	requestData, paramDiagnostics := plan.NscaleComputeCluster()
+	diagnostics.Append(paramDiagnostics...)
 	if diagnostics.HasError() {
 		return "", diagnostics
 	}
@@ -364,7 +380,7 @@ func computeClusterUpdate(
 	updateResponse, err := client.LegacyCompute.PutApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(
 		ctx,
 		client.OrganizationID,
-		client.ProjectID,
+		projectID,
 		id,
 		requestData,
 	)
@@ -390,6 +406,13 @@ func computeClusterUpdate(
 }
 
 func computeClusterDelete(ctx context.Context, client *nscale.Client, id string) error {
+	if client.ProjectID == "" {
+		return errors.New(
+			"a project ID is required to delete a compute cluster; set a default project_id on the " +
+				"provider (or the NSCALE_PROJECT_ID environment variable)",
+		)
+	}
+
 	deleteResponse, err := client.LegacyCompute.DeleteApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(
 		ctx,
 		client.OrganizationID,

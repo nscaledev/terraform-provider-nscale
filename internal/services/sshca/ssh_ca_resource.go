@@ -157,13 +157,13 @@ func sshCACreate(
 	client *nscale.Client,
 	plan SSHCertificateAuthorityResourceModel,
 ) (*regionapi.SshCertificateAuthorityV2Read, diag.Diagnostics) {
-	var diagnostics diag.Diagnostics
-
-	// Default the project to the provider-configured project when the
-	// configuration omits one.
-	if plan.ProjectID.ValueString() == "" {
-		plan.ProjectID = types.StringValue(client.ProjectID)
+	// Resolve the project from the resource or the provider default, erroring
+	// when the configuration omits both.
+	projectID, diagnostics := client.ResolveProjectID(plan.ProjectID.ValueString())
+	if diagnostics.HasError() {
+		return nil, diagnostics
 	}
+	plan.ProjectID = types.StringValue(projectID)
 
 	params := plan.NscaleSSHCACreateParams(client.OrganizationID)
 

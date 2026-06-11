@@ -215,10 +215,10 @@ func (r *ObjectStorageEndpointResource) Schema(
 	}
 }
 
+// setDefaultIDs fills the region ID from the provider configuration when the plan
+// leaves it empty. The project ID is resolved separately at create (see Create)
+// because an unresolved project ID must raise an error rather than silently default.
 func (r *ObjectStorageEndpointResource) setDefaultIDs(data *ObjectStorageEndpointResourceModel) {
-	if data.ProjectID.ValueString() == "" {
-		data.ProjectID = types.StringValue(r.client.ProjectID)
-	}
 	if data.RegionID.ValueString() == "" {
 		data.RegionID = types.StringValue(r.client.RegionID)
 	}
@@ -238,6 +238,13 @@ func (r *ObjectStorageEndpointResource) Create(
 		response.Diagnostics.Append(diagnostics...)
 		return
 	}
+
+	projectID, diagnostics := r.client.ResolveProjectID(data.ProjectID.ValueString())
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+	data.ProjectID = types.StringValue(projectID)
 
 	params, diagnostics := data.NscaleObjectStorageEndpointCreateParams(ctx, r.client.OrganizationID)
 	if diagnostics.HasError() {

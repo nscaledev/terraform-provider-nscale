@@ -233,13 +233,16 @@ func instanceCreate(
 	client *nscale.Client,
 	plan InstanceResourceModel,
 ) (*computeapi.InstanceRead, diag.Diagnostics) {
-	// Default the project ID from the provider configuration when the plan
-	// leaves it empty. This is only meaningful at create time.
-	if plan.ProjectID.ValueString() == "" {
-		plan.ProjectID = types.StringValue(client.ProjectID)
+	// Resolve the project ID from the resource or the provider default, erroring
+	// when neither is set. This is only meaningful at create time.
+	projectID, diagnostics := client.ResolveProjectID(plan.ProjectID.ValueString())
+	if diagnostics.HasError() {
+		return nil, diagnostics
 	}
+	plan.ProjectID = types.StringValue(projectID)
 
-	params, diagnostics := plan.NscaleInstanceCreateParams(client.OrganizationID)
+	params, paramDiagnostics := plan.NscaleInstanceCreateParams(client.OrganizationID)
+	diagnostics.Append(paramDiagnostics...)
 	if diagnostics.HasError() {
 		return nil, diagnostics
 	}
