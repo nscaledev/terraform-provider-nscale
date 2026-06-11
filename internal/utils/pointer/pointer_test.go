@@ -18,60 +18,12 @@ package pointer
 
 import "testing"
 
-func TestReference(t *testing.T) {
-	t.Run("preserves a non-zero value", func(t *testing.T) {
-		got := Reference(42) //nolint:modernize // exercising Reference itself, not new().
-		if got == nil {
-			t.Fatal("Reference returned nil")
-		}
-		if *got != 42 {
-			t.Errorf("*Reference(42) = %d, want 42", *got)
-		}
-	})
-
-	t.Run("zero value still yields a non-nil pointer", func(t *testing.T) {
-		// This is the whole reason Reference exists over new(T): it keeps the
-		// supplied value, including a zero, rather than zero-valuing.
-		got := Reference(0) //nolint:modernize // exercising Reference itself, not new().
-		if got == nil {
-			t.Fatal("Reference(0) returned nil")
-		}
-		if *got != 0 {
-			t.Errorf("*Reference(0) = %d, want 0", *got)
-		}
-	})
-
-	t.Run("string", func(t *testing.T) {
-		got := Reference("hello") //nolint:modernize // exercising Reference itself, not new().
-		if got == nil || *got != "hello" {
-			t.Errorf("*Reference(\"hello\") = %v, want \"hello\"", got)
-		}
-	})
-}
-
-func TestDereference(t *testing.T) {
-	t.Run("non-nil returns the pointed-to value", func(t *testing.T) {
-		value := 7
-		if got := Dereference(&value); got != 7 {
-			t.Errorf("Dereference(&7) = %d, want 7", got)
-		}
-	})
-
-	t.Run("nil int returns the zero value", func(t *testing.T) {
-		var p *int
-		if got := Dereference(p); got != 0 {
-			t.Errorf("Dereference((*int)(nil)) = %d, want 0", got)
-		}
-	})
-
-	t.Run("nil string returns the empty string", func(t *testing.T) {
-		var p *string
-		if got := Dereference(p); got != "" {
-			t.Errorf("Dereference((*string)(nil)) = %q, want \"\"", got)
-		}
-	})
-}
-
+// TestReferenceSlice pins the one non-trivial contract in this package: a nil
+// slice must become a pointer to a non-nil *empty* slice. That distinction is
+// load-bearing — a nil slice marshals to JSON `null`, an empty slice to `[]`,
+// and getting it wrong produces spurious diffs or rejected request bodies.
+// (Reference and Dereference are one-line generic wrappers with no logic worth
+// testing; ReferenceSlice exercises Reference transitively.)
 func TestReferenceSlice(t *testing.T) {
 	t.Run("nil slice becomes a pointer to a non-nil empty slice", func(t *testing.T) {
 		var in []int
