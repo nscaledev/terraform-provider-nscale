@@ -20,10 +20,17 @@ test:
 
 # schemacheck diffs the provider's live schema against the committed baseline at
 # testdata/schema/provider-schema.golden.json and fails on drift. Requires
-# terraform and jq on PATH; no credentials needed. Regenerate the baseline with
-# ./scripts/regenerate-schema.sh after an intentional schema change.
+# terraform and jq on PATH; no credentials needed. Run `make schema-update`
+# after an intentional schema change.
 schemacheck:
 	./scripts/check-provider-schema.sh
+
+# schema-update regenerates the committed schema baseline. Run it deliberately
+# after an intentional schema change (added/removed/renamed attribute, resource,
+# or data source), then commit testdata/schema/provider-schema.golden.json — the
+# diff is part of your PR and is what reviewers check.
+schema-update:
+	./scripts/regenerate-schema.sh
 
 # -p 1 serializes packages: acceptance tests share one project, and the API can
 # fail to provision resources (e.g. networks) created concurrently across them.
@@ -37,4 +44,4 @@ testacc-env:
 	@test -f .env || { echo ".env not found — copy a teammate's or pull from your secret store"; exit 1; }
 	@set -a; . ./.env; set +a; $(MAKE) testacc
 
-.PHONY: fmt lint test schemacheck testacc testacc-env build install generate
+.PHONY: fmt lint test schemacheck schema-update testacc testacc-env build install generate

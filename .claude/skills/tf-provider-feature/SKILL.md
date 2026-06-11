@@ -74,7 +74,7 @@ Goal: working resource/data source code following the codebase's existing patter
    - For new async resources, prefer `retry.StateChangeConf` ([§2.2](reference/playbook.md)) over hand-rolled polling.
    - For write-once secret fields, use the stash-on-Read pattern in [playbook §2.3](reference/playbook.md) and add an import warning.
    - **If the API uses upstream openapi types where `omitempty` is applied to a non-pointer `bool`/primitive that you need to round-trip, wrap at the service boundary** ([§1.6](reference/playbook.md)). This is the canonical "Provider produced inconsistent result after apply" bug.
-4. **Register** the resource/data source factory in `internal/provider/provider.go`. **Without this step the type compiles but is invisible to users.** It is the single most common oversight.
+4. **Register** the resource/data source factory in `internal/provider/provider.go`. **Without this step the type compiles but is invisible to users.** It is the single most common oversight — `make schemacheck` now catches it, since an unregistered type never appears in the schema snapshot.
 5. **Build:**
    ```sh
    make install
@@ -137,6 +137,11 @@ The repo uses the **legacy `website/docs/{r,d}/*.html.markdown`** layout, not th
    - **Topic-specific guidance subsections in the order listed in [playbook §5.5](reference/playbook.md)**: `Async behaviour`, `Timeouts`, `Import`, `Handling the secret` (write-once cases), `Notes` (API constraints not in schema). The point of these sections is to short-circuit support questions — anything you had to figure out the hard way during this implementation goes here.
 3. **Cross-check with the example file.** The HCL block in the markdown does not have to be identical to `examples/<service>/main.tf`, but the two should not contradict each other (same attribute names, plausible values).
 4. **Discard `docs/`** — it is gitignored and not tracked.
+5. **Regenerate the schema baseline:**
+   ```sh
+   make schema-update
+   ```
+   A new resource/data source (or any attribute or `MarkdownDescription` change) moves the provider's public schema, so the committed snapshot at `testdata/schema/provider-schema.golden.json` must be regenerated and committed. Unlike `docs/`, **this file IS tracked** — its diff is the user-facing API change and is what reviewers read. CI's `schema` job fails if you skip it.
 
 ---
 
@@ -145,7 +150,7 @@ The repo uses the **legacy `website/docs/{r,d}/*.html.markdown`** layout, not th
 Run all of these and confirm they pass:
 
 ```sh
-make fmt lint test
+make fmt lint test schemacheck
 ```
 
 Plus the manual test loop from Phase 4 with a clean exit (destroy leaves no resources behind).
@@ -160,6 +165,7 @@ If any of the following are true, the feature is **not done**:
 - The resource is registered in `provider.go` but not documented in `website/docs/`.
 - The example in `examples/<service>/main.tf` does not actually apply.
 - `ImportStateVerifyIgnore` is set on any field without a comment naming why.
+- `make schemacheck` fails — you changed the schema but did not commit the regenerated `testdata/schema/provider-schema.golden.json`.
 
 ---
 

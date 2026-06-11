@@ -65,15 +65,14 @@ flips, dropped resources, registration omissions, and silent MarkdownDescription
 edits. Catches the entire user-facing API surface without the maintainer having
 to remember to update a registry list.
 
-**Today:** ❌ Not present. The repo has no `testdata/schema/*.golden.json` and no
-diff harness.
-
-**Recommended:** a single `scripts/check-provider-schema.sh` driven by
-`terraform providers schema -json` + `jq -S` for deterministic output, with the
-baseline at `testdata/schema/provider-schema.golden.json`. Wire it into CI as a
-separate fast job. Updating the baseline becomes a deliberate review step
-(`./scripts/regenerate-schema.sh`), the same way we treat `make generate`
-output for docs.
+**Today:** ✅ Present (DX-1250). `scripts/check-provider-schema.sh` (wired as
+`make schemacheck`) renders `terraform providers schema -json | jq -S` via a
+`dev_overrides` `.terraformrc` and diffs it against the committed baseline at
+`testdata/schema/provider-schema.golden.json`. It runs as a credential-free
+`schema` job in CI on every PR. Updating the baseline is a deliberate review
+step — `make schema-update` (`./scripts/regenerate-schema.sh`) — the same way
+we treat `make generate` output for docs. The regenerated baseline's diff is
+the user-facing API change, so reviewers read it directly.
 
 ### Layer 3 — Replay / contract tests
 
@@ -164,7 +163,7 @@ These all gate behind `TF_ACC=1` and the env vars listed below; without them,
 | Plan/apply lifecycle bugs against real API | Layer 4 | 1, 2, 3 |
 | Perpetual diff regressions (e.g. a missing `UseStateForUnknown`) | Layer 4 (via `PlanOnly: true` step) | 1, 2 |
 | `model ↔ API` converter bugs | Layer 1 (if written) | 4 only catches *if* the bug surfaces as user-visible drift |
-| Schema rename / removal / required-flip | Layer 2 (if adopted) | 1, 4 — neither would notice an unused field disappearing |
+| Schema rename / removal / required-flip | Layer 2 (`make schemacheck`) | 1, 4 — neither would notice an unused field disappearing |
 | Provider-config env-var precedence | Layer 1 (if `resolveConfig`-style helper extracted) or Layer 3 | 4 catches it via auth failures only |
 | Async state watcher timing | Layer 4 | 1, 3 unless replay encodes the polling sequence |
 | Sensitive-value leakage to logs | Manual code review + Layer 4 with `TF_LOG=DEBUG` | 1, 2, 3 |
@@ -225,10 +224,14 @@ Strongly encouraged but currently missing across the repo:
    via `nscale.RemoveOperationTags`, and any custom `Permissions`/`Spec`
    nested struct.
 
-Out of scope for individual resource PRs (would be its own piece of work):
+Plus, whenever your change alters the schema (it almost always does — a new
+resource, attribute, or even a `Description` edit counts):
 
-6. Schema snapshot baseline (Layer 2) — adds value to the provider as a whole,
-   not to one resource.
+6. Regenerate the schema baseline: `make schema-update`, then commit
+   `testdata/schema/provider-schema.golden.json`. CI's `schema` job fails if
+   you forget. See Layer 2 above.
+
+Out of scope for individual resource PRs (would be its own piece of work):
 7. Replay corpus (Layer 3) — needs an HTTP recording harness and a stub
    server in tree first.
 
@@ -239,9 +242,9 @@ Out of scope for individual resource PRs (would be its own piece of work):
 Roughly in priority order, none of which are part of DX-958 but each has
 clear value.
 
-1. **Add Layer 2 (schema snapshot).** Highest signal-to-effort ratio.
-   `scripts/check-provider-schema.sh` calling `terraform providers schema
-   -json | jq -S | diff` against `testdata/schema/provider-schema.golden.json`.
+1. ✅ **Done (DX-1250) — Layer 2 schema snapshot.** `make schemacheck` diffs
+   `terraform providers schema -json | jq -S` against
+   `testdata/schema/provider-schema.golden.json`; runs in CI on every PR.
    Catches drift across every service for the cost of one shell script.
 2. **Add Layer 1 model-converter unit tests for `objectstorage`** as a
    pattern. Then the same pattern can be propagated to the other services

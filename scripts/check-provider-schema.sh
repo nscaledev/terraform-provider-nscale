@@ -27,7 +27,7 @@ if ! diff -u "$baseline" "$actual"; then
 	echo >&2
 	echo "error: provider schema differs from the committed baseline." >&2
 	echo "       if this change is intentional, run:" >&2
-	echo "           ./scripts/regenerate-schema.sh" >&2
+	echo "           make schema-update   # (or ./scripts/regenerate-schema.sh)" >&2
 	echo "       and commit testdata/schema/provider-schema.golden.json" >&2
 	exit 1
 fi
