@@ -57,7 +57,7 @@ provider "nscale" {
 - `service_token` (String, Sensitive) The service token for authenticating with the Nscale API server.
 - `region_id` (String) The identifier of the region for which resources are managed. Regional resources include a top-level region_id field, allowing the region to be explicitly specified and to override the default region when provided.
 - `organization_id` (String) The identifier of the organization for which resources are managed.
-- `project_id` (String) The identifier of the project for which resources are managed.
+- `project_id` (String) The default project identifier for project-scoped resources that do not set their own `project_id`. Optional: organization-level workflows and configurations that set `project_id` on every resource do not need it.
 
 ### Environment Variables
 
