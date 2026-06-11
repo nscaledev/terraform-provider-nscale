@@ -1227,7 +1227,7 @@
               "type": "string"
             },
             "project_id": {
-              "description": "The identifier of the project for which resources are managed.",
+              "description": "The default project identifier for project-scoped resources that do not set their own project_id. Optional: org-level workflows and configurations that set project_id on every resource do not need it.",
               "description_kind": "markdown",
               "optional": true,
               "type": "string"
