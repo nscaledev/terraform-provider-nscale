@@ -115,7 +115,7 @@ func (p NscaleProvider) Schema(ctx context.Context, request provider.SchemaReque
 				Optional:            true,
 			},
 			"project_id": schema.StringAttribute{
-				MarkdownDescription: "The identifier of the project for which resources are managed.",
+				MarkdownDescription: "The default project identifier for project-scoped resources that do not set their own project_id. Optional: org-level workflows and configurations that set project_id on every resource do not need it.",
 				Optional:            true,
 			},
 		},
@@ -202,14 +202,11 @@ func (p NscaleProvider) Configure(
 		return
 	}
 
+	// project_id is an optional default: it is only consumed as a fallback by
+	// project-scoped resources that omit their own project_id. Resources enforce
+	// the requirement at point of use (via Client.ResolveProjectID), so an empty
+	// value here is valid and keeps org-level and fully-explicit workflows working.
 	projectID := resolveValue(data.ProjectID.ValueString(), "NSCALE_PROJECT_ID", "")
-	if projectID == "" {
-		response.Diagnostics.AddError(
-			"Missing Project ID",
-			"Please provide a project ID either through the configuration or the NSCALE_PROJECT_ID environment variable.",
-		)
-		return
-	}
 
 	userAgent := fmt.Sprintf(
 		"Terraform/%s terraform-provider-nscale/%s",

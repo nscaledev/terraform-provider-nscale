@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
@@ -102,6 +103,31 @@ func NewClient(
 	}
 
 	return client, nil
+}
+
+// ResolveProjectID returns the project ID a project-scoped resource should use:
+// the resource's own value when set, otherwise the provider-level default. The
+// provider treats project_id as optional at configuration time, so the
+// requirement is enforced here, at point of use, with a clear resource-level
+// error when neither a resource nor a provider value is available. This lets
+// org-level and fully-explicit workflows run without a placeholder project.
+func (c *Client) ResolveProjectID(resourceProjectID string) (string, diag.Diagnostics) {
+	var diagnostics diag.Diagnostics
+
+	switch {
+	case resourceProjectID != "":
+		return resourceProjectID, diagnostics
+	case c.ProjectID != "":
+		return c.ProjectID, diagnostics
+	default:
+		diagnostics.AddError(
+			"Missing Project ID",
+			"This resource is project-scoped and requires a project ID. Set project_id on the "+
+				"resource, or configure a default project_id on the provider (or via the "+
+				"NSCALE_PROJECT_ID environment variable).",
+		)
+		return "", diagnostics
+	}
 }
 
 type errorResponse struct {

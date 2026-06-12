@@ -184,15 +184,21 @@ func (r *NetworkResource) Schema(
 	}
 }
 
-// setDefaultIDs fills the project and region IDs from the provider configuration
-// when the plan leaves them empty.
-func setDefaultIDs(client *nscale.Client, data *NetworkResourceModel) {
-	if data.ProjectID.ValueString() == "" {
-		data.ProjectID = types.StringValue(client.ProjectID)
+// setDefaultIDs resolves the project and region IDs for a create. The project ID
+// falls back to the provider default and errors when neither it nor a resource
+// value is set; the region ID falls back silently. Only meaningful at create time.
+func setDefaultIDs(client *nscale.Client, data *NetworkResourceModel) diag.Diagnostics {
+	projectID, diagnostics := client.ResolveProjectID(data.ProjectID.ValueString())
+	if diagnostics.HasError() {
+		return diagnostics
 	}
+	data.ProjectID = types.StringValue(projectID)
+
 	if data.RegionID.ValueString() == "" {
 		data.RegionID = types.StringValue(client.RegionID)
 	}
+
+	return diagnostics
 }
 
 func networkCreate(
@@ -200,7 +206,9 @@ func networkCreate(
 	client *nscale.Client,
 	plan NetworkResourceModel,
 ) (*regionapi.NetworkV2Read, diag.Diagnostics) {
-	setDefaultIDs(client, &plan)
+	if diagnostics := setDefaultIDs(client, &plan); diagnostics.HasError() {
+		return nil, diagnostics
+	}
 
 	params, diagnostics := plan.NscaleNetworkCreateParams(client.OrganizationID)
 	if diagnostics.HasError() {
