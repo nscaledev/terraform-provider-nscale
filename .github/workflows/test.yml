@@ -54,6 +54,13 @@ jobs:
           cache: true
       - run: go mod download
       - run: make test
+      - name: Upload coverage profile
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: coverage.out
+          if-no-files-found: error
 
   # Diff the provider's live schema against the committed baseline. No
   # credentials needed — uses a dev_overrides .terraformrc, not a real API.
