@@ -23,7 +23,18 @@ Checklist for adding a new resource / data source to the Nscale Terraform provid
 
 ## Registration
 
-- Add the resource / data source factory to `internal/provider/provider.go` — forgetting this leaves the type invisible to users even though tests compile.
+- Add the resource / data source factory to `internal/provider/provider.go` — forgetting this leaves the type invisible to users even though tests compile. The schema snapshot test (`make schema-check`) catches this omission: a registered resource appears in the baseline, an unregistered one doesn't.
+
+## Schema baseline
+
+The provider's full public schema is snapshotted to `testdata/schema/provider-schema.golden.json` and diffed in CI on every PR (the `schema` job / `make schema-check`). Any change to an attribute, resource, or data source — including a `Description` edit — changes the schema, so after an intentional change you must regenerate the baseline:
+
+```
+make schema-update          # regenerates testdata/schema/provider-schema.golden.json
+git add testdata/schema/provider-schema.golden.json
+```
+
+Commit the regenerated baseline as part of your PR — its diff is exactly the user-facing API change, and reviewers check it. If you forget, CI's `schema` job fails with the diff and tells you to run `make schema-update`. It needs `terraform` + `jq` on PATH but no credentials (it uses a `dev_overrides` `.terraformrc`).
 
 ## Docs generation
 
@@ -41,6 +52,7 @@ The repo uses the **legacy `website/docs/{r,d}/*.html.markdown`** layout, not th
 
 - `make fmt lint` — gofmt + golangci-lint.
 - `make test` — unit tests (`go test ./...`).
+- `make schema-check` — diff the provider schema against the committed baseline; run `make schema-update` and commit the result if you changed the schema on purpose (see "Schema baseline" above).
 - `make testacc` — acceptance tests (requires live API credentials; gated behind `TF_ACC=1`).
 - Confirm the example in `examples/<service>/main.tf` actually applies against a real project before shipping.
 

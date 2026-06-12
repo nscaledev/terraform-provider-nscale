@@ -208,10 +208,10 @@ func (r *FileStorageResource) Schema(
 	}
 }
 
+// setDefaults fills attributes that are safe to default on every read/write. The
+// project ID is resolved separately at create (see Create) because, unlike these,
+// an unresolved project ID must raise an error rather than silently default.
 func (r *FileStorageResource) setDefaults(data *FileStorageResourceModel) {
-	if data.ProjectID.ValueString() == "" {
-		data.ProjectID = types.StringValue(r.client.ProjectID)
-	}
 	if data.RegionID.ValueString() == "" {
 		data.RegionID = types.StringValue(r.client.RegionID)
 	}
@@ -238,6 +238,13 @@ func (r *FileStorageResource) Create(
 		response.Diagnostics.Append(diagnostics...)
 		return
 	}
+
+	projectID, diagnostics := r.client.ResolveProjectID(data.ProjectID.ValueString())
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+	data.ProjectID = types.StringValue(projectID)
 
 	params, diagnostics := data.NscaleFileStorageCreateParams(r.client.OrganizationID)
 	if diagnostics.HasError() {

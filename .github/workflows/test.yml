@@ -61,3 +61,22 @@ jobs:
           name: coverage
           path: coverage.out
           if-no-files-found: error
+
+  # Diff the provider's live schema against the committed baseline. No
+  # credentials needed — uses a dev_overrides .terraformrc, not a real API.
+  schema:
+    name: Schema snapshot
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+      - run: go mod download
+      - run: make schema-check
