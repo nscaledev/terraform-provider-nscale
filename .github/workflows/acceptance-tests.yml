@@ -1,0 +1,78 @@
+# Run the provider's acceptance tests (TF_ACC=1) against the live staging API.
+#
+# These tests provision real, billable resources in a shared staging project,
+# so this workflow runs ONLY on trusted events:
+#   * push to main    — every merge is validated against staging
+#   * workflow_dispatch — on-demand run from the Actions tab
+#
+# There is deliberately NO pull_request / pull_request_target trigger. Fork PRs
+# never receive secrets, and we never execute fork code with credentials in
+# scope, so the secrets-from-forks risk does not apply here. Acceptance signal
+# on external PRs only arrives once a maintainer merges (or manually dispatches).
+name: Acceptance tests
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Acceptance tests share a single staging project and run serialized (-p 1).
+# Serialize workflow runs too so a merge landing mid-run can't clobber another
+# run's resources. Don't cancel in flight — let a run finish and tear its
+# resources down cleanly rather than leaking half-provisioned infra.
+concurrency:
+  group: acceptance-tests
+  cancel-in-progress: false
+
+jobs:
+  testacc:
+    name: Acceptance tests (staging)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      # The acceptance test framework shells out to a real terraform binary.
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+      - run: go mod download
+
+      # Fail fast with a clear message if the repo hasn't been configured with
+      # credentials, rather than letting every test fail with a confusing auth
+      # error. See the env block below for the full list of required secrets.
+      - name: Check credentials are configured
+        env:
+          NSCALE_SERVICE_TOKEN: ${{ secrets.NSCALE_SERVICE_TOKEN }}
+        run: |
+          if [ -z "$NSCALE_SERVICE_TOKEN" ]; then
+            echo "::error::NSCALE_SERVICE_TOKEN is not set. Configure the acceptance-test secrets in repo Settings → Secrets and variables → Actions. See .github/workflows/acceptance-tests.yml for the full list."
+            exit 1
+          fi
+
+      - name: Run acceptance tests
+        env:
+          NSCALE_SERVICE_TOKEN: ${{ secrets.NSCALE_SERVICE_TOKEN }}
+          NSCALE_ORGANIZATION_ID: ${{ secrets.NSCALE_ORGANIZATION_ID }}
+          NSCALE_PROJECT_ID: ${{ secrets.NSCALE_PROJECT_ID }}
+          NSCALE_REGION_ID: ${{ secrets.NSCALE_REGION_ID }}
+          NSCALE_REGION_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_REGION_SERVICE_API_ENDPOINT }}
+          NSCALE_COMPUTE_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_COMPUTE_SERVICE_API_ENDPOINT }}
+          NSCALE_STORAGE_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_STORAGE_SERVICE_API_ENDPOINT }}
+          NSCALE_IDENTITY_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_IDENTITY_SERVICE_API_ENDPOINT }}
+          NSCALE_TEST_IMAGE_ID: ${{ secrets.NSCALE_TEST_IMAGE_ID }}
+          NSCALE_TEST_FLAVOR_ID: ${{ secrets.NSCALE_TEST_FLAVOR_ID }}
+          NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID: ${{ secrets.NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID }}
+          NSCALE_TEST_FILE_STORAGE_CLASS_ID: ${{ secrets.NSCALE_TEST_FILE_STORAGE_CLASS_ID }}
+          NSCALE_TEST_SSH_CA_PUBLIC_KEY: ${{ secrets.NSCALE_TEST_SSH_CA_PUBLIC_KEY }}
+          NSCALE_TEST_ROLE_ID: ${{ secrets.NSCALE_TEST_ROLE_ID }}
+          TF_VAR_role_id: ${{ secrets.TF_VAR_ROLE_ID }}
+          TF_VAR_user_ids: ${{ secrets.TF_VAR_USER_IDS }}
+        run: make testacc
