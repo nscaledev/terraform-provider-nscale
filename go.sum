@@ -174,8 +174,8 @@ github.com/mitchellh/reflectwalk v1.0.2 h1:G2LzWKi524PWgd3mLHV8Y5k7s6XUvT0Gef6zx
 github.com/mitchellh/reflectwalk v1.0.2/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
 github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 h1:RWengNIwukTxcDr9M+97sNutRR1RKhG96O6jWumTTnw=
 github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826/go.mod h1:TaXosZuwdSHYgviHp1DAtfrULt5eUgsSMsZf+YrPgl8=
-github.com/nscaledev/nscale-sdk-go v0.0.1 h1:NI3x3VHvHdq+DtyhUZbtopqvCokZO2D02EAGHuyB044=
-github.com/nscaledev/nscale-sdk-go v0.0.1/go.mod h1:3sEl+y61l1KCqKHUJqyOv/yggvc7LNGNsr3y6CTw2KA=
+github.com/nscaledev/nscale-sdk-go v0.0.2 h1:DlHVpaRlJN5QqvZvkoN+W3amOr2FrTkyivX3idvexc4=
+github.com/nscaledev/nscale-sdk-go v0.0.2/go.mod h1:ogxL37/0mOAXPqugbqvrLEej+W9PYGy0ICJ9goF5TN4=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/nxadm/tail v1.4.8/go.mod h1:+ncqLTQzXmGhMZNUePPaPqPvBxHAIsmXswZKocGu+AU=

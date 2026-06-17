@@ -113,7 +113,10 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 			Prefix:         m.CIDRBlock.ValueString(),
 			ProjectId:      m.ProjectID.ValueString(),
 			RegionId:       m.RegionID.ValueString(),
-			Routes:         nonEmptyRoutes,
+			// Reservations are not exposed by the provider; the platform applies
+			// its default reservation when this is omitted.
+			Reservations: nil,
+			Routes:       nonEmptyRoutes,
 		},
 	}
 

@@ -11,7 +11,7 @@ require (
 	github.com/hashicorp/terraform-plugin-go v0.29.0
 	github.com/hashicorp/terraform-plugin-log v0.9.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.37.0
-	github.com/nscaledev/nscale-sdk-go v0.0.1
+	github.com/nscaledev/nscale-sdk-go v0.0.2
 	github.com/unikorn-cloud/compute v1.16.0-rc3
 	github.com/unikorn-cloud/core v1.16.0-rc3
 )
