@@ -24,16 +24,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -41,9 +46,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = &PlacementResource{}
-	_ resource.ResourceWithConfigure   = &PlacementResource{}
-	_ resource.ResourceWithImportState = &PlacementResource{}
+	_ resource.Resource                   = &PlacementResource{}
+	_ resource.ResourceWithConfigure      = &PlacementResource{}
+	_ resource.ResourceWithImportState    = &PlacementResource{}
+	_ resource.ResourceWithValidateConfig = &PlacementResource{}
 )
 
 type PlacementResourceModel struct {
@@ -174,22 +180,37 @@ func (r *PlacementResource) Schema(
 					"max_skew": schema.Int64Attribute{
 						MarkdownDescription: "The maximum difference in host count between any two domains. Applicable only when `policy` is `spread`.",
 						Optional:            true,
+						Computed:            true,
 						Validators: []validator.Int64{
 							int64validator.AtLeast(1),
+						},
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+							int64planmodifier.RequiresReplaceIfConfigured(),
 						},
 					},
 					"min_domains": schema.Int64Attribute{
 						MarkdownDescription: "The minimum number of domains that must receive at least one selected host. Applicable only when `policy` is `spread`. Must be less than or equal to `host_count`.",
 						Optional:            true,
+						Computed:            true,
 						Validators: []validator.Int64{
 							int64validator.AtLeast(1),
+						},
+						PlanModifiers: []planmodifier.Int64{
+							int64planmodifier.UseStateForUnknown(),
+							int64planmodifier.RequiresReplaceIfConfigured(),
 						},
 					},
 					"when_unsatisfiable": schema.StringAttribute{
 						MarkdownDescription: "The behaviour when the constraint cannot be fully satisfied. `fail` returns an error; `bestEffort` applies the constraint as closely as it can.",
 						Optional:            true,
+						Computed:            true,
 						Validators: []validator.String{
 							stringvalidator.OneOf("fail", "bestEffort"),
+						},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.RequiresReplaceIfConfigured(),
 						},
 					},
 				},
@@ -223,16 +244,31 @@ func (r *PlacementResource) Schema(
 							"enable_public_ip": schema.BoolAttribute{
 								MarkdownDescription: "Whether or not to provision a public IP for each server.",
 								Optional:            true,
+								Computed:            true,
+								PlanModifiers: []planmodifier.Bool{
+									boolplanmodifier.UseStateForUnknown(),
+									boolplanmodifier.RequiresReplaceIfConfigured(),
+								},
 							},
 							"security_group_ids": schema.ListAttribute{
 								MarkdownDescription: "A list of security group IDs to apply to each server.",
 								ElementType:         types.StringType,
 								Optional:            true,
+								Computed:            true,
+								PlanModifiers: []planmodifier.List{
+									listplanmodifier.UseStateForUnknown(),
+									listplanmodifier.RequiresReplaceIfConfigured(),
+								},
 							},
 							"allowed_source_addresses": schema.ListAttribute{
 								MarkdownDescription: "A list of network prefixes that are allowed to egress from each server. By default, only packets from the server's network interface's IP address are allowed to enter the network.",
 								ElementType:         types.StringType,
 								Optional:            true,
+								Computed:            true,
+								PlanModifiers: []planmodifier.List{
+									listplanmodifier.UseStateForUnknown(),
+									listplanmodifier.RequiresReplaceIfConfigured(),
+								},
 							},
 						},
 					},
@@ -278,6 +314,86 @@ func (r *PlacementResource) Schema(
 			}),
 		},
 	}
+}
+
+// ValidateConfig surfaces constraint/policy mismatches at plan time rather than
+// letting them fail as an API 400 at apply. The spread-only fields (max_skew,
+// min_domains, when_unsatisfiable) are meaningful only when policy is "spread",
+// and min_domains cannot exceed host_count.
+func (r *PlacementResource) ValidateConfig(
+	ctx context.Context,
+	request resource.ValidateConfigRequest,
+	response *resource.ValidateConfigResponse,
+) {
+	var model PlacementResourceModel
+	response.Diagnostics.Append(request.Config.Get(ctx, &model)...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	if model.Constraints.IsNull() || model.Constraints.IsUnknown() {
+		return
+	}
+
+	var constraints PlacementConstraintsModel
+	response.Diagnostics.Append(model.Constraints.As(ctx, &constraints, basetypes.ObjectAsOptions{})...)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	response.Diagnostics.Append(validatePlacementConstraints(constraints, model.HostCount)...)
+}
+
+// validatePlacementConstraints holds the constraint/policy rules so they can be
+// exercised directly in unit tests without constructing a tfsdk.Config.
+func validatePlacementConstraints(
+	constraints PlacementConstraintsModel,
+	hostCount types.Int64,
+) diag.Diagnostics {
+	var diagnostics diag.Diagnostics
+	constraintsPath := path.Root("constraints")
+
+	if constraints.Policy.ValueString() == "pack" {
+		spreadOnly := []struct {
+			name  string
+			value attr.Value
+		}{
+			{"max_skew", constraints.MaxSkew},
+			{"min_domains", constraints.MinDomains},
+			{"when_unsatisfiable", constraints.WhenUnsatisfiable},
+		}
+		for _, field := range spreadOnly {
+			if isKnownSet(field.value) {
+				diagnostics.AddAttributeError(
+					constraintsPath.AtName(field.name),
+					"Invalid Placement Constraint",
+					fmt.Sprintf("%q is only applicable when policy is \"spread\".", field.name),
+				)
+			}
+		}
+	}
+
+	if isKnownSet(constraints.MinDomains) &&
+		!hostCount.IsNull() && !hostCount.IsUnknown() &&
+		constraints.MinDomains.ValueInt64() > hostCount.ValueInt64() {
+		diagnostics.AddAttributeError(
+			constraintsPath.AtName("min_domains"),
+			"Invalid Placement Constraint",
+			fmt.Sprintf(
+				"min_domains (%d) must be less than or equal to host_count (%d).",
+				constraints.MinDomains.ValueInt64(),
+				hostCount.ValueInt64(),
+			),
+		)
+	}
+
+	return diagnostics
+}
+
+// isKnownSet reports whether a configured value is present, i.e. neither null
+// nor unknown. Unknown values are deferred to apply-time validation.
+func isKnownSet(value attr.Value) bool {
+	return !value.IsNull() && !value.IsUnknown()
 }
 
 func placementCreate(

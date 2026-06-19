@@ -69,7 +69,7 @@ resource "nscale_reservation" "test" {
   name        = %[1]q
   accelerator = %[2]q
   unit        = %[3]q
-  unit_count       = 1
+  unit_count  = 1
 }
 
 data "nscale_reservation" "test" {

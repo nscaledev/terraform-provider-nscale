@@ -74,7 +74,7 @@ resource "nscale_reservation" "test" {
   description = "managed by terraform acceptance tests"
   accelerator = %[2]q
   unit        = %[3]q
-  unit_count       = %[4]d
+  unit_count  = %[4]d
 
   tags = {
     workload = "training"

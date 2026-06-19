@@ -18,6 +18,8 @@ package reservation
 
 import (
 	"context"
+	"encoding/base64"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -155,7 +157,9 @@ func newPlacementConstraintsObject(source reservationapi.PlacementConstraintsV2)
 func newPlacementServerSpecObject(source reservationapi.PlacementServerSpecV2) types.Object {
 	userData := types.StringNull()
 	if source.UserData != nil {
-		userData = types.StringValue(string(*source.UserData))
+		// The API returns the decoded bytes; re-encode to base64 so the value
+		// round-trips against the base64-encoded string supplied in configuration.
+		userData = types.StringValue(base64.StdEncoding.EncodeToString(*source.UserData))
 	}
 
 	return types.ObjectValueMust(
@@ -276,8 +280,19 @@ func (m *PlacementModel) serverSpec(ctx context.Context) (reservationapi.Placeme
 
 	var userData *[]byte
 	if value := model.UserData.ValueString(); value != "" {
-		temp := []byte(value)
-		userData = &temp
+		// user_data is supplied as a base64-encoded string. The SDK serializes the
+		// []byte field as base64 itself, so decode here to avoid double-encoding;
+		// the Base64Validator on the attribute guarantees the value is well-formed.
+		decoded, err := base64.StdEncoding.DecodeString(value)
+		if err != nil {
+			var diagnostics diag.Diagnostics
+			diagnostics.AddError(
+				"Invalid user_data",
+				fmt.Sprintf("Failed to decode base64 user_data: %s", err),
+			)
+			return reservationapi.PlacementServerSpecV2{}, diagnostics
+		}
+		userData = &decoded
 	}
 
 	networking, diagnostics := model.networking(ctx)

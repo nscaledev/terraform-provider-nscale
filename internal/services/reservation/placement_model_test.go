@@ -17,6 +17,7 @@ limitations under the License.
 package reservation
 
 import (
+	"encoding/base64"
 	"testing"
 	"time"
 
@@ -31,7 +32,10 @@ func objectAsOptions() basetypes.ObjectAsOptions { return basetypes.ObjectAsOpti
 
 func TestNewPlacementModelFull(t *testing.T) {
 	creationTime := time.Date(2026, time.April, 28, 11, 3, 12, 0, time.UTC)
-	userData := []byte("IyEvYmluL3NoCg==")
+	// The API returns the decoded user_data bytes; the model must expose them as
+	// the base64 string that was originally configured.
+	userData := []byte("#!/bin/sh\n")
+	encodedUserData := base64.StdEncoding.EncodeToString(userData)
 	whenUnsatisfiable := reservationapi.Fail
 	publicIP := true
 
@@ -124,8 +128,8 @@ func TestNewPlacementModelFull(t *testing.T) {
 	if serverSpec.SSHCertificateAuthorityID.ValueString() != "ca-1" {
 		t.Errorf("SSHCertificateAuthorityID = %q, want %q", serverSpec.SSHCertificateAuthorityID.ValueString(), "ca-1")
 	}
-	if serverSpec.UserData.ValueString() != string(userData) {
-		t.Errorf("UserData = %q, want %q", serverSpec.UserData.ValueString(), string(userData))
+	if serverSpec.UserData.ValueString() != encodedUserData {
+		t.Errorf("UserData = %q, want %q", serverSpec.UserData.ValueString(), encodedUserData)
 	}
 	if serverSpec.Networking.IsNull() {
 		t.Fatalf("Networking is null, want populated")
@@ -218,7 +222,9 @@ func TestNscalePlacementCreateParams(t *testing.T) {
 			map[string]attr.Value{
 				"image_id":                     types.StringValue("ubuntu-24.04"),
 				"ssh_certificate_authority_id": types.StringValue("ca-1"),
-				"user_data":                    types.StringNull(),
+				// Supplied as base64; the create params must carry the decoded bytes
+				// so the SDK does not base64-encode the value a second time.
+				"user_data": types.StringValue(base64.StdEncoding.EncodeToString([]byte("#!/bin/sh\n"))),
 				"networking": types.ObjectValueMust(
 					PlacementServerNetworkingModelAttributeType.AttrTypes,
 					map[string]attr.Value{
@@ -274,6 +280,9 @@ func TestNscalePlacementCreateParams(t *testing.T) {
 		len(*params.Spec.ServerSpec.Networking.SecurityGroups) != 1 {
 		t.Errorf("SecurityGroups = %v, want one element", params.Spec.ServerSpec.Networking.SecurityGroups)
 	}
+	if params.Spec.ServerSpec.UserData == nil || string(*params.Spec.ServerSpec.UserData) != "#!/bin/sh\n" {
+		t.Errorf("UserData = %q, want decoded %q", params.Spec.ServerSpec.UserData, "#!/bin/sh\n")
+	}
 }
 
 // TestNscalePlacementCreateParamsNoNetworking confirms that omitting the
@@ -322,5 +331,90 @@ func TestNscalePlacementCreateParamsNoNetworking(t *testing.T) {
 	}
 	if params.Spec.ServerSpec.UserData != nil {
 		t.Errorf("UserData = %v, want nil", params.Spec.ServerSpec.UserData)
+	}
+}
+
+func TestValidatePlacementConstraints(t *testing.T) {
+	testCases := []struct {
+		name        string
+		constraints PlacementConstraintsModel
+		hostCount   types.Int64
+		wantErrors  int
+	}{
+		{
+			name: "spread with all fields is valid",
+			constraints: PlacementConstraintsModel{
+				Policy:            types.StringValue("spread"),
+				MaxSkew:           types.Int64Value(1),
+				MinDomains:        types.Int64Value(3),
+				WhenUnsatisfiable: types.StringValue("fail"),
+			},
+			hostCount:  types.Int64Value(8),
+			wantErrors: 0,
+		},
+		{
+			name: "pack with no spread-only fields is valid",
+			constraints: PlacementConstraintsModel{
+				Policy:            types.StringValue("pack"),
+				MaxSkew:           types.Int64Null(),
+				MinDomains:        types.Int64Null(),
+				WhenUnsatisfiable: types.StringNull(),
+			},
+			hostCount:  types.Int64Value(8),
+			wantErrors: 0,
+		},
+		{
+			name: "pack with all spread-only fields set reports each",
+			constraints: PlacementConstraintsModel{
+				Policy:            types.StringValue("pack"),
+				MaxSkew:           types.Int64Value(1),
+				MinDomains:        types.Int64Value(2),
+				WhenUnsatisfiable: types.StringValue("fail"),
+			},
+			hostCount:  types.Int64Value(8),
+			wantErrors: 3,
+		},
+		{
+			name: "min_domains greater than host_count is invalid",
+			constraints: PlacementConstraintsModel{
+				Policy:            types.StringValue("spread"),
+				MaxSkew:           types.Int64Null(),
+				MinDomains:        types.Int64Value(9),
+				WhenUnsatisfiable: types.StringNull(),
+			},
+			hostCount:  types.Int64Value(8),
+			wantErrors: 1,
+		},
+		{
+			name: "unknown spread-only fields under pack are deferred",
+			constraints: PlacementConstraintsModel{
+				Policy:            types.StringValue("pack"),
+				MaxSkew:           types.Int64Unknown(),
+				MinDomains:        types.Int64Unknown(),
+				WhenUnsatisfiable: types.StringUnknown(),
+			},
+			hostCount:  types.Int64Value(8),
+			wantErrors: 0,
+		},
+		{
+			name: "unknown host_count defers min_domains comparison",
+			constraints: PlacementConstraintsModel{
+				Policy:            types.StringValue("spread"),
+				MaxSkew:           types.Int64Null(),
+				MinDomains:        types.Int64Value(9),
+				WhenUnsatisfiable: types.StringNull(),
+			},
+			hostCount:  types.Int64Unknown(),
+			wantErrors: 0,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			diagnostics := validatePlacementConstraints(testCase.constraints, testCase.hostCount)
+			if got := diagnostics.ErrorsCount(); got != testCase.wantErrors {
+				t.Errorf("ErrorsCount() = %d, want %d (%v)", got, testCase.wantErrors, diagnostics)
+			}
+		})
 	}
 }

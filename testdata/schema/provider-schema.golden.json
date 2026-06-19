@@ -2658,12 +2658,14 @@
                 "nested_type": {
                   "attributes": {
                     "max_skew": {
+                      "computed": true,
                       "description": "The maximum difference in host count between any two domains. Applicable only when `policy` is `spread`.",
                       "description_kind": "markdown",
                       "optional": true,
                       "type": "number"
                     },
                     "min_domains": {
+                      "computed": true,
                       "description": "The minimum number of domains that must receive at least one selected host. Applicable only when `policy` is `spread`. Must be less than or equal to `host_count`.",
                       "description_kind": "markdown",
                       "optional": true,
@@ -2676,6 +2678,7 @@
                       "type": "string"
                     },
                     "when_unsatisfiable": {
+                      "computed": true,
                       "description": "The behaviour when the constraint cannot be fully satisfied. `fail` returns an error; `bestEffort` applies the constraint as closely as it can.",
                       "description_kind": "markdown",
                       "optional": true,
@@ -2769,6 +2772,7 @@
                       "nested_type": {
                         "attributes": {
                           "allowed_source_addresses": {
+                            "computed": true,
                             "description": "A list of network prefixes that are allowed to egress from each server. By default, only packets from the server's network interface's IP address are allowed to enter the network.",
                             "description_kind": "markdown",
                             "optional": true,
@@ -2778,12 +2782,14 @@
                             ]
                           },
                           "enable_public_ip": {
+                            "computed": true,
                             "description": "Whether or not to provision a public IP for each server.",
                             "description_kind": "markdown",
                             "optional": true,
                             "type": "bool"
                           },
                           "security_group_ids": {
+                            "computed": true,
                             "description": "A list of security group IDs to apply to each server.",
                             "description_kind": "markdown",
                             "optional": true,

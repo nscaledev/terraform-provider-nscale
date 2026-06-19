@@ -221,14 +221,22 @@ func (r *ReservationResource) Schema(
 }
 
 // setDefaultIDs fills the project and region IDs from the provider configuration
-// when the plan leaves them empty.
-func setDefaultIDs(client *nscale.Client, data *ReservationResourceModel) {
-	if data.ProjectID.ValueString() == "" {
-		data.ProjectID = types.StringValue(client.ProjectID)
+// when the plan leaves them empty. The project ID is resolved through
+// Client.ResolveProjectID so a configuration that sets neither a resource nor a
+// provider-level project_id fails at plan time with a clear diagnostic rather
+// than producing an invalid create request.
+func setDefaultIDs(client *nscale.Client, data *ReservationResourceModel) diag.Diagnostics {
+	projectID, diagnostics := client.ResolveProjectID(data.ProjectID.ValueString())
+	if diagnostics.HasError() {
+		return diagnostics
 	}
+	data.ProjectID = types.StringValue(projectID)
+
 	if data.RegionID.ValueString() == "" {
 		data.RegionID = types.StringValue(client.RegionID)
 	}
+
+	return diagnostics
 }
 
 func reservationCreate(
@@ -236,7 +244,9 @@ func reservationCreate(
 	client *nscale.Client,
 	plan ReservationResourceModel,
 ) (*reservationapi.ReservationV2Read, diag.Diagnostics) {
-	setDefaultIDs(client, &plan)
+	if diagnostics := setDefaultIDs(client, &plan); diagnostics.HasError() {
+		return nil, diagnostics
+	}
 
 	params, diagnostics := plan.NscaleReservationCreateParams(client.OrganizationID)
 	if diagnostics.HasError() {
