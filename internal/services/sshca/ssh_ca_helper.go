@@ -21,6 +21,7 @@ import (
 
 	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -30,7 +31,12 @@ func getSSHCA(
 	id string,
 	client *nscale.Client,
 ) (*regionapi.SshCertificateAuthorityV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	resp, err := client.Region.GetApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, id)
+	caID, err := regionids.ParseSSHCertificateAuthorityID(id)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resp, err := client.Region.GetApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, caID)
 	if err != nil {
 		return nil, nil, err
 	}

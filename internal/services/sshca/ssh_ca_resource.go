@@ -30,6 +30,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -191,7 +192,12 @@ func sshCACreate(
 }
 
 func sshCADelete(ctx context.Context, client *nscale.Client, id string) error {
-	deleteResponse, err := client.Region.DeleteApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, id)
+	caID, err := regionids.ParseSSHCertificateAuthorityID(id)
+	if err != nil {
+		return err
+	}
+
+	deleteResponse, err := client.Region.DeleteApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, caID)
 	if err != nil {
 		return err
 	}

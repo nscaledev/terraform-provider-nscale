@@ -21,6 +21,7 @@ import (
 
 	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -30,7 +31,12 @@ func getNetwork(
 	id string,
 	client *nscale.Client,
 ) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	networkResponse, err := client.Region.GetApiV2NetworksNetworkID(ctx, id)
+	networkID, err := regionids.ParseNetworkID(id)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	networkResponse, err := client.Region.GetApiV2NetworksNetworkID(ctx, networkID)
 	if err != nil {
 		return nil, nil, err
 	}

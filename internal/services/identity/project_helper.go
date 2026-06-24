@@ -20,6 +20,7 @@ import (
 	"context"
 
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
+	identityids "github.com/unikorn-cloud/identity/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -29,10 +30,20 @@ func getProject(
 	id string,
 	client *nscale.Client,
 ) (*identityapi.ProjectRead, error) {
+	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	projectID, err := identityids.ParseProjectID(id)
+	if err != nil {
+		return nil, err
+	}
+
 	projectResponse, err := client.Identity.GetApiV1OrganizationsOrganizationIDProjectsProjectID(
 		ctx,
-		client.OrganizationID,
-		id,
+		organizationID,
+		projectID,
 	)
 	if err != nil {
 		return nil, err

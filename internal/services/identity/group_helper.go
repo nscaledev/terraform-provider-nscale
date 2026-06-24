@@ -20,6 +20,7 @@ import (
 	"context"
 
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
+	identityids "github.com/unikorn-cloud/identity/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -29,10 +30,20 @@ func getGroup(
 	id string,
 	client *nscale.Client,
 ) (*identityapi.GroupRead, error) {
+	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	groupID, err := identityids.ParseGroupID(id)
+	if err != nil {
+		return nil, err
+	}
+
 	groupResponse, err := client.Identity.GetApiV1OrganizationsOrganizationIDGroupsGroupid(
 		ctx,
-		client.OrganizationID,
-		id,
+		organizationID,
+		groupID,
 	)
 	if err != nil {
 		return nil, err

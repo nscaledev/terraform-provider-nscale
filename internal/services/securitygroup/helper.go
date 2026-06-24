@@ -21,6 +21,7 @@ import (
 
 	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -30,7 +31,12 @@ func getSecurityGroup(
 	id string,
 	client *nscale.Client,
 ) (*regionapi.SecurityGroupV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	securityGroupResponse, err := client.Region.GetApiV2SecuritygroupsSecurityGroupID(ctx, id)
+	securityGroupID, err := regionids.ParseSecurityGroupID(id)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	securityGroupResponse, err := client.Region.GetApiV2SecuritygroupsSecurityGroupID(ctx, securityGroupID)
 	if err != nil {
 		return nil, nil, err
 	}

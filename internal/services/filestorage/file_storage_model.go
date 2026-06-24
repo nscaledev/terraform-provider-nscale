@@ -18,6 +18,7 @@ package filestorage
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -25,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
@@ -111,34 +113,31 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 		return regionapi.StorageV2Create{}, diagnostics
 	}
 
+	regionID, err := regionids.ParseRegionID(m.RegionID.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Invalid Region ID",
+			fmt.Sprintf("Could not parse region ID %q: %s", m.RegionID.ValueString(), err),
+		)
+		return regionapi.StorageV2Create{}, diagnostics
+	}
+
 	fileStorage := regionapi.StorageV2Create{
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
 			Tags:        tags,
 		},
-		Spec: struct {
-			Attachments    *regionapi.StorageAttachmentV2Spec `json:"attachments,omitempty"`
-			OrganizationId string                             `json:"organizationId"`
-			ProjectId      string                             `json:"projectId"`
-			RegionId       string                             `json:"regionId"`
-			SizeGiB        int64                              `json:"sizeGiB"`
-			StorageClassId string                             `json:"storageClassId"`
-			StorageType    regionapi.StorageTypeV2Spec        `json:"storageType"`
-		}{
-			Attachments: &regionapi.StorageAttachmentV2Spec{
-				NetworkIds: networkIDs,
-			},
-			OrganizationId: organizationID,
-			ProjectId:      m.ProjectID.ValueString(),
-			RegionId:       m.RegionID.ValueString(),
-			SizeGiB:        m.Capacity.ValueInt64(),
-			StorageClassId: m.StorageClassID.ValueString(),
-			StorageType: regionapi.StorageTypeV2Spec{
-				NFS: &regionapi.NFSV2Spec{
-					RootSquash: m.RootSquash.ValueBool(),
-				},
-			},
+	}
+	fileStorage.Spec.Attachments = &regionapi.StorageAttachmentV2Spec{NetworkIds: networkIDs}
+	fileStorage.Spec.OrganizationId = organizationID
+	fileStorage.Spec.ProjectId = m.ProjectID.ValueString()
+	fileStorage.Spec.RegionId = regionID
+	fileStorage.Spec.SizeGiB = m.Capacity.ValueInt64()
+	fileStorage.Spec.StorageClassId = m.StorageClassID.ValueString()
+	fileStorage.Spec.StorageType = regionapi.StorageTypeV2Spec{
+		NFS: &regionapi.NFSV2Spec{
+			RootSquash: m.RootSquash.ValueBool(),
 		},
 	}
 
@@ -164,7 +163,7 @@ func (m *FileStorageModel) NscaleFileStorageUpdateParams() (regionapi.StorageV2U
 			Name:        m.Name.ValueString(),
 			Tags:        tags,
 		},
-		Spec: regionapi.StorageV2Spec{
+		Spec: regionapi.StorageV2WriteSpec{
 			Attachments: &regionapi.StorageAttachmentV2Spec{
 				NetworkIds: networkIDs,
 			},
