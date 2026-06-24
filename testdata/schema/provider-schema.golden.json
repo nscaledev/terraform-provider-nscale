@@ -1637,7 +1637,7 @@
               },
               "snapshot_policies": {
                 "computed": true,
-                "description": "The user-managed snapshot policies for the file storage. These are separate from platform-managed Default Snapshot Protection, which is never represented here. When omitted or null, Terraform observes and preserves whatever policies exist remotely; when set to an empty set (`[]`), Terraform enforces that no user-managed policies exist; when set to one or more policies, Terraform enforces exactly that set. Policies are identified by `name` and ordering is not significant.",
+                "description": "The user-managed snapshot policies for the file storage. These are separate from platform-managed Default Snapshot Protection, which is never represented here. When omitted or null, Terraform observes and preserves whatever policies exist remotely; when set to an empty set (`[]`), Terraform enforces that no user-managed policies exist; when set to one or more policies, Terraform enforces exactly that set. Policies are identified by `name` and ordering is not significant. At most four policies are allowed.",
                 "description_kind": "markdown",
                 "nested_type": {
                   "attributes": {

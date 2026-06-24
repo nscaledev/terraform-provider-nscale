@@ -164,34 +164,42 @@ func (r *FileStorageResource) Schema(
 					"platform-managed Default Snapshot Protection, which is never represented here. When omitted or null, " +
 					"Terraform observes and preserves whatever policies exist remotely; when set to an empty set (`[]`), " +
 					"Terraform enforces that no user-managed policies exist; when set to one or more policies, Terraform " +
-					"enforces exactly that set. Policies are identified by `name` and ordering is not significant.",
-				Optional: true,
-				Computed: true,
+					"enforces exactly that set. Policies are identified by `name` and ordering is not significant. " +
+					"At most four policies are allowed.",
+				Optional:   true,
+				Computed:   true,
+				Validators: snapshotPoliciesSetValidators(),
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"name": schema.StringAttribute{
 							MarkdownDescription: "The snapshot policy name. Acts as the policy's stable identity key and must be unique within the file storage.",
 							Required:            true,
+							Validators:          snapshotPolicyNameValidators(),
 						},
 						"schedule": schema.SingleNestedAttribute{
 							MarkdownDescription: "When snapshots are taken for this policy.",
 							Required:            true,
+							Validators:          snapshotScheduleValidators(),
 							Attributes: map[string]schema.Attribute{
 								"interval": schema.StringAttribute{
 									MarkdownDescription: "The snapshot cadence: `hourly`, `daily`, `weekly`, or `monthly`.",
 									Required:            true,
+									Validators:          snapshotScheduleIntervalValidators(),
 								},
 								"time_of_day": schema.StringAttribute{
 									MarkdownDescription: "The UTC time of day snapshots are taken, in `HH:MMZ` form. Applies to daily, weekly, and monthly schedules.",
 									Optional:            true,
+									Validators:          snapshotTimeOfDayValidators(),
 								},
 								"day_of_week": schema.StringAttribute{
 									MarkdownDescription: "The UTC day of week snapshots are taken (`monday` through `sunday`). Applies to weekly schedules.",
 									Optional:            true,
+									Validators:          snapshotDayOfWeekValidators(),
 								},
 								"day_of_month": schema.Int64Attribute{
 									MarkdownDescription: "The UTC day of month snapshots are taken (1 through 28). Applies to monthly schedules.",
 									Optional:            true,
+									Validators:          snapshotDayOfMonthValidators(),
 								},
 							},
 						},
@@ -202,6 +210,7 @@ func (r *FileStorageResource) Schema(
 								"keep": schema.Int64Attribute{
 									MarkdownDescription: "The number of snapshots to retain.",
 									Required:            true,
+									Validators:          snapshotRetentionKeepValidators(),
 								},
 							},
 						},
