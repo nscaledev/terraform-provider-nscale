@@ -369,7 +369,7 @@ func (m *FileStorageModel) NscaleFileStorageUpdateParams() (regionapi.StorageV2U
 			Name:        m.Name.ValueString(),
 			Tags:        tags,
 		},
-		Spec: regionapi.StorageV2Spec{
+		Spec: regionapi.StorageV2WriteSpec{
 			Attachments: &regionapi.StorageAttachmentV2Spec{
 				NetworkIds: networkIDs,
 			},
