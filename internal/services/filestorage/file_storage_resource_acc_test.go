@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
 func TestAccFileStorageResource_basic(t *testing.T) {
@@ -212,6 +213,234 @@ func TestAccFileStorageResource_customSnapshotPolicy(t *testing.T) {
 			},
 		},
 	})
+}
+
+// User-managed Snapshot Policy HCL fragments reused by the lifecycle test. Each
+// is a single element of a snapshot_policies set. policyNightly is policyDaily
+// renamed (identical schedule and retention) so the rename step isolates the
+// name change from any schedule or retention change.
+const (
+	policyDaily = `
+    {
+      name = "daily"
+      schedule = {
+        interval    = "daily"
+        time_of_day = "02:00Z"
+      }
+      retention = {
+        keep = 7
+      }
+    }`
+
+	policyWeekly = `
+    {
+      name = "weekly"
+      schedule = {
+        interval    = "weekly"
+        time_of_day = "03:00Z"
+        day_of_week = "sunday"
+      }
+      retention = {
+        keep = 4
+      }
+    }`
+
+	policyNightly = `
+    {
+      name = "nightly"
+      schedule = {
+        interval    = "daily"
+        time_of_day = "02:00Z"
+      }
+      retention = {
+        keep = 7
+      }
+    }`
+)
+
+// TestAccFileStorageResource_snapshotPolicyLifecycle hardens the full
+// replacement lifecycle of a configured user-managed Snapshot Policy Set. The
+// File Storage's storage_class_id never changes across the walk, so every
+// transition is an in-place update; an id captured at create and re-asserted at
+// each step proves no transition replaces the parent File Storage. The walk:
+//
+//	create [daily, weekly]            -> two named policies exist
+//	reorder [weekly, daily] plan-only -> order-only difference produces no diff
+//	rename  [nightly, weekly]         -> daily renamed; element replaced in the set
+//	remove  [weekly]                  -> only nightly removed; weekly intact
+//	clear   []                        -> all user-managed policies cleared
+//	re-add  [daily]                   -> empty set replaced with a new policy
+func TestAccFileStorageResource_snapshotPolicyLifecycle(t *testing.T) {
+	storageClassID := os.Getenv("NSCALE_TEST_FILE_STORAGE_CLASS_ID")
+	name := "tf-acc-file-storage-policy-lifecycle"
+
+	var fileStorageID string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				// Create with two user-managed policies.
+				Config: testAccFileStorageResourceConfigSnapshotPolicies(
+					name, storageClassID, policyDaily+","+policyWeekly,
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCaptureFileStorageID("nscale_file_storage.test", &fileStorageID),
+					resource.TestCheckResourceAttr("nscale_file_storage.test", "snapshot_policies.#", "2"),
+					resource.TestCheckTypeSetElemNestedAttrs(
+						"nscale_file_storage.test", "snapshot_policies.*", map[string]string{
+							"name":                 "daily",
+							"schedule.interval":    "daily",
+							"schedule.time_of_day": "02:00Z",
+							"retention.keep":       "7",
+						},
+					),
+					resource.TestCheckTypeSetElemNestedAttrs(
+						"nscale_file_storage.test", "snapshot_policies.*", map[string]string{
+							"name":                 "weekly",
+							"schedule.interval":    "weekly",
+							"schedule.time_of_day": "03:00Z",
+							"schedule.day_of_week": "sunday",
+							"retention.keep":       "4",
+						},
+					),
+				),
+			},
+			{
+				// Order-only difference: the same two policies listed in the
+				// reverse order must produce no plan diff, because the policy
+				// collection is an unordered set.
+				Config: testAccFileStorageResourceConfigSnapshotPolicies(
+					name, storageClassID, policyWeekly+","+policyDaily,
+				),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+			{
+				// Rename daily -> nightly. The set still has two policies; daily is
+				// gone and nightly is present. The id is unchanged, so renaming a
+				// policy did not replace the parent File Storage.
+				Config: testAccFileStorageResourceConfigSnapshotPolicies(
+					name, storageClassID, policyNightly+","+policyWeekly,
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPtr("nscale_file_storage.test", "id", &fileStorageID),
+					resource.TestCheckResourceAttr("nscale_file_storage.test", "snapshot_policies.#", "2"),
+					resource.TestCheckTypeSetElemNestedAttrs(
+						"nscale_file_storage.test", "snapshot_policies.*", map[string]string{
+							"name":              "nightly",
+							"schedule.interval": "daily",
+							"retention.keep":    "7",
+						},
+					),
+					resource.TestCheckTypeSetElemNestedAttrs(
+						"nscale_file_storage.test", "snapshot_policies.*", map[string]string{
+							"name":              "weekly",
+							"schedule.interval": "weekly",
+							"retention.keep":    "4",
+						},
+					),
+				),
+			},
+			{
+				// Remove one policy from the multi-policy set: dropping nightly
+				// leaves weekly intact. Count is exactly one and it is weekly.
+				Config: testAccFileStorageResourceConfigSnapshotPolicies(
+					name, storageClassID, policyWeekly,
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPtr("nscale_file_storage.test", "id", &fileStorageID),
+					resource.TestCheckResourceAttr("nscale_file_storage.test", "snapshot_policies.#", "1"),
+					resource.TestCheckTypeSetElemNestedAttrs(
+						"nscale_file_storage.test", "snapshot_policies.*", map[string]string{
+							"name":              "weekly",
+							"schedule.interval": "weekly",
+							"retention.keep":    "4",
+						},
+					),
+				),
+			},
+			{
+				// Replace the configured non-empty set with an explicit empty set:
+				// all user-managed policies are cleared.
+				Config: testAccFileStorageResourceConfigSnapshotPolicies(
+					name, storageClassID, "",
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPtr("nscale_file_storage.test", "id", &fileStorageID),
+					resource.TestCheckResourceAttr("nscale_file_storage.test", "snapshot_policies.#", "0"),
+				),
+			},
+			{
+				// Replace the explicit empty set with a non-empty set: the desired
+				// user-managed policy is created.
+				Config: testAccFileStorageResourceConfigSnapshotPolicies(
+					name, storageClassID, policyDaily,
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrPtr("nscale_file_storage.test", "id", &fileStorageID),
+					resource.TestCheckResourceAttr("nscale_file_storage.test", "snapshot_policies.#", "1"),
+					resource.TestCheckTypeSetElemNestedAttrs(
+						"nscale_file_storage.test", "snapshot_policies.*", map[string]string{
+							"name":                 "daily",
+							"schedule.interval":    "daily",
+							"schedule.time_of_day": "02:00Z",
+							"retention.keep":       "7",
+						},
+					),
+				),
+			},
+			{
+				ResourceName:            "nscale_file_storage.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"timeouts", "refresh_usage"},
+			},
+		},
+	})
+}
+
+// testAccCaptureFileStorageID records the live id of a File Storage resource
+// from Terraform state into id, so later lifecycle steps can assert the id is
+// unchanged and thereby prove a transition updated the resource in place rather
+// than replacing it.
+func testAccCaptureFileStorageID(resourceName string, id *string) resource.TestCheckFunc {
+	return func(state *terraform.State) error {
+		rs, ok := state.RootModule().Resources[resourceName]
+		if !ok {
+			return fmt.Errorf("resource %s not found in state", resourceName)
+		}
+		*id = rs.Primary.ID
+		return nil
+	}
+}
+
+// testAccFileStorageResourceConfigSnapshotPolicies renders a File Storage with
+// an explicit snapshot_policies set. policiesHCL is the comma-separated set
+// elements; passing an empty string renders `snapshot_policies = []`, the
+// explicit empty user-managed Snapshot Policy Set.
+func testAccFileStorageResourceConfigSnapshotPolicies(name, storageClassID, policiesHCL string) string {
+	return fmt.Sprintf(`
+resource "nscale_network" "test" {
+  name       = "%[1]s-net"
+  cidr_block = "192.168.247.0/24"
+}
+
+resource "nscale_file_storage" "test" {
+  name             = %[1]q
+  storage_class_id = %[2]q
+  capacity         = 20
+  root_squash      = true
+
+  snapshot_policies = [%[3]s
+  ]
+
+  network {
+    id = nscale_network.test.id
+  }
+}
+`, name, storageClassID, policiesHCL)
 }
 
 func testAccFileStorageResourceConfigCustomSnapshotPolicy(

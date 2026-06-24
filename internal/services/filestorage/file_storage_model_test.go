@@ -68,6 +68,31 @@ func singleDailySnapshotPolicySet() types.Set {
 	})
 }
 
+// A Snapshot Policy Set is unordered: two sets holding the same user-managed
+// policies in different orders must be equal. This is what makes reordering
+// policies in configuration produce no plan diff, and is the whole reason the
+// policy collection is modelled as a set rather than a list. The fixture builds
+// each side through the read mapper, mirroring how an API read populates state.
+func TestSnapshotPolicySetIsOrderInsensitive(t *testing.T) {
+	weekly := regionapi.StorageSnapshotPolicyV2Spec{
+		Name:      "weekly",
+		Schedule:  regionapi.StorageSnapshotScheduleV2Spec{Interval: regionapi.StorageSnapshotScheduleIntervalV2Weekly},
+		Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 4},
+	}
+	daily := regionapi.StorageSnapshotPolicyV2Spec{
+		Name:      "daily",
+		Schedule:  regionapi.StorageSnapshotScheduleV2Spec{Interval: regionapi.StorageSnapshotScheduleIntervalV2Daily},
+		Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 7},
+	}
+
+	weeklyThenDaily := NewFileStorageSnapshotPolicies(&regionapi.StorageSnapshotPolicyListV2Spec{weekly, daily})
+	dailyThenWeekly := NewFileStorageSnapshotPolicies(&regionapi.StorageSnapshotPolicyListV2Spec{daily, weekly})
+
+	if !weeklyThenDaily.Equal(dailyThenWeekly) {
+		t.Fatalf("snapshot policy sets differing only in order are not equal:\n %v\n %v", weeklyThenDaily, dailyThenWeekly)
+	}
+}
+
 // snapshotPolicyNames returns the ordered policy names in an API request list,
 // or nil when the request omits the field (null). It lets request-building
 // tests distinguish "observe/preserve" (nil pointer), "enforce empty"
@@ -366,6 +391,58 @@ func TestNscaleFileStorageCreateParamsMarshalsSingleCustomPolicy(t *testing.T) {
 	}
 	if policy.Retention.Keep != 7 {
 		t.Fatalf("retention.keep = %d, want 7", policy.Retention.Keep)
+	}
+}
+
+// Order-only differences in the configured Snapshot Policy Set must not produce
+// unstable API requests: the same user-managed policies marshal to the same
+// deterministic list — sorted by name — regardless of the order they appear in
+// the set. This is what lets reordering policies in configuration round-trip
+// without churning the API request. A three-policy set exercises ordering beyond
+// a single swapped pair.
+func TestNscaleFileStorageUpdateParamsSnapshotPolicyOrderIsDeterministic(t *testing.T) {
+	makeModel := func(policies types.Set) FileStorageModel {
+		return FileStorageModel{
+			Name:             types.StringValue("fs"),
+			Capacity:         types.Int64Value(20),
+			RootSquash:       types.BoolValue(true),
+			Network:          types.ListNull(FileStorageNetworkModelAttributeType),
+			SnapshotPolicies: policies,
+		}
+	}
+
+	policy := func(name string) regionapi.StorageSnapshotPolicyV2Spec {
+		return regionapi.StorageSnapshotPolicyV2Spec{
+			Name:      name,
+			Schedule:  regionapi.StorageSnapshotScheduleV2Spec{Interval: regionapi.StorageSnapshotScheduleIntervalV2Hourly},
+			Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 3},
+		}
+	}
+
+	scrambled := NewFileStorageSnapshotPolicies(&regionapi.StorageSnapshotPolicyListV2Spec{
+		policy("charlie"), policy("alpha"), policy("bravo"),
+	})
+	reordered := NewFileStorageSnapshotPolicies(&regionapi.StorageSnapshotPolicyListV2Spec{
+		policy("bravo"), policy("charlie"), policy("alpha"),
+	})
+
+	want := []string{"alpha", "bravo", "charlie"}
+
+	for _, tt := range []struct {
+		name     string
+		policies types.Set
+	}{
+		{name: "scrambled", policies: scrambled},
+		{name: "reordered", policies: reordered},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			model := makeModel(tt.policies)
+			params, diagnostics := model.NscaleFileStorageUpdateParams()
+			if diagnostics.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diagnostics)
+			}
+			assertSnapshotPolicyNames(t, params.Spec.SnapshotPolicies, want)
+		})
 	}
 }
 
