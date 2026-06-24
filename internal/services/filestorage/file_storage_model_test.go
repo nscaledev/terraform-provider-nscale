@@ -17,10 +17,7 @@ limitations under the License.
 package filestorage
 
 import (
-<<<<<<< HEAD
 	"reflect"
-=======
->>>>>>> e9b23f1 (feat(filestorage): expose Default Snapshot Protection)
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -33,7 +30,6 @@ import (
 // ID succeed; the value is otherwise irrelevant to these tests.
 const testRegionID = "11111111-1111-1111-1111-111111111111"
 
-<<<<<<< HEAD
 // unsortedSnapshotPolicySet builds a known set holding two user-managed
 // policies given out of name order ("weekly" before "daily"). Request building
 // must emit them sorted by name, so this fixture lets create and update tests
@@ -136,8 +132,6 @@ func assertSnapshotPolicyNames(t *testing.T, got *regionapi.StorageSnapshotPolic
 	}
 }
 
-=======
->>>>>>> e9b23f1 (feat(filestorage): expose Default Snapshot Protection)
 func assertBoolPointerEqual(t *testing.T, got, want *bool) {
 	t.Helper()
 
@@ -221,7 +215,6 @@ func TestNscaleFileStorageCreateParamsDefaultSnapshotProtectionEnabled(t *testin
 	}
 }
 
-<<<<<<< HEAD
 // A read that exposes no user-managed Snapshot Policies must map to a known
 // empty set, not null. The explicit-empty path depends on this: a user who
 // configures `snapshot_policies = []` must see the resulting state match their
@@ -453,8 +446,6 @@ func TestNscaleFileStorageUpdateParamsSnapshotPolicyOrderIsDeterministic(t *test
 	}
 }
 
-=======
->>>>>>> e9b23f1 (feat(filestorage): expose Default Snapshot Protection)
 // Update must observe the remote value (omit the field) when Default Snapshot
 // Protection is not explicitly configured, and enforce the explicit value
 // otherwise.
@@ -489,7 +480,6 @@ func TestNscaleFileStorageUpdateParamsDefaultSnapshotProtectionEnabled(t *testin
 		})
 	}
 }
-<<<<<<< HEAD
 
 // Update must preserve the API's null-versus-empty distinction: a null set is
 // omitted so existing user-managed policies are preserved, an explicit empty
@@ -537,5 +527,3 @@ func TestNscaleFileStorageUpdateParamsSnapshotPolicies(t *testing.T) {
 		})
 	}
 }
-=======
->>>>>>> e9b23f1 (feat(filestorage): expose Default Snapshot Protection)
