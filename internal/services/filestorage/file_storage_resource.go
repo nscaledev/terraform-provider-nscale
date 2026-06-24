@@ -159,6 +159,55 @@ func (r *FileStorageResource) Schema(
 				Optional: true,
 				Computed: true,
 			},
+			"snapshot_policies": schema.SetNestedAttribute{
+				MarkdownDescription: "The user-managed snapshot policies for the file storage. These are separate from " +
+					"platform-managed Default Snapshot Protection, which is never represented here. When omitted or null, " +
+					"Terraform observes and preserves whatever policies exist remotely; when set to an empty set (`[]`), " +
+					"Terraform enforces that no user-managed policies exist; when set to one or more policies, Terraform " +
+					"enforces exactly that set. Policies are identified by `name` and ordering is not significant.",
+				Optional: true,
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							MarkdownDescription: "The snapshot policy name. Acts as the policy's stable identity key and must be unique within the file storage.",
+							Required:            true,
+						},
+						"schedule": schema.SingleNestedAttribute{
+							MarkdownDescription: "When snapshots are taken for this policy.",
+							Required:            true,
+							Attributes: map[string]schema.Attribute{
+								"interval": schema.StringAttribute{
+									MarkdownDescription: "The snapshot cadence: `hourly`, `daily`, `weekly`, or `monthly`.",
+									Required:            true,
+								},
+								"time_of_day": schema.StringAttribute{
+									MarkdownDescription: "The UTC time of day snapshots are taken, in `HH:MMZ` form. Applies to daily, weekly, and monthly schedules.",
+									Optional:            true,
+								},
+								"day_of_week": schema.StringAttribute{
+									MarkdownDescription: "The UTC day of week snapshots are taken (`monday` through `sunday`). Applies to weekly schedules.",
+									Optional:            true,
+								},
+								"day_of_month": schema.Int64Attribute{
+									MarkdownDescription: "The UTC day of month snapshots are taken (1 through 28). Applies to monthly schedules.",
+									Optional:            true,
+								},
+							},
+						},
+						"retention": schema.SingleNestedAttribute{
+							MarkdownDescription: "How many snapshots this policy retains.",
+							Required:            true,
+							Attributes: map[string]schema.Attribute{
+								"keep": schema.Int64Attribute{
+									MarkdownDescription: "The number of snapshots to retain.",
+									Required:            true,
+								},
+							},
+						},
+					},
+				},
+			},
 			"tags": schema.MapAttribute{
 				MarkdownDescription: "A map of tags assigned to the file storage.",
 				ElementType:         types.StringType,
@@ -246,6 +295,22 @@ func configuredDefaultSnapshotProtection(
 	return value
 }
 
+// configuredSnapshotPolicies reads the user-managed Snapshot Policy Set exactly
+// as written in configuration. Like Default Snapshot Protection, the attribute
+// is optional/computed, so its plan and state values can hold an API-read set;
+// only the configuration separates an explicitly managed set — including an
+// explicit empty set (`[]`) that enforces no user-managed policies — from an
+// omitted/null set that merely observes the remote value.
+func configuredSnapshotPolicies(
+	ctx context.Context,
+	config tfsdk.Config,
+	diagnostics *diag.Diagnostics,
+) types.Set {
+	var value types.Set
+	diagnostics.Append(config.GetAttribute(ctx, path.Root("snapshot_policies"), &value)...)
+	return value
+}
+
 func (m *FileStorageResourceModel) preserveSizeIfUsageRefreshDisabled(previousSize types.Int64) {
 	if m.RefreshUsage.ValueBool() {
 		return
@@ -273,6 +338,7 @@ func (r *FileStorageResource) Create(
 	data.ProjectID = types.StringValue(projectID)
 
 	data.DefaultSnapshotProtectionEnabled = configuredDefaultSnapshotProtection(ctx, request.Config, &response.Diagnostics)
+	data.SnapshotPolicies = configuredSnapshotPolicies(ctx, request.Config, &response.Diagnostics)
 	if response.Diagnostics.HasError() {
 		return
 	}
@@ -375,6 +441,7 @@ func (r *FileStorageResource) Update(
 	}
 
 	data.DefaultSnapshotProtectionEnabled = configuredDefaultSnapshotProtection(ctx, request.Config, &response.Diagnostics)
+	data.SnapshotPolicies = configuredSnapshotPolicies(ctx, request.Config, &response.Diagnostics)
 	if response.Diagnostics.HasError() {
 		return
 	}

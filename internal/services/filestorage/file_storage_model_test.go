@@ -17,6 +17,7 @@ limitations under the License.
 package filestorage
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -28,6 +29,83 @@ import (
 // A syntactically valid UUID so request-building helpers that parse the region
 // ID succeed; the value is otherwise irrelevant to these tests.
 const testRegionID = "11111111-1111-1111-1111-111111111111"
+
+// unsortedSnapshotPolicySet builds a known set holding two user-managed
+// policies given out of name order ("weekly" before "daily"). Request building
+// must emit them sorted by name, so this fixture lets create and update tests
+// assert deterministic ordering.
+func unsortedSnapshotPolicySet() types.Set {
+	return NewFileStorageSnapshotPolicies(&regionapi.StorageSnapshotPolicyListV2Spec{
+		{
+			Name:      "weekly",
+			Schedule:  regionapi.StorageSnapshotScheduleV2Spec{Interval: regionapi.StorageSnapshotScheduleIntervalV2Weekly},
+			Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 4},
+		},
+		{
+			Name:      "daily",
+			Schedule:  regionapi.StorageSnapshotScheduleV2Spec{Interval: regionapi.StorageSnapshotScheduleIntervalV2Daily},
+			Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 7},
+		},
+	})
+}
+
+// singleDailySnapshotPolicySet builds a known set holding exactly one
+// user-managed daily policy with a UTC time of day. It lets the
+// single-custom-policy request-building test assert that schedule and retention
+// detail — not just the policy name — survive into the SDK request. Building it
+// through the read mapper mirrors the real round-trip: an API read populates the
+// set and a subsequent apply marshals it back.
+func singleDailySnapshotPolicySet() types.Set {
+	return NewFileStorageSnapshotPolicies(&regionapi.StorageSnapshotPolicyListV2Spec{
+		{
+			Name: "daily",
+			Schedule: regionapi.StorageSnapshotScheduleV2Spec{
+				Interval:  regionapi.StorageSnapshotScheduleIntervalV2Daily,
+				TimeOfDay: pointer.Reference("02:00Z"),
+			},
+			Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 7},
+		},
+	})
+}
+
+// snapshotPolicyNames returns the ordered policy names in an API request list,
+// or nil when the request omits the field (null). It lets request-building
+// tests distinguish "observe/preserve" (nil pointer), "enforce empty"
+// (non-nil, empty), and "enforce exact set" (non-nil, named) without caring
+// about per-policy detail.
+func snapshotPolicyNames(list *regionapi.StorageSnapshotPolicyListV2Spec) []string {
+	if list == nil {
+		return nil
+	}
+	names := make([]string, 0, len(*list))
+	for _, policy := range *list {
+		names = append(names, policy.Name)
+	}
+	return names
+}
+
+// assertSnapshotPolicyNames asserts the request list carries exactly want, in
+// order. A nil want means the field must be omitted (null pointer); a non-nil
+// (possibly empty) want means the field must be present with those names. The
+// nil-versus-empty distinction is the whole point, so reflect.DeepEqual is used
+// deliberately (it separates nil from an empty slice).
+func assertSnapshotPolicyNames(t *testing.T, got *regionapi.StorageSnapshotPolicyListV2Spec, want []string) {
+	t.Helper()
+
+	if want == nil {
+		if got != nil {
+			t.Fatalf("snapshotPolicies = %v, want omitted (null)", snapshotPolicyNames(got))
+		}
+		return
+	}
+
+	if got == nil {
+		t.Fatalf("snapshotPolicies omitted (null), want %v", want)
+	}
+	if names := snapshotPolicyNames(got); !reflect.DeepEqual(names, want) {
+		t.Fatalf("snapshotPolicies names = %v, want %v", names, want)
+	}
+}
 
 func assertBoolPointerEqual(t *testing.T, got, want *bool) {
 	t.Helper()
@@ -112,6 +190,185 @@ func TestNscaleFileStorageCreateParamsDefaultSnapshotProtectionEnabled(t *testin
 	}
 }
 
+// A read that exposes no user-managed Snapshot Policies must map to a known
+// empty set, not null. The explicit-empty path depends on this: a user who
+// configures `snapshot_policies = []` must see the resulting state match their
+// configuration so that apply produces no post-apply diff.
+func TestNewFileStorageModelMapsAbsentSnapshotPoliciesToEmptySet(t *testing.T) {
+	var source regionapi.StorageV2Read
+	source.Spec.SnapshotPolicies = nil
+
+	model := NewFileStorageModel(&source)
+
+	if model.SnapshotPolicies.IsNull() {
+		t.Fatal("SnapshotPolicies = null, want empty set")
+	}
+	if got := len(model.SnapshotPolicies.Elements()); got != 0 {
+		t.Fatalf("SnapshotPolicies has %d elements, want 0", got)
+	}
+}
+
+// An API list that is present but empty represents a File Storage with no
+// user-managed Snapshot Policies and must map to the same known empty set as an
+// absent list.
+func TestNewFileStorageModelMapsEmptySnapshotPolicyListToEmptySet(t *testing.T) {
+	var source regionapi.StorageV2Read
+	empty := regionapi.StorageSnapshotPolicyListV2Spec{}
+	source.Spec.SnapshotPolicies = &empty
+
+	model := NewFileStorageModel(&source)
+
+	if model.SnapshotPolicies.IsNull() {
+		t.Fatal("SnapshotPolicies = null, want empty set")
+	}
+	if got := len(model.SnapshotPolicies.Elements()); got != 0 {
+		t.Fatalf("SnapshotPolicies has %d elements, want 0", got)
+	}
+}
+
+// Reads must surface the API's user-managed Snapshot Policies so that importing
+// or refreshing File Storage that already has policies does not silently drop
+// them (which would otherwise clear them on the next apply).
+func TestNewFileStorageModelMapsUserManagedSnapshotPolicies(t *testing.T) {
+	var source regionapi.StorageV2Read
+	source.Spec.SnapshotPolicies = &regionapi.StorageSnapshotPolicyListV2Spec{
+		{
+			Name: "daily",
+			Schedule: regionapi.StorageSnapshotScheduleV2Spec{
+				Interval:  regionapi.StorageSnapshotScheduleIntervalV2Daily,
+				TimeOfDay: pointer.Reference("02:00Z"),
+			},
+			Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 7},
+		},
+	}
+
+	model := NewFileStorageModel(&source)
+
+	elements := model.SnapshotPolicies.Elements()
+	if len(elements) != 1 {
+		t.Fatalf("SnapshotPolicies has %d elements, want 1", len(elements))
+	}
+
+	policy := elements[0].(types.Object).Attributes()
+	if got := policy["name"].(types.String).ValueString(); got != "daily" {
+		t.Fatalf("name = %q, want daily", got)
+	}
+
+	schedule := policy["schedule"].(types.Object).Attributes()
+	if got := schedule["interval"].(types.String).ValueString(); got != "daily" {
+		t.Fatalf("schedule.interval = %q, want daily", got)
+	}
+	if got := schedule["time_of_day"].(types.String).ValueString(); got != "02:00Z" {
+		t.Fatalf("schedule.time_of_day = %q, want 02:00Z", got)
+	}
+
+	retention := policy["retention"].(types.Object).Attributes()
+	if got := retention["keep"].(types.Int64).ValueInt64(); got != 7 {
+		t.Fatalf("retention.keep = %d, want 7", got)
+	}
+}
+
+// Create must preserve the API's null-versus-empty distinction for the
+// user-managed Snapshot Policy Set: an unconfigured (null) set is omitted so
+// the API resolves it, an explicit empty set is sent as an empty list to
+// enforce no user-managed policies, and a non-empty set is sent in full,
+// deterministically ordered by name.
+func TestNscaleFileStorageCreateParamsSnapshotPolicies(t *testing.T) {
+	tests := []struct {
+		name      string
+		policies  types.Set
+		wantNames []string // nil => field omitted (null)
+	}{
+		{
+			name:      "null omits the field",
+			policies:  types.SetNull(FileStorageSnapshotPolicyModelAttributeType),
+			wantNames: nil,
+		},
+		{
+			name:      "empty set enforces no policies",
+			policies:  NewFileStorageSnapshotPolicies(&regionapi.StorageSnapshotPolicyListV2Spec{}),
+			wantNames: []string{},
+		},
+		{
+			name:      "non-empty set is sent sorted by name",
+			policies:  unsortedSnapshotPolicySet(),
+			wantNames: []string{"daily", "weekly"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := FileStorageModel{
+				Name:             types.StringValue("fs"),
+				RegionID:         types.StringValue(testRegionID),
+				Capacity:         types.Int64Value(20),
+				StorageClassID:   types.StringValue("class"),
+				RootSquash:       types.BoolValue(true),
+				Network:          types.ListNull(FileStorageNetworkModelAttributeType),
+				SnapshotPolicies: tt.policies,
+			}
+
+			params, diagnostics := model.NscaleFileStorageCreateParams("org")
+			if diagnostics.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diagnostics)
+			}
+
+			assertSnapshotPolicyNames(t, params.Spec.SnapshotPolicies, tt.wantNames)
+		})
+	}
+}
+
+// A single configured user-managed policy must reach the SDK request with its
+// full schedule and retention detail, not just its name. The names-only
+// request-building tests above prove null-versus-empty-versus-set semantics;
+// this proves that for a configured policy the interval, UTC time of day, and
+// retention count are marshaled, and that schedule fields irrelevant to a daily
+// cadence (day of week, day of month) stay absent.
+func TestNscaleFileStorageCreateParamsMarshalsSingleCustomPolicy(t *testing.T) {
+	model := FileStorageModel{
+		Name:             types.StringValue("fs"),
+		RegionID:         types.StringValue(testRegionID),
+		Capacity:         types.Int64Value(20),
+		StorageClassID:   types.StringValue("class"),
+		RootSquash:       types.BoolValue(true),
+		Network:          types.ListNull(FileStorageNetworkModelAttributeType),
+		SnapshotPolicies: singleDailySnapshotPolicySet(),
+	}
+
+	params, diagnostics := model.NscaleFileStorageCreateParams("org")
+	if diagnostics.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diagnostics)
+	}
+
+	policies := params.Spec.SnapshotPolicies
+	if policies == nil {
+		t.Fatal("snapshotPolicies omitted (null), want one policy")
+	}
+	if got := len(*policies); got != 1 {
+		t.Fatalf("snapshotPolicies has %d entries, want 1", got)
+	}
+
+	policy := (*policies)[0]
+	if policy.Name != "daily" {
+		t.Fatalf("name = %q, want daily", policy.Name)
+	}
+	if policy.Schedule.Interval != regionapi.StorageSnapshotScheduleIntervalV2Daily {
+		t.Fatalf("schedule.interval = %q, want daily", policy.Schedule.Interval)
+	}
+	if policy.Schedule.TimeOfDay == nil || *policy.Schedule.TimeOfDay != "02:00Z" {
+		t.Fatalf("schedule.timeOfDay = %v, want 02:00Z", policy.Schedule.TimeOfDay)
+	}
+	if policy.Schedule.DayOfWeek != nil {
+		t.Fatalf("schedule.dayOfWeek = %q, want absent for a daily policy", *policy.Schedule.DayOfWeek)
+	}
+	if policy.Schedule.DayOfMonth != nil {
+		t.Fatalf("schedule.dayOfMonth = %d, want absent for a daily policy", *policy.Schedule.DayOfMonth)
+	}
+	if policy.Retention.Keep != 7 {
+		t.Fatalf("retention.keep = %d, want 7", policy.Retention.Keep)
+	}
+}
+
 // Update must observe the remote value (omit the field) when Default Snapshot
 // Protection is not explicitly configured, and enforce the explicit value
 // otherwise.
@@ -143,6 +400,53 @@ func TestNscaleFileStorageUpdateParamsDefaultSnapshotProtectionEnabled(t *testin
 			}
 
 			assertBoolPointerEqual(t, params.Spec.DefaultSnapshotProtectionEnabled, tt.want)
+		})
+	}
+}
+
+// Update must preserve the API's null-versus-empty distinction: a null set is
+// omitted so existing user-managed policies are preserved, an explicit empty
+// set is sent as an empty list to clear them, and a non-empty set replaces the
+// full list, deterministically ordered by name.
+func TestNscaleFileStorageUpdateParamsSnapshotPolicies(t *testing.T) {
+	tests := []struct {
+		name      string
+		policies  types.Set
+		wantNames []string // nil => field omitted (null)
+	}{
+		{
+			name:      "null preserves existing policies",
+			policies:  types.SetNull(FileStorageSnapshotPolicyModelAttributeType),
+			wantNames: nil,
+		},
+		{
+			name:      "empty set clears policies",
+			policies:  NewFileStorageSnapshotPolicies(&regionapi.StorageSnapshotPolicyListV2Spec{}),
+			wantNames: []string{},
+		},
+		{
+			name:      "non-empty set replaces the full list sorted by name",
+			policies:  unsortedSnapshotPolicySet(),
+			wantNames: []string{"daily", "weekly"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := FileStorageModel{
+				Name:             types.StringValue("fs"),
+				Capacity:         types.Int64Value(20),
+				RootSquash:       types.BoolValue(true),
+				Network:          types.ListNull(FileStorageNetworkModelAttributeType),
+				SnapshotPolicies: tt.policies,
+			}
+
+			params, diagnostics := model.NscaleFileStorageUpdateParams()
+			if diagnostics.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diagnostics)
+			}
+
+			assertSnapshotPolicyNames(t, params.Spec.SnapshotPolicies, tt.wantNames)
 		})
 	}
 }
