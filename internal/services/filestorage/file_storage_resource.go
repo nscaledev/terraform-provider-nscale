@@ -23,6 +23,7 @@ import (
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -30,6 +31,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 	regionids "github.com/unikorn-cloud/region/pkg/ids"
@@ -149,6 +151,14 @@ func (r *FileStorageResource) Schema(
 				MarkdownDescription: "Whether root squashing is applied to the file storage to restrict root access for clients.",
 				Required:            true,
 			},
+			"default_snapshot_protection_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether platform-managed Default Snapshot Protection is enabled for the file storage. " +
+					"This is separate from any user-managed snapshot policies. When omitted or null, the platform default " +
+					"applies and Terraform reads back the resolved value without enforcing it; when set to `true` or `false`, " +
+					"Terraform manages the setting and drift-corrects out-of-band changes.",
+				Optional: true,
+				Computed: true,
+			},
 			"tags": schema.MapAttribute{
 				MarkdownDescription: "A map of tags assigned to the file storage.",
 				ElementType:         types.StringType,
@@ -221,6 +231,21 @@ func (r *FileStorageResource) setDefaults(data *FileStorageResourceModel) {
 	}
 }
 
+// configuredDefaultSnapshotProtection reads the Default Snapshot Protection
+// value exactly as written in configuration. The attribute is optional/computed,
+// so its plan and state values can hold a previously API-resolved value; only
+// the configuration distinguishes a setting the user explicitly manages (a known
+// value, to be enforced) from one they omit (null, to be observed).
+func configuredDefaultSnapshotProtection(
+	ctx context.Context,
+	config tfsdk.Config,
+	diagnostics *diag.Diagnostics,
+) types.Bool {
+	var value types.Bool
+	diagnostics.Append(config.GetAttribute(ctx, path.Root("default_snapshot_protection_enabled"), &value)...)
+	return value
+}
+
 func (m *FileStorageResourceModel) preserveSizeIfUsageRefreshDisabled(previousSize types.Int64) {
 	if m.RefreshUsage.ValueBool() {
 		return
@@ -246,6 +271,11 @@ func (r *FileStorageResource) Create(
 		return
 	}
 	data.ProjectID = types.StringValue(projectID)
+
+	data.DefaultSnapshotProtectionEnabled = configuredDefaultSnapshotProtection(ctx, request.Config, &response.Diagnostics)
+	if response.Diagnostics.HasError() {
+		return
+	}
 
 	params, diagnostics := data.NscaleFileStorageCreateParams(r.client.OrganizationID)
 	if diagnostics.HasError() {
@@ -341,6 +371,11 @@ func (r *FileStorageResource) Update(
 	data, diagnostics := nscale.ReadTerraformState[FileStorageResourceModel](ctx, request.Plan.Get, r.setDefaults)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
+	data.DefaultSnapshotProtectionEnabled = configuredDefaultSnapshotProtection(ctx, request.Config, &response.Diagnostics)
+	if response.Diagnostics.HasError() {
 		return
 	}
 

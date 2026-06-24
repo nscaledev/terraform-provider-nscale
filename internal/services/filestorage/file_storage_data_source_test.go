@@ -43,6 +43,9 @@ func TestAccFileStorageDataSource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("data.nscale_file_storage.test", "storage_class_id", storageClassID),
 					resource.TestCheckResourceAttr("data.nscale_file_storage.test", "capacity", "20"),
 					resource.TestCheckResourceAttr("data.nscale_file_storage.test", "root_squash", "true"),
+					resource.TestCheckResourceAttrSet(
+						"data.nscale_file_storage.test", "default_snapshot_protection_enabled",
+					),
 					resource.TestCheckResourceAttrSet("data.nscale_file_storage.test", "project_id"),
 					resource.TestCheckResourceAttrSet("data.nscale_file_storage.test", "region_id"),
 					resource.TestCheckResourceAttrSet("data.nscale_file_storage.test", "creation_time"),

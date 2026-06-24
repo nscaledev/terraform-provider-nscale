@@ -89,6 +89,11 @@ func (s *FileStorageDataSource) Schema(
 				MarkdownDescription: "Indicates whether root squashing is enabled for the file storage.",
 				Computed:            true,
 			},
+			"default_snapshot_protection_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether platform-managed Default Snapshot Protection is enabled for the file storage. " +
+					"This is separate from any user-managed snapshot policies.",
+				Computed: true,
+			},
 			"tags": schema.MapAttribute{
 				MarkdownDescription: "A map of tags assigned to the file storage.",
 				ElementType:         types.StringType,

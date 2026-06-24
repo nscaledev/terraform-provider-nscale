@@ -45,10 +45,27 @@ type FileStorageModel struct {
 	ProjectID      types.String `tfsdk:"project_id"`
 	RegionID       types.String `tfsdk:"region_id"`
 	CreationTime   types.String `tfsdk:"creation_time"`
+
+	// DefaultSnapshotProtectionEnabled mirrors the API-resolved platform-managed
+	// Default Snapshot Protection setting. It is separate from any user-managed
+	// Snapshot Policy Set.
+	DefaultSnapshotProtectionEnabled types.Bool `tfsdk:"default_snapshot_protection_enabled"`
 }
 
 // bytesToGiBShift converts a byte count to whole gibibytes (1 GiB = 2^30 bytes).
 const bytesToGiBShift = 30
+
+// defaultSnapshotProtectionPointer maps the configured Default Snapshot
+// Protection value to the API request field. A null or unknown value means the
+// user did not explicitly configure the setting, so it is omitted from the
+// request and the API resolves it (observe/adopt). An explicit true or false is
+// sent so the API manages and drift-corrects it (enforce).
+func defaultSnapshotProtectionPointer(value types.Bool) *bool {
+	if value.IsNull() || value.IsUnknown() {
+		return nil
+	}
+	return value.ValueBoolPointer()
+}
 
 func NewFileStorageModel(source *regionapi.StorageV2Read) FileStorageModel {
 	size := types.Int64Value(0)
@@ -81,6 +98,8 @@ func NewFileStorageModel(source *regionapi.StorageV2Read) FileStorageModel {
 		ProjectID:      types.StringValue(source.Metadata.ProjectId),
 		RegionID:       types.StringValue(source.Status.RegionId),
 		CreationTime:   types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
+
+		DefaultSnapshotProtectionEnabled: types.BoolPointerValue(source.Spec.DefaultSnapshotProtectionEnabled),
 	}
 }
 
@@ -130,6 +149,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 		},
 	}
 	fileStorage.Spec.Attachments = &regionapi.StorageAttachmentV2Spec{NetworkIds: networkIDs}
+	fileStorage.Spec.DefaultSnapshotProtectionEnabled = defaultSnapshotProtectionPointer(m.DefaultSnapshotProtectionEnabled)
 	fileStorage.Spec.OrganizationId = organizationID
 	fileStorage.Spec.ProjectId = m.ProjectID.ValueString()
 	fileStorage.Spec.RegionId = regionID
@@ -163,11 +183,12 @@ func (m *FileStorageModel) NscaleFileStorageUpdateParams() (regionapi.StorageV2U
 			Name:        m.Name.ValueString(),
 			Tags:        tags,
 		},
-		Spec: regionapi.StorageV2WriteSpec{
+		Spec: regionapi.StorageV2Spec{
 			Attachments: &regionapi.StorageAttachmentV2Spec{
 				NetworkIds: networkIDs,
 			},
-			SizeGiB: m.Capacity.ValueInt64(),
+			DefaultSnapshotProtectionEnabled: defaultSnapshotProtectionPointer(m.DefaultSnapshotProtectionEnabled),
+			SizeGiB:                          m.Capacity.ValueInt64(),
 			StorageType: regionapi.StorageTypeV2Spec{
 				NFS: &regionapi.NFSV2Spec{
 					RootSquash: m.RootSquash.ValueBool(),

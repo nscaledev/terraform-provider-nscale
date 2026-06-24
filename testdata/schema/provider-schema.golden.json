@@ -191,6 +191,12 @@
                 "description_kind": "markdown",
                 "type": "string"
               },
+              "default_snapshot_protection_enabled": {
+                "computed": true,
+                "description": "Whether platform-managed Default Snapshot Protection is enabled for the file storage. This is separate from any user-managed snapshot policies.",
+                "description_kind": "markdown",
+                "type": "bool"
+              },
               "description": {
                 "computed": true,
                 "description": "The description of the file storage.",
@@ -1504,6 +1510,13 @@
                 "description": "The timestamp when the file storage was created.",
                 "description_kind": "markdown",
                 "type": "string"
+              },
+              "default_snapshot_protection_enabled": {
+                "computed": true,
+                "description": "Whether platform-managed Default Snapshot Protection is enabled for the file storage. This is separate from any user-managed snapshot policies. When omitted or null, the platform default applies and Terraform reads back the resolved value without enforcing it; when set to `true` or `false`, Terraform manages the setting and drift-corrects out-of-band changes.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "bool"
               },
               "description": {
                 "description": "The description of the file storage.",
