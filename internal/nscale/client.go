@@ -26,6 +26,7 @@ import (
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 
 	// legacycomputeapi is the still-on-unikorn-cloud client used solely by the
@@ -43,12 +44,13 @@ type Client struct {
 	Region         regionapi.ClientInterface
 	Compute        computeapi.ClientInterface
 	Identity       identityapi.ClientInterface
+	Reservation    reservationapi.ClientInterface
 	LegacyCompute  legacycomputeapi.ClientInterface
 	Storage        storageapi.ClientInterface
 }
 
 func NewClient(
-	regionServiceBaseURL, computeServiceBaseURL, identityServiceBaseURL, storageServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string,
+	regionServiceBaseURL, computeServiceBaseURL, identityServiceBaseURL, reservationServiceBaseURL, storageServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string,
 ) (*Client, error) {
 	httpClient := NewHTTPClient(userAgent, serviceToken)
 
@@ -65,6 +67,14 @@ func NewClient(
 	identity, err := identityapi.NewClient(identityServiceBaseURL, identityapi.WithHTTPClient(httpClient))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Nscale identity API client: %w", err)
+	}
+
+	reservation, err := reservationapi.NewClient(
+		reservationServiceBaseURL,
+		reservationapi.WithHTTPClient(httpClient),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Nscale reservation API client: %w", err)
 	}
 
 	legacyCompute, err := legacycomputeapi.NewClient(
@@ -87,6 +97,7 @@ func NewClient(
 		Region:         region,
 		Compute:        compute,
 		Identity:       identity,
+		Reservation:    reservation,
 		LegacyCompute:  legacyCompute,
 		Storage:        storage,
 	}

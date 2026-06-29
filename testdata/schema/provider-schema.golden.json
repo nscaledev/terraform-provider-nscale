@@ -1037,6 +1037,186 @@
           },
           "version": 0
         },
+        "nscale_placement": {
+          "block": {
+            "attributes": {
+              "constraints": {
+                "computed": true,
+                "description": "The scheduling policy applied when selecting hosts from the reservation.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "max_skew": {
+                      "computed": true,
+                      "description": "The maximum difference in host count between any two domains.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    },
+                    "min_domains": {
+                      "computed": true,
+                      "description": "The minimum number of domains that must receive at least one selected host.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    },
+                    "policy": {
+                      "computed": true,
+                      "description": "The placement policy.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "when_unsatisfiable": {
+                      "computed": true,
+                      "description": "The behaviour when the constraint cannot be fully satisfied.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "single"
+                }
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the placement was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the placement.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "host_count": {
+                "computed": true,
+                "description": "The number of hosts allocated from the reservation.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
+              "id": {
+                "description": "A unique identifier for the placement.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the placement.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "network_id": {
+                "computed": true,
+                "description": "The identifier of the network the placement belongs to.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project the placement is provisioned in.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning status of the placement.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "ready_host_count": {
+                "computed": true,
+                "description": "The number of hosts whose Region server resources are ready.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region the placement belongs to.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "reservation_id": {
+                "computed": true,
+                "description": "The identifier of the reservation the placement allocates from.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "server_spec": {
+                "computed": true,
+                "description": "Region server options applied to each pinned server.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "image_id": {
+                      "computed": true,
+                      "description": "The image used for each pinned server.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "networking": {
+                      "computed": true,
+                      "description": "Region server networking options applied to each pinned server.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "allowed_source_addresses": {
+                            "computed": true,
+                            "description": "A list of network prefixes that are allowed to egress from each server.",
+                            "description_kind": "markdown",
+                            "type": [
+                              "list",
+                              "string"
+                            ]
+                          },
+                          "enable_public_ip": {
+                            "computed": true,
+                            "description": "Whether or not a public IP is provisioned for each server.",
+                            "description_kind": "markdown",
+                            "type": "bool"
+                          },
+                          "security_group_ids": {
+                            "computed": true,
+                            "description": "A list of security group IDs applied to each server.",
+                            "description_kind": "markdown",
+                            "type": [
+                              "list",
+                              "string"
+                            ]
+                          }
+                        },
+                        "nesting_mode": "single"
+                      }
+                    },
+                    "ssh_certificate_authority_id": {
+                      "computed": true,
+                      "description": "The SSH certificate authority ID.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "user_data": {
+                      "computed": true,
+                      "description": "Base64-encoded configuration information or scripts used upon launch.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "single"
+                }
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the placement.",
+                "description_kind": "markdown",
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "description": "Nscale Placement",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
         "nscale_region": {
           "block": {
             "attributes": {
@@ -1061,6 +1241,108 @@
               }
             },
             "description": "Nscale Region",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_reservation": {
+          "block": {
+            "attributes": {
+              "accelerator": {
+                "computed": true,
+                "description": "The public accelerator model or family reserved.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "claimed_unit_count": {
+                "computed": true,
+                "description": "The number of reservation units successfully claimed.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the reservation was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the reservation.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "description": "A unique identifier for the reservation.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "machine_flavor_id": {
+                "computed": true,
+                "description": "The resolved Region machine flavor used for pinned servers.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the reservation.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project the reservation is provisioned in.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning status of the reservation.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region the capacity is reserved in.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the reservation.",
+                "description_kind": "markdown",
+                "type": [
+                  "map",
+                  "string"
+                ]
+              },
+              "topology_hash": {
+                "computed": true,
+                "description": "A hash of the claimed topology projection accepted by the reservation.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "topology_observed_at": {
+                "computed": true,
+                "description": "The timestamp when the claimed topology projection was last observed.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "unit": {
+                "computed": true,
+                "description": "The public reservation granularity reserved.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "unit_count": {
+                "computed": true,
+                "description": "The number of reservation units reserved.",
+                "description_kind": "markdown",
+                "type": "number"
+              }
+            },
+            "description": "Nscale Reservation",
             "description_kind": "markdown"
           },
           "version": 0
@@ -1240,6 +1522,12 @@
             },
             "region_service_api_endpoint": {
               "description": "The endpoint of the Nscale Region Service API server.",
+              "description_kind": "markdown",
+              "optional": true,
+              "type": "string"
+            },
+            "reservation_service_api_endpoint": {
+              "description": "The endpoint of the Nscale Reservation Service API server.",
               "description_kind": "markdown",
               "optional": true,
               "type": "string"
@@ -2357,6 +2645,342 @@
               }
             },
             "description": "An S3-compatible object storage endpoint provisioned in an Nscale project. The endpoint exposes a chosen endpoint class's connectivity (public DNS today; private may be added in future) and carries one or more identity policies that govern what its access keys are allowed to do.",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_placement": {
+          "block": {
+            "attributes": {
+              "constraints": {
+                "description": "The scheduling policy applied when selecting hosts from the reservation. Changing this forces a new placement to be created.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "max_skew": {
+                      "computed": true,
+                      "description": "The maximum difference in host count between any two domains. Applicable only when `policy` is `spread`.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "number"
+                    },
+                    "min_domains": {
+                      "computed": true,
+                      "description": "The minimum number of domains that must receive at least one selected host. Applicable only when `policy` is `spread`. Must be less than or equal to `host_count`.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "number"
+                    },
+                    "policy": {
+                      "description": "The placement policy. `pack` fills domains sequentially, maximising locality; `spread` distributes hosts as evenly as possible across domains.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "when_unsatisfiable": {
+                      "computed": true,
+                      "description": "The behaviour when the constraint cannot be fully satisfied. `fail` returns an error; `bestEffort` applies the constraint as closely as it can.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "single"
+                },
+                "required": true
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the placement was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the placement. Changing this forces a new placement to be created.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "host_count": {
+                "description": "The number of hosts to allocate from the reservation. Must be at least 1. Changing this forces a new placement to be created.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "number"
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the placement.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the placement. Changing this forces a new placement to be created.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "network_id": {
+                "description": "The identifier of the network to attach hosts to. This also determines the InfiniBand partition boundary; all hosts in a placement share a single partition key. Changing this forces a new placement to be created.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project the placement is provisioned in.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning status of the placement.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "ready_host_count": {
+                "computed": true,
+                "description": "The number of hosts whose Region server resources are ready.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region the placement belongs to.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "reservation_id": {
+                "description": "The identifier of the reservation to allocate hosts from. Changing this forces a new placement to be created.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "server_spec": {
+                "description": "Region server options applied to each pinned server. Changing this forces a new placement to be created.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "image_id": {
+                      "description": "The image to use for each pinned server.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "networking": {
+                      "description": "Region server networking options applied to each pinned server.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "allowed_source_addresses": {
+                            "computed": true,
+                            "description": "A list of network prefixes that are allowed to egress from each server. By default, only packets from the server's network interface's IP address are allowed to enter the network.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": [
+                              "list",
+                              "string"
+                            ]
+                          },
+                          "enable_public_ip": {
+                            "computed": true,
+                            "description": "Whether or not to provision a public IP for each server.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "bool"
+                          },
+                          "security_group_ids": {
+                            "computed": true,
+                            "description": "A list of security group IDs to apply to each server.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": [
+                              "list",
+                              "string"
+                            ]
+                          }
+                        },
+                        "nesting_mode": "single"
+                      },
+                      "optional": true
+                    },
+                    "ssh_certificate_authority_id": {
+                      "description": "The SSH certificate authority ID.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "user_data": {
+                      "description": "Base64-encoded configuration information or scripts to use upon launch.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "single"
+                },
+                "required": true
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the placement. Changing this forces a new placement to be created.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "map",
+                  "string"
+                ]
+              }
+            },
+            "block_types": {
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale Placement",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_reservation": {
+          "block": {
+            "attributes": {
+              "accelerator": {
+                "description": "The public accelerator model or family to reserve, for example `GB300`. Changing this forces a new reservation to be created.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "claimed_unit_count": {
+                "computed": true,
+                "description": "The number of reservation units successfully claimed.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the reservation was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the reservation. Changing this forces a new reservation to be created.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the reservation.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "machine_flavor_id": {
+                "computed": true,
+                "description": "The resolved Region machine flavor used for pinned servers.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the reservation. Changing this forces a new reservation to be created.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project the reservation is provisioned in. If not specified, this defaults to the project ID configured in the provider. Changing this forces a new reservation to be created.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning status of the reservation.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region to reserve capacity in. If not specified, this defaults to the region ID configured in the provider. Changing this forces a new reservation to be created.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the reservation. Changing this forces a new reservation to be created.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "map",
+                  "string"
+                ]
+              },
+              "topology_hash": {
+                "computed": true,
+                "description": "A hash of the claimed topology projection accepted by the reservation.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "topology_observed_at": {
+                "computed": true,
+                "description": "The timestamp when the claimed topology projection was last observed.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "unit": {
+                "description": "The public reservation granularity to reserve, for example `NVL72`. Changing this forces a new reservation to be created.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "unit_count": {
+                "description": "The number of reservation units to reserve. Must be at least 1. Changing this forces a new reservation to be created.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "number"
+              }
+            },
+            "block_types": {
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale Reservation",
             "description_kind": "markdown"
           },
           "version": 0
