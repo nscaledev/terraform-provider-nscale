@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -249,11 +250,20 @@ func networkUpdate(
 		return "", diagnostics
 	}
 
+	networkID, err := regionids.ParseNetworkID(id)
+	if err != nil {
+		diagnostics.AddError(
+			"Invalid Network ID",
+			fmt.Sprintf("Could not parse network ID %q: %s", id, err),
+		)
+		return "", diagnostics
+	}
+
 	// Tag the update so the watcher can confirm the PUT has propagated through
 	// the cache-backed API before reading back a terminal status.
 	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
 
-	updateResponse, err := client.Region.PutApiV2NetworksNetworkID(ctx, id, params)
+	updateResponse, err := client.Region.PutApiV2NetworksNetworkID(ctx, networkID, params)
 	if err != nil {
 		diagnostics.AddError(
 			"Failed to Update Network",
@@ -276,7 +286,12 @@ func networkUpdate(
 }
 
 func networkDelete(ctx context.Context, client *nscale.Client, id string) error {
-	deleteResponse, err := client.Region.DeleteApiV2NetworksNetworkID(ctx, id)
+	networkID, err := regionids.ParseNetworkID(id)
+	if err != nil {
+		return err
+	}
+
+	deleteResponse, err := client.Region.DeleteApiV2NetworksNetworkID(ctx, networkID)
 	if err != nil {
 		return err
 	}

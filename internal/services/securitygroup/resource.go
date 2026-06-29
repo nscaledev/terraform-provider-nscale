@@ -33,6 +33,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -312,9 +313,23 @@ func (r *SecurityGroupResource) Update(
 	}
 
 	id := data.ID.ValueString()
+
+	securityGroupID, err := regionids.ParseSecurityGroupID(id)
+	if err != nil {
+		response.Diagnostics.AddError(
+			"Invalid Security Group ID",
+			fmt.Sprintf("Could not parse security group ID %q: %s", id, err),
+		)
+		return
+	}
+
 	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
 
-	securityGroupUpdateResponse, err := r.client.Region.PutApiV2SecuritygroupsSecurityGroupID(ctx, id, params)
+	securityGroupUpdateResponse, err := r.client.Region.PutApiV2SecuritygroupsSecurityGroupID(
+		ctx,
+		securityGroupID,
+		params,
+	)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Security Group",
@@ -364,6 +379,15 @@ func (r *SecurityGroupResource) Delete(
 
 	id := data.ID.ValueString()
 
+	securityGroupID, err := regionids.ParseSecurityGroupID(id)
+	if err != nil {
+		response.Diagnostics.AddError(
+			"Invalid Security Group ID",
+			fmt.Sprintf("Could not parse security group ID %q: %s", id, err),
+		)
+		return
+	}
+
 	deleteTimeout, diagnostics := data.Timeouts.Delete(ctx, defaultDeleteTimeout)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -372,10 +396,10 @@ func (r *SecurityGroupResource) Delete(
 
 	// Retry while the API reports the SG is still in use — typically a parallel
 	// instance update is dropping the reference. See nscale.RetryDelete.
-	err := nscale.RetryDelete(ctx, deleteTimeout, func(ctx context.Context) (error, bool) {
-		deleteResponse, err := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, id)
-		if err != nil {
-			return err, false
+	err = nscale.RetryDelete(ctx, deleteTimeout, func(ctx context.Context) (error, bool) {
+		deleteResponse, deleteErr := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, securityGroupID)
+		if deleteErr != nil {
+			return deleteErr, false
 		}
 		defer deleteResponse.Body.Close()
 		if readErr := nscale.ReadEmptyResponse(deleteResponse); readErr != nil {

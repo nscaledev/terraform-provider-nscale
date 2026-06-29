@@ -18,6 +18,7 @@ package securitygroup
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -25,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
@@ -122,6 +124,15 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 		rules = append(rules, source.NscaleSecurityGroupRule())
 	}
 
+	networkID, err := regionids.ParseNetworkID(m.NetworkID.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Invalid Network ID",
+			fmt.Sprintf("Could not parse network ID %q: %s", m.NetworkID.ValueString(), err),
+		)
+		return regionapi.SecurityGroupV2Create{}, diagnostics
+	}
+
 	securityGroup := regionapi.SecurityGroupV2Create{
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
@@ -129,7 +140,7 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 			Tags:        tags,
 		},
 		Spec: regionapi.SecurityGroupV2CreateSpec{
-			NetworkId: m.NetworkID.ValueString(),
+			NetworkId: networkID,
 			Rules:     rules,
 		},
 	}

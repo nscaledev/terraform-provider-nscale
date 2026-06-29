@@ -30,6 +30,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
+	identityids "github.com/unikorn-cloud/identity/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -194,9 +195,18 @@ func groupCreate(
 		return nil, diagnostics
 	}
 
+	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
+	if err != nil {
+		diagnostics.AddError(
+			"Invalid Organization ID",
+			fmt.Sprintf("Could not parse organization ID %q: %s", client.OrganizationID, err),
+		)
+		return nil, diagnostics
+	}
+
 	createResponse, err := client.Identity.PostApiV1OrganizationsOrganizationIDGroups(
 		ctx,
-		client.OrganizationID,
+		organizationID,
 		params,
 	)
 	if err != nil {
@@ -232,14 +242,32 @@ func groupUpdate(
 		return "", diagnostics
 	}
 
+	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
+	if err != nil {
+		diagnostics.AddError(
+			"Invalid Organization ID",
+			fmt.Sprintf("Could not parse organization ID %q: %s", client.OrganizationID, err),
+		)
+		return "", diagnostics
+	}
+
+	groupID, err := identityids.ParseGroupID(id)
+	if err != nil {
+		diagnostics.AddError(
+			"Invalid Group ID",
+			fmt.Sprintf("Could not parse group ID %q: %s", id, err),
+		)
+		return "", diagnostics
+	}
+
 	// Tag the update so the watcher can confirm the PUT has propagated through
 	// the cache-backed API before reading back a terminal status.
 	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
 
 	updateResponse, err := client.Identity.PutApiV1OrganizationsOrganizationIDGroupsGroupid(
 		ctx,
-		client.OrganizationID,
-		id,
+		organizationID,
+		groupID,
 		params,
 	)
 	if err != nil {
@@ -264,10 +292,20 @@ func groupUpdate(
 }
 
 func groupDelete(ctx context.Context, client *nscale.Client, id string) error {
+	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
+	if err != nil {
+		return err
+	}
+
+	groupID, err := identityids.ParseGroupID(id)
+	if err != nil {
+		return err
+	}
+
 	deleteResponse, err := client.Identity.DeleteApiV1OrganizationsOrganizationIDGroupsGroupid(
 		ctx,
-		client.OrganizationID,
-		id,
+		organizationID,
+		groupID,
 	)
 	if err != nil {
 		return err
