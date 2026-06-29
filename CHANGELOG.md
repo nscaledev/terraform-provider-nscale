@@ -10,10 +10,23 @@ Categories used: `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-29
+
+### FEATURES
+
+- Added `nscale_reservation` and `nscale_placement` resources and data sources ([#53](https://github.com/nscaledev/terraform-provider-nscale/pull/53)).
+- Added object storage `nscale_object_storage_endpoint` and `nscale_object_storage_access_key` resources and data sources, plus the `nscale_object_storage_endpoint_class` data source ([#42](https://github.com/nscaledev/terraform-provider-nscale/pull/42)).
+- Added `nscale_identity_project` and `nscale_identity_group` resources and data sources ([#50](https://github.com/nscaledev/terraform-provider-nscale/pull/50)).
+
 ### ENHANCEMENTS
 
-- Migrated to the public [`nscale-sdk-go`](https://github.com/nscaledev/nscale-sdk-go) SDK for compute (Instance API), region, and common types. The deprecated `nscale_compute_cluster` resource stays on the legacy client behind an in-package type-compat shim until its scheduled removal.
+- `project_id` is now optional at provider `Configure` time, allowing it to be set per-resource (DX-1252, [#58](https://github.com/nscaledev/terraform-provider-nscale/pull/58)).
+- Migrated to the public [`nscale-sdk-go`](https://github.com/nscaledev/nscale-sdk-go) SDK for compute (Instance API), region, and common types, and upgraded it to v0.0.4 ([#49](https://github.com/nscaledev/terraform-provider-nscale/pull/49), [#62](https://github.com/nscaledev/terraform-provider-nscale/pull/62)). The deprecated `nscale_compute_cluster` resource stays on the legacy client behind an in-package type-compat shim until its scheduled removal.
 - Removed the vendored dependency tree (`vendor/`). All dependencies now resolve via the public Go module proxy.
+
+### BUG FIXES
+
+- Fixed `nscale_placement` `server_spec.networking` list handling: a crash when `security_group_ids` or `allowed_source_addresses` was left unset, and an "inconsistent result after apply" error (`[]` becoming `null`) when either was set to an empty list ([#64](https://github.com/nscaledev/terraform-provider-nscale/pull/64)).
 
 ## [1.2.0] - 2026-05-27
 
@@ -76,7 +89,8 @@ breaking changes will increment the major version.
 
 Final pre-1.0 release. See git history for the full 0.0.x series.
 
-[Unreleased]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/nscaledev/terraform-provider-nscale/compare/v0.0.10...v1.0.0
