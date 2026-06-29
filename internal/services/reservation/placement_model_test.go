@@ -334,6 +334,125 @@ func TestNscalePlacementCreateParamsNoNetworking(t *testing.T) {
 	}
 }
 
+// TestNscalePlacementCreateParamsUnknownNetworkingLists reproduces the crash
+// that occurred when a networking list was left unset. Because the list
+// attributes are Optional+Computed, Terraform passes an omitted value as
+// unknown ("known after apply") at plan time; the expand must skip those rather
+// than failing the ElementsAs conversion into []string.
+func TestNscalePlacementCreateParamsUnknownNetworkingLists(t *testing.T) {
+	model := PlacementModel{
+		Name:          types.StringValue("workers"),
+		Tags:          types.MapNull(types.StringType),
+		ReservationID: types.StringValue("reservation-1"),
+		NetworkID:     types.StringValue("network-1"),
+		HostCount:     types.Int64Value(1),
+		Constraints: types.ObjectValueMust(
+			PlacementConstraintsModelAttributeType.AttrTypes,
+			map[string]attr.Value{
+				"policy":             types.StringValue("pack"),
+				"max_skew":           types.Int64Null(),
+				"min_domains":        types.Int64Null(),
+				"when_unsatisfiable": types.StringNull(),
+			},
+		),
+		ServerSpec: types.ObjectValueMust(
+			PlacementServerSpecModelAttributeType.AttrTypes,
+			map[string]attr.Value{
+				"image_id":                     types.StringValue("ubuntu-24.04"),
+				"ssh_certificate_authority_id": types.StringNull(),
+				"user_data":                    types.StringNull(),
+				"networking": types.ObjectValueMust(
+					PlacementServerNetworkingModelAttributeType.AttrTypes,
+					map[string]attr.Value{
+						"enable_public_ip": types.BoolNull(),
+						"security_group_ids": types.ListValueMust(
+							types.StringType,
+							[]attr.Value{types.StringValue("sg-1")},
+						),
+						// Omitted by the user; Computed ⇒ unknown at plan time.
+						"allowed_source_addresses": types.ListUnknown(types.StringType),
+					},
+				),
+			},
+		),
+	}
+
+	params, diagnostics := model.NscalePlacementCreateParams(t.Context())
+	if diagnostics.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diagnostics)
+	}
+
+	if params.Spec.ServerSpec.Networking == nil {
+		t.Fatalf("Networking is nil, want populated")
+	}
+	if params.Spec.ServerSpec.Networking.SecurityGroups == nil ||
+		len(*params.Spec.ServerSpec.Networking.SecurityGroups) != 1 {
+		t.Errorf("SecurityGroups = %v, want one element", params.Spec.ServerSpec.Networking.SecurityGroups)
+	}
+	if got := params.Spec.ServerSpec.Networking.AllowedSourceAddresses; got != nil && len(*got) != 0 {
+		t.Errorf("AllowedSourceAddresses = %v, want empty (unknown omitted)", *got)
+	}
+}
+
+// TestNewPlacementModelNetworkingNilLists reproduces the "inconsistent result
+// after apply: was [], now null" error. The API does not round-trip empty
+// networking lists — it returns nil — so the flatten must surface them as
+// empty (known) lists rather than null, matching a configured `[]`.
+func TestNewPlacementModelNetworkingNilLists(t *testing.T) {
+	source := &reservationapi.PlacementV2Read{
+		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+			Id:                 "placement-3",
+			Name:               "n",
+			OrganizationId:     "org-1",
+			ProjectId:          "project-1",
+			CreationTime:       time.Date(2026, time.April, 28, 11, 3, 12, 0, time.UTC),
+			ProvisioningStatus: coreapi.ResourceProvisioningStatusProvisioned,
+			HealthStatus:       coreapi.ResourceHealthStatusHealthy,
+		},
+		Spec: reservationapi.PlacementV2Spec{
+			Count:       1,
+			Constraints: reservationapi.PlacementConstraintsV2{Policy: reservationapi.Pack},
+			ServerSpec: reservationapi.PlacementServerSpecV2{
+				ImageId: "ubuntu-24.04",
+				// API echoes the networking object but omits the list fields.
+				Networking: &reservationapi.PlacementServerNetworkingV2{
+					SecurityGroups:         nil,
+					AllowedSourceAddresses: nil,
+				},
+			},
+		},
+		Status: reservationapi.PlacementV2Status{
+			RegionId:      "region-1",
+			ReservationId: "reservation-1",
+			NetworkId:     "network-1",
+		},
+	}
+
+	model := NewPlacementModel(source)
+
+	var serverSpec PlacementServerSpecModel
+	if diagnostics := model.ServerSpec.As(t.Context(), &serverSpec, objectAsOptions()); diagnostics.HasError() {
+		t.Fatalf("server_spec As: %v", diagnostics)
+	}
+	if serverSpec.Networking.IsNull() {
+		t.Fatalf("Networking is null, want populated")
+	}
+
+	var networking PlacementServerNetworkingModel
+	if diagnostics := serverSpec.Networking.As(t.Context(), &networking, objectAsOptions()); diagnostics.HasError() {
+		t.Fatalf("networking As: %v", diagnostics)
+	}
+	if networking.SecurityGroupIDs.IsNull() {
+		t.Errorf("SecurityGroupIDs is null, want empty list")
+	}
+	if networking.AllowedSourceAddresses.IsNull() {
+		t.Errorf("AllowedSourceAddresses is null, want empty list")
+	}
+	if got := len(networking.AllowedSourceAddresses.Elements()); got != 0 {
+		t.Errorf("AllowedSourceAddresses len = %d, want 0", got)
+	}
+}
+
 func TestValidatePlacementConstraints(t *testing.T) {
 	testCases := []struct {
 		name        string

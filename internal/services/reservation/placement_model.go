@@ -178,17 +178,21 @@ func newPlacementServerNetworkingObject(source *reservationapi.PlacementServerNe
 		return types.ObjectNull(PlacementServerNetworkingModelAttributeType.AttrTypes)
 	}
 
-	var securityGroupIDs []attr.Value
+	// security_group_ids and allowed_source_addresses are Optional+Computed lists
+	// the user can set. Emit a known empty list (not null) when there are no
+	// elements so a configured `[]` round-trips: the API echoes `[]` faithfully,
+	// and collapsing it to null here would trip "inconsistent result after apply:
+	// was [], now null". (This is why we avoid tftypes.NullableListValueMust,
+	// which nulls empty lists, for these two fields.)
+	securityGroupIDs := make([]attr.Value, 0)
 	if source.SecurityGroups != nil {
-		securityGroupIDs = make([]attr.Value, 0, len(*source.SecurityGroups))
 		for _, securityGroupID := range *source.SecurityGroups {
 			securityGroupIDs = append(securityGroupIDs, types.StringValue(securityGroupID))
 		}
 	}
 
-	var allowedSourceAddresses []attr.Value
+	allowedSourceAddresses := make([]attr.Value, 0)
 	if source.AllowedSourceAddresses != nil {
-		allowedSourceAddresses = make([]attr.Value, 0, len(*source.AllowedSourceAddresses))
 		for _, allowedSourceAddress := range *source.AllowedSourceAddresses {
 			allowedSourceAddresses = append(allowedSourceAddresses, types.StringValue(allowedSourceAddress))
 		}
@@ -198,8 +202,8 @@ func newPlacementServerNetworkingObject(source *reservationapi.PlacementServerNe
 		PlacementServerNetworkingModelAttributeType.AttrTypes,
 		map[string]attr.Value{
 			"enable_public_ip":         types.BoolPointerValue(source.PublicIP),
-			"security_group_ids":       tftypes.NullableListValueMust(types.StringType, securityGroupIDs),
-			"allowed_source_addresses": tftypes.NullableListValueMust(types.StringType, allowedSourceAddresses),
+			"security_group_ids":       types.ListValueMust(types.StringType, securityGroupIDs),
+			"allowed_source_addresses": types.ListValueMust(types.StringType, allowedSourceAddresses),
 		},
 	)
 }
@@ -323,15 +327,23 @@ func (m *PlacementServerSpecModel) networking(
 		return nil, diagnostics
 	}
 
+	// security_group_ids and allowed_source_addresses are Optional+Computed, so
+	// Terraform passes them as unknown when the user omits them. ElementsAs into
+	// a plain []string cannot represent unknown, so guard each list and treat
+	// null/unknown as "omit".
 	var securityGroupIDs []string
-	if diagnostics := model.SecurityGroupIDs.ElementsAs(ctx, &securityGroupIDs, false); diagnostics.HasError() {
-		return nil, diagnostics
+	if !model.SecurityGroupIDs.IsNull() && !model.SecurityGroupIDs.IsUnknown() {
+		if diagnostics := model.SecurityGroupIDs.ElementsAs(ctx, &securityGroupIDs, false); diagnostics.HasError() {
+			return nil, diagnostics
+		}
 	}
 
 	var allowedSourceAddresses []string
-	diagnostics := model.AllowedSourceAddresses.ElementsAs(ctx, &allowedSourceAddresses, false)
-	if diagnostics.HasError() {
-		return nil, diagnostics
+	if !model.AllowedSourceAddresses.IsNull() && !model.AllowedSourceAddresses.IsUnknown() {
+		diagnostics := model.AllowedSourceAddresses.ElementsAs(ctx, &allowedSourceAddresses, false)
+		if diagnostics.HasError() {
+			return nil, diagnostics
+		}
 	}
 
 	return &reservationapi.PlacementServerNetworkingV2{
