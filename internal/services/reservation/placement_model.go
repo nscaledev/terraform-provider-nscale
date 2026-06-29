@@ -235,7 +235,10 @@ func (m *PlacementModel) NscalePlacementCreateParams(
 			NetworkId:     m.NetworkID.ValueString(),
 			Count:         int(m.HostCount.ValueInt64()),
 			Constraints:   constraints,
-			ServerSpec:    serverSpec,
+			// readiness_policy is a v2 field not yet exposed by this provider;
+			// omitting it lets the API apply its default.
+			ReadinessPolicy: nil,
+			ServerSpec:      serverSpec,
 		},
 	}, nil
 }

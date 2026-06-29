@@ -492,10 +492,11 @@ linters:
 
       # The identity project and group resources are both plain synchronous CRUD
       # over the org-scoped identity API, so their Create/Read/Update/Delete
-      # bodies are structurally identical (only the wrapped types differ). The
-      # codebase convention is explicit per-resource CRUD rather than a shared
-      # generic, so dupl's clone detection is expected here.
-      - path: 'internal/services/identity/(project|group)_resource\.go$'
+      # bodies — and their get/getStatus helpers, which parse the org-scoped IDs
+      # and read the resource — are structurally identical (only the wrapped
+      # types differ). The codebase convention is explicit per-resource CRUD
+      # rather than a shared generic, so dupl's clone detection is expected here.
+      - path: 'internal/services/identity/(project|group)_(resource|helper)\.go$'
         linters: [dupl]
 
       # Inline structs in *_model.go files must mirror the openapi-generated *.Spec

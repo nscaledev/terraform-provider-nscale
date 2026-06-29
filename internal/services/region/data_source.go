@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	identityids "github.com/unikorn-cloud/identity/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -112,7 +113,16 @@ func (s *RegionDataSource) Read(
 		return
 	}
 
-	regionListResponse, err := s.client.Region.GetApiV1OrganizationsOrganizationIDRegions(ctx, s.client.OrganizationID)
+	organizationID, err := identityids.ParseOrganizationID(s.client.OrganizationID)
+	if err != nil {
+		response.Diagnostics.AddError(
+			"Invalid Organization ID",
+			fmt.Sprintf("Could not parse organization ID %q: %s", s.client.OrganizationID, err),
+		)
+		return
+	}
+
+	regionListResponse, err := s.client.Region.GetApiV1OrganizationsOrganizationIDRegions(ctx, organizationID)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Region",

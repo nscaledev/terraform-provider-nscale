@@ -21,6 +21,7 @@ import (
 
 	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -30,7 +31,12 @@ func getFileStorage(
 	id string,
 	client *nscale.Client,
 ) (*regionapi.StorageV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	fileStorageResponse, err := client.Region.GetApiV2FilestorageFilestorageID(ctx, id)
+	fileStorageID, err := regionids.ParseFileStorageID(id)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fileStorageResponse, err := client.Region.GetApiV2FilestorageFilestorageID(ctx, fileStorageID)
 	if err != nil {
 		return nil, nil, err
 	}

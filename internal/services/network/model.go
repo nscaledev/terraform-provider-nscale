@@ -18,6 +18,7 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -25,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
@@ -101,6 +103,15 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 		nonEmptyRoutes = &routes
 	}
 
+	regionID, err := regionids.ParseRegionID(m.RegionID.ValueString())
+	if err != nil {
+		diagnostics.AddError(
+			"Invalid Region ID",
+			fmt.Sprintf("Could not parse region ID %q: %s", m.RegionID.ValueString(), err),
+		)
+		return regionapi.NetworkV2Create{}, diagnostics
+	}
+
 	network := regionapi.NetworkV2Create{
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
@@ -112,8 +123,10 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 			OrganizationId: organizationID,
 			Prefix:         m.CIDRBlock.ValueString(),
 			ProjectId:      m.ProjectID.ValueString(),
-			RegionId:       m.RegionID.ValueString(),
-			Routes:         nonEmptyRoutes,
+			RegionId:       regionID,
+			// Network reservations are not exposed by this resource.
+			Reservations: nil,
+			Routes:       nonEmptyRoutes,
 		},
 	}
 
