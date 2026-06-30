@@ -313,7 +313,6 @@ func (r *SecurityGroupResource) Update(
 	}
 
 	id := data.ID.ValueString()
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
 
 	securityGroupID, err := regionids.ParseSecurityGroupID(id)
 	if err != nil {
@@ -324,7 +323,13 @@ func (r *SecurityGroupResource) Update(
 		return
 	}
 
-	securityGroupUpdateResponse, err := r.client.Region.PutApiV2SecuritygroupsSecurityGroupID(ctx, securityGroupID, params)
+	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+
+	securityGroupUpdateResponse, err := r.client.Region.PutApiV2SecuritygroupsSecurityGroupID(
+		ctx,
+		securityGroupID,
+		params,
+	)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update Security Group",
@@ -392,9 +397,9 @@ func (r *SecurityGroupResource) Delete(
 	// Retry while the API reports the SG is still in use — typically a parallel
 	// instance update is dropping the reference. See nscale.RetryDelete.
 	err = nscale.RetryDelete(ctx, deleteTimeout, func(ctx context.Context) (error, bool) {
-		deleteResponse, err := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, securityGroupID)
-		if err != nil {
-			return err, false
+		deleteResponse, deleteErr := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, securityGroupID)
+		if deleteErr != nil {
+			return deleteErr, false
 		}
 		defer deleteResponse.Body.Close()
 		if readErr := nscale.ReadEmptyResponse(deleteResponse); readErr != nil {

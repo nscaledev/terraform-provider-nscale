@@ -192,12 +192,12 @@ func sshCACreate(
 }
 
 func sshCADelete(ctx context.Context, client *nscale.Client, id string) error {
-	caID, err := regionids.ParseSSHCertificateAuthorityID(id)
+	sshCAID, err := regionids.ParseSSHCertificateAuthorityID(id)
 	if err != nil {
 		return err
 	}
 
-	deleteResponse, err := client.Region.DeleteApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, caID)
+	deleteResponse, err := client.Region.DeleteApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, sshCAID)
 	if err != nil {
 		return err
 	}

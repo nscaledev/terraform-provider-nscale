@@ -31,12 +31,12 @@ func getSSHCA(
 	id string,
 	client *nscale.Client,
 ) (*regionapi.SshCertificateAuthorityV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	caID, err := regionids.ParseSSHCertificateAuthorityID(id)
+	sshCAID, err := regionids.ParseSSHCertificateAuthorityID(id)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	resp, err := client.Region.GetApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, caID)
+	resp, err := client.Region.GetApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, sshCAID)
 	if err != nil {
 		return nil, nil, err
 	}
