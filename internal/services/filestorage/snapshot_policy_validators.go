@@ -242,7 +242,8 @@ func (v snapshotScheduleShapeValidator) ValidateObject(
 		return
 	}
 
-	switch schedule.Interval.ValueString() {
+	interval := schedule.Interval.ValueString()
+	switch interval {
 	case string(regionapi.StorageSnapshotScheduleIntervalV2Hourly):
 		v.notAllowed(request.Path, "hourly", "time_of_day", schedule.TimeOfDay, response)
 		v.notAllowed(request.Path, "hourly", "day_of_week", schedule.DayOfWeek, response)
@@ -259,6 +260,12 @@ func (v snapshotScheduleShapeValidator) ValidateObject(
 		v.required(request.Path, "monthly", "time_of_day", schedule.TimeOfDay, response)
 		v.required(request.Path, "monthly", "day_of_month", schedule.DayOfMonth, response)
 		v.notAllowed(request.Path, "monthly", "day_of_week", schedule.DayOfWeek, response)
+	default:
+		response.Diagnostics.AddAttributeError(
+			request.Path.AtName("interval"),
+			"Invalid Snapshot Schedule",
+			fmt.Sprintf("Snapshot schedule interval %q is not supported by the provider.", interval),
+		)
 	}
 }
 

@@ -18,7 +18,6 @@ package filestorage
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"time"
 
@@ -166,6 +165,43 @@ type FileStorageSnapshotRetentionModel struct {
 	Keep types.Int64 `tfsdk:"keep"`
 }
 
+func NewFileStorageModel(source *regionapi.StorageV2Read) FileStorageModel {
+	size := types.Int64Value(0)
+	if source.Status.Usage != nil && source.Status.Usage.UsedBytes != nil {
+		size = types.Int64Value(*source.Status.Usage.UsedBytes >> bytesToGiBShift)
+	}
+
+	rootSquash := types.BoolNull()
+	if source.Spec.StorageType.NFS != nil {
+		rootSquash = types.BoolValue(source.Spec.StorageType.NFS.RootSquash)
+	}
+
+	networks := types.ListNull(FileStorageNetworkModelAttributeType)
+	if source.Status.Attachments != nil {
+		networks = NewFileStorageNetworkModels(*source.Status.Attachments)
+	}
+
+	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
+
+	return FileStorageModel{
+		ID:             types.StringValue(source.Metadata.Id),
+		Name:           types.StringValue(source.Metadata.Name),
+		Description:    types.StringPointerValue(source.Metadata.Description),
+		StorageClassID: types.StringValue(source.Status.StorageClassId),
+		Size:           size,
+		Capacity:       types.Int64Value(source.Spec.SizeGiB),
+		RootSquash:     rootSquash,
+		Network:        networks,
+		Tags:           tftypes.TagMapValueMust(tags),
+		ProjectID:      types.StringValue(source.Metadata.ProjectId),
+		RegionID:       types.StringValue(source.Status.RegionId),
+		CreationTime:   types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
+
+		DefaultSnapshotProtectionEnabled: types.BoolPointerValue(source.Spec.DefaultSnapshotProtectionEnabled),
+		SnapshotPolicies:                 NewFileStorageSnapshotPolicies(source.Spec.SnapshotPolicies),
+	}
+}
+
 // snapshotPoliciesAPI converts the Snapshot Policy Set into the
 // API request list while preserving the null-versus-empty distinction the API
 // defines. A null or unknown set returns a nil pointer so the field is omitted
@@ -173,13 +209,15 @@ type FileStorageSnapshotRetentionModel struct {
 // non-nil pointer so the API receives an explicit list — an empty list enforces
 // no policies, a non-empty list enforces exactly that set.
 // Policies are emitted deterministically ordered by name.
-func (m *FileStorageModel) snapshotPoliciesAPI() (*regionapi.StorageSnapshotPolicyListV2Spec, diag.Diagnostics) {
+func (m *FileStorageModel) snapshotPoliciesAPI(
+	ctx context.Context,
+) (*regionapi.StorageSnapshotPolicyListV2Spec, diag.Diagnostics) {
 	if m.SnapshotPolicies.IsNull() || m.SnapshotPolicies.IsUnknown() {
 		return nil, nil
 	}
 
 	var policies []FileStorageSnapshotPolicyModel
-	if diagnostics := m.SnapshotPolicies.ElementsAs(context.TODO(), &policies, false); diagnostics.HasError() {
+	if diagnostics := m.SnapshotPolicies.ElementsAs(ctx, &policies, false); diagnostics.HasError() {
 		return nil, diagnostics
 	}
 
@@ -243,46 +281,9 @@ func defaultSnapshotProtectionPointer(value types.Bool) *bool {
 	return value.ValueBoolPointer()
 }
 
-func NewFileStorageModel(source *regionapi.StorageV2Read) FileStorageModel {
-	size := types.Int64Value(0)
-	if source.Status.Usage != nil && source.Status.Usage.UsedBytes != nil {
-		size = types.Int64Value(*source.Status.Usage.UsedBytes >> bytesToGiBShift)
-	}
-
-	rootSquash := types.BoolNull()
-	if source.Spec.StorageType.NFS != nil {
-		rootSquash = types.BoolValue(source.Spec.StorageType.NFS.RootSquash)
-	}
-
-	networks := types.ListNull(FileStorageNetworkModelAttributeType)
-	if source.Status.Attachments != nil {
-		networks = NewFileStorageNetworkModels(*source.Status.Attachments)
-	}
-
-	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
-
-	return FileStorageModel{
-		ID:             types.StringValue(source.Metadata.Id),
-		Name:           types.StringValue(source.Metadata.Name),
-		Description:    types.StringPointerValue(source.Metadata.Description),
-		StorageClassID: types.StringValue(source.Status.StorageClassId),
-		Size:           size,
-		Capacity:       types.Int64Value(source.Spec.SizeGiB),
-		RootSquash:     rootSquash,
-		Network:        networks,
-		Tags:           tftypes.TagMapValueMust(tags),
-		ProjectID:      types.StringValue(source.Metadata.ProjectId),
-		RegionID:       types.StringValue(source.Status.RegionId),
-		CreationTime:   types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
-
-		DefaultSnapshotProtectionEnabled: types.BoolPointerValue(source.Spec.DefaultSnapshotProtectionEnabled),
-		SnapshotPolicies:                 NewFileStorageSnapshotPolicies(source.Spec.SnapshotPolicies),
-	}
-}
-
-func (m *FileStorageModel) networkIDs() ([]string, diag.Diagnostics) {
+func (m *FileStorageModel) networkIDs(ctx context.Context) ([]string, diag.Diagnostics) {
 	var networks []FileStorageNetworkModel
-	if diagnostics := m.Network.ElementsAs(context.TODO(), &networks, false); diagnostics.HasError() {
+	if diagnostics := m.Network.ElementsAs(ctx, &networks, false); diagnostics.HasError() {
 		return nil, diagnostics
 	}
 
@@ -295,6 +296,7 @@ func (m *FileStorageModel) networkIDs() ([]string, diag.Diagnostics) {
 }
 
 func (m *FileStorageModel) NscaleFileStorageCreateParams(
+	ctx context.Context,
 	organizationID string,
 ) (regionapi.StorageV2Create, diag.Diagnostics) {
 	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
@@ -304,22 +306,18 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 
 	tags = nscale.RemoveOperationTags(tags)
 
-	networkIDs, diagnostics := m.networkIDs()
+	networkIDs, diagnostics := m.networkIDs(ctx)
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Create{}, diagnostics
 	}
 
-	snapshotPolicies, diagnostics := m.snapshotPoliciesAPI()
+	snapshotPolicies, diagnostics := m.snapshotPoliciesAPI(ctx)
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Create{}, diagnostics
 	}
 
-	regionID, err := regionids.ParseRegionID(m.RegionID.ValueString())
-	if err != nil {
-		diagnostics.AddError(
-			"Invalid Region ID",
-			fmt.Sprintf("Could not parse region ID %q: %s", m.RegionID.ValueString(), err),
-		)
+	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", regionids.ParseRegionID, &diagnostics)
+	if !ok {
 		return regionapi.StorageV2Create{}, diagnostics
 	}
 
@@ -348,7 +346,9 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 	return fileStorage, nil
 }
 
-func (m *FileStorageModel) NscaleFileStorageUpdateParams() (regionapi.StorageV2Update, diag.Diagnostics) {
+func (m *FileStorageModel) NscaleFileStorageUpdateParams(
+	ctx context.Context,
+) (regionapi.StorageV2Update, diag.Diagnostics) {
 	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Update{}, diagnostics
@@ -356,12 +356,12 @@ func (m *FileStorageModel) NscaleFileStorageUpdateParams() (regionapi.StorageV2U
 
 	tags = nscale.RemoveOperationTags(tags)
 
-	networkIDs, diagnostics := m.networkIDs()
+	networkIDs, diagnostics := m.networkIDs(ctx)
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Update{}, diagnostics
 	}
 
-	snapshotPolicies, diagnostics := m.snapshotPoliciesAPI()
+	snapshotPolicies, diagnostics := m.snapshotPoliciesAPI(ctx)
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Update{}, diagnostics
 	}

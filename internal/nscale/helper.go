@@ -52,6 +52,20 @@ func ReadTerraformState[T any](ctx context.Context, fn StateReaderFunc, mutates 
 	return data, nil
 }
 
+// ParseID parses a typed SDK ID and appends a consistent Terraform diagnostic on failure.
+func ParseID[T any](raw, label string, parse func(string) (T, error), diagnostics *diag.Diagnostics) (T, bool) {
+	id, err := parse(raw)
+	if err != nil {
+		diagnostics.AddError(
+			fmt.Sprintf("Invalid %s ID", label),
+			fmt.Sprintf("Could not parse %s ID %q: %s", strings.ToLower(label), raw, err),
+		)
+		return id, false
+	}
+
+	return id, true
+}
+
 func assertState[T any](state any, diagnostics *diag.Diagnostics) (*T, bool) {
 	var zero *T
 

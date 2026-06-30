@@ -213,6 +213,18 @@ func TestSnapshotScheduleShapeMonthlyRequiresDayOfMonth(t *testing.T) {
 	}
 }
 
+// If the interval enum validator is extended without adding shape rules here,
+// the shape validator must fail closed instead of silently accepting it.
+func TestSnapshotScheduleShapeRejectsUnsupportedInterval(t *testing.T) {
+	schedule := scheduleObject("yearly", nil, nil, nil)
+
+	response := runObjectValidator(schedule)
+
+	if !response.Diagnostics.HasError() {
+		t.Fatal("HasError() = false, want true for an unsupported schedule interval")
+	}
+}
+
 // Each interval has exactly one well-formed shape: hourly carries no timing
 // fields, daily a time, weekly a time and weekday, monthly a time and day of
 // month. The validator must accept these and never invent a diff for a correct

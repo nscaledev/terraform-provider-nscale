@@ -250,12 +250,8 @@ func networkUpdate(
 		return "", diagnostics
 	}
 
-	networkID, err := regionids.ParseNetworkID(id)
-	if err != nil {
-		diagnostics.AddError(
-			"Invalid Network ID",
-			fmt.Sprintf("Could not parse network ID %q: %s", id, err),
-		)
+	networkID, ok := nscale.ParseID(id, "Network", regionids.ParseNetworkID, &diagnostics)
+	if !ok {
 		return "", diagnostics
 	}
 

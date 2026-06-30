@@ -2,17 +2,63 @@ package nscale
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 )
 
 type waitTestResource struct {
 	name string
+}
+
+func TestParseIDReturnsParsedID(t *testing.T) {
+	var diagnostics diag.Diagnostics
+
+	got, ok := ParseID("raw", "Project", func(raw string) (string, error) {
+		return "parsed-" + raw, nil
+	}, &diagnostics)
+	if !ok {
+		t.Fatalf("ParseID() returned ok=false with diagnostics: %#v", diagnostics)
+	}
+
+	if got != "parsed-raw" {
+		t.Fatalf("ParseID() returned %q, want %q", got, "parsed-raw")
+	}
+
+	if len(diagnostics) != 0 {
+		t.Fatalf("ParseID() returned unexpected diagnostics: %#v", diagnostics)
+	}
+}
+
+func TestParseIDAddsDiagnostic(t *testing.T) {
+	var diagnostics diag.Diagnostics
+
+	_, ok := ParseID("not-id", "File Storage", func(string) (string, error) {
+		return "", errors.New("not a uuid")
+	}, &diagnostics)
+	if ok {
+		t.Fatal("ParseID() returned ok=true, want ok=false")
+	}
+
+	errs := diagnostics.Errors()
+	if len(errs) != 1 {
+		t.Fatalf("ParseID() returned %d error diagnostics, want 1: %#v", len(errs), diagnostics)
+	}
+
+	if errs[0].Summary() != "Invalid File Storage ID" {
+		t.Fatalf("ParseID() summary = %q, want %q", errs[0].Summary(), "Invalid File Storage ID")
+	}
+
+	const wantDetail = `Could not parse file storage ID "not-id": not a uuid`
+	if errs[0].Detail() != wantDetail {
+		t.Fatalf("ParseID() detail = %q, want %q", errs[0].Detail(), wantDetail)
+	}
 }
 
 // TestCreateStateWatcherWaitHandlesTransientProvisioningStates ensures create waits continue polling through non-terminal provisioning states.

@@ -17,6 +17,7 @@ limitations under the License.
 package filestorage
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -211,7 +212,7 @@ func TestNscaleFileStorageCreateParamsDefaultSnapshotProtectionEnabled(t *testin
 				DefaultSnapshotProtectionEnabled: tt.configured,
 			}
 
-			params, diagnostics := model.NscaleFileStorageCreateParams("org")
+			params, diagnostics := model.NscaleFileStorageCreateParams(context.Background(), "org")
 			if diagnostics.HasError() {
 				t.Fatalf("unexpected diagnostics: %v", diagnostics)
 			}
@@ -339,7 +340,7 @@ func TestNscaleFileStorageCreateParamsSnapshotPolicies(t *testing.T) {
 				SnapshotPolicies: tt.policies,
 			}
 
-			params, diagnostics := model.NscaleFileStorageCreateParams("org")
+			params, diagnostics := model.NscaleFileStorageCreateParams(context.Background(), "org")
 			if diagnostics.HasError() {
 				t.Fatalf("unexpected diagnostics: %v", diagnostics)
 			}
@@ -366,7 +367,7 @@ func TestNscaleFileStorageCreateParamsMarshalsSingleCustomPolicy(t *testing.T) {
 		SnapshotPolicies: singleDailySnapshotPolicySet(),
 	}
 
-	params, diagnostics := model.NscaleFileStorageCreateParams("org")
+	params, diagnostics := model.NscaleFileStorageCreateParams(context.Background(), "org")
 	if diagnostics.HasError() {
 		t.Fatalf("unexpected diagnostics: %v", diagnostics)
 	}
@@ -445,7 +446,7 @@ func TestNscaleFileStorageUpdateParamsSnapshotPolicyOrderIsDeterministic(t *test
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			model := makeModel(tt.policies)
-			params, diagnostics := model.NscaleFileStorageUpdateParams()
+			params, diagnostics := model.NscaleFileStorageUpdateParams(context.Background())
 			if diagnostics.HasError() {
 				t.Fatalf("unexpected diagnostics: %v", diagnostics)
 			}
@@ -479,7 +480,7 @@ func TestNscaleFileStorageUpdateParamsDefaultSnapshotProtectionEnabled(t *testin
 				DefaultSnapshotProtectionEnabled: tt.configured,
 			}
 
-			params, diagnostics := model.NscaleFileStorageUpdateParams()
+			params, diagnostics := model.NscaleFileStorageUpdateParams(context.Background())
 			if diagnostics.HasError() {
 				t.Fatalf("unexpected diagnostics: %v", diagnostics)
 			}
@@ -526,7 +527,7 @@ func TestNscaleFileStorageUpdateParamsSnapshotPolicies(t *testing.T) {
 				SnapshotPolicies: tt.policies,
 			}
 
-			params, diagnostics := model.NscaleFileStorageUpdateParams()
+			params, diagnostics := model.NscaleFileStorageUpdateParams(context.Background())
 			if diagnostics.HasError() {
 				t.Fatalf("unexpected diagnostics: %v", diagnostics)
 			}

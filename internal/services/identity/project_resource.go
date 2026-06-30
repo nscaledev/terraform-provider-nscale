@@ -160,12 +160,13 @@ func projectCreate(
 		return nil, diagnostics
 	}
 
-	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
-	if err != nil {
-		diagnostics.AddError(
-			"Invalid Organization ID",
-			fmt.Sprintf("Could not parse organization ID %q: %s", client.OrganizationID, err),
-		)
+	organizationID, ok := nscale.ParseID(
+		client.OrganizationID,
+		"Organization",
+		identityids.ParseOrganizationID,
+		&diagnostics,
+	)
+	if !ok {
 		return nil, diagnostics
 	}
 
@@ -207,21 +208,18 @@ func projectUpdate(
 		return "", diagnostics
 	}
 
-	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
-	if err != nil {
-		diagnostics.AddError(
-			"Invalid Organization ID",
-			fmt.Sprintf("Could not parse organization ID %q: %s", client.OrganizationID, err),
-		)
+	organizationID, ok := nscale.ParseID(
+		client.OrganizationID,
+		"Organization",
+		identityids.ParseOrganizationID,
+		&diagnostics,
+	)
+	if !ok {
 		return "", diagnostics
 	}
 
-	projectID, err := identityids.ParseProjectID(id)
-	if err != nil {
-		diagnostics.AddError(
-			"Invalid Project ID",
-			fmt.Sprintf("Could not parse project ID %q: %s", id, err),
-		)
+	projectID, ok := nscale.ParseID(id, "Project", identityids.ParseProjectID, &diagnostics)
+	if !ok {
 		return "", diagnostics
 	}
 

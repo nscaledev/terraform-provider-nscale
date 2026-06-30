@@ -356,7 +356,7 @@ func (r *FileStorageResource) Create(
 		return
 	}
 
-	params, diagnostics := data.NscaleFileStorageCreateParams(r.client.OrganizationID)
+	params, diagnostics := data.NscaleFileStorageCreateParams(ctx, r.client.OrganizationID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -463,7 +463,7 @@ func (r *FileStorageResource) Update(
 		return
 	}
 
-	params, diagnostics := data.NscaleFileStorageUpdateParams()
+	params, diagnostics := data.NscaleFileStorageUpdateParams(ctx)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -471,12 +471,8 @@ func (r *FileStorageResource) Update(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, err := regionids.ParseFileStorageID(id)
-	if err != nil {
-		response.Diagnostics.AddError(
-			"Invalid File Storage ID",
-			fmt.Sprintf("Could not parse file storage ID %q: %s", id, err),
-		)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", regionids.ParseFileStorageID, &response.Diagnostics)
+	if !ok {
 		return
 	}
 
@@ -534,12 +530,8 @@ func (r *FileStorageResource) Delete(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, err := regionids.ParseFileStorageID(id)
-	if err != nil {
-		response.Diagnostics.AddError(
-			"Invalid File Storage ID",
-			fmt.Sprintf("Could not parse file storage ID %q: %s", id, err),
-		)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", regionids.ParseFileStorageID, &response.Diagnostics)
+	if !ok {
 		return
 	}
 
@@ -554,7 +546,7 @@ func (r *FileStorageResource) Delete(
 	defer fileStorageDeleteResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(fileStorageDeleteResponse); err != nil {
-		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+		if e, isAPIError := nscale.AsAPIError(err); isAPIError && e.StatusCode != http.StatusNotFound {
 			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 			response.Diagnostics.AddError(
 				"Failed to Delete File Storage",

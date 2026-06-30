@@ -18,7 +18,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -103,12 +102,8 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 		nonEmptyRoutes = &routes
 	}
 
-	regionID, err := regionids.ParseRegionID(m.RegionID.ValueString())
-	if err != nil {
-		diagnostics.AddError(
-			"Invalid Region ID",
-			fmt.Sprintf("Could not parse region ID %q: %s", m.RegionID.ValueString(), err),
-		)
+	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", regionids.ParseRegionID, &diagnostics)
+	if !ok {
 		return regionapi.NetworkV2Create{}, diagnostics
 	}
 
