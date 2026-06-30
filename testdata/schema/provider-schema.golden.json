@@ -191,6 +191,12 @@
                 "description_kind": "markdown",
                 "type": "string"
               },
+              "default_snapshot_protection_enabled": {
+                "computed": true,
+                "description": "Whether platform-managed Default Snapshot Protection is enabled for the file storage. This is separate from any user-managed snapshot policies.",
+                "description_kind": "markdown",
+                "type": "bool"
+              },
               "description": {
                 "computed": true,
                 "description": "The description of the file storage.",
@@ -232,6 +238,72 @@
                 "description": "The amount of storage currently used, in gibibytes.",
                 "description_kind": "markdown",
                 "type": "number"
+              },
+              "snapshot_policies": {
+                "computed": true,
+                "description": "The user-managed snapshot policies for the file storage, identified by `name`.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "name": {
+                      "computed": true,
+                      "description": "The snapshot policy name.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "retention": {
+                      "computed": true,
+                      "description": "How many snapshots this policy retains.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "keep": {
+                            "computed": true,
+                            "description": "The number of snapshots to retain.",
+                            "description_kind": "markdown",
+                            "type": "number"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      }
+                    },
+                    "schedule": {
+                      "computed": true,
+                      "description": "When snapshots are taken for this policy.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "day_of_month": {
+                            "computed": true,
+                            "description": "The day of month snapshots are taken (1 through 28).",
+                            "description_kind": "markdown",
+                            "type": "number"
+                          },
+                          "day_of_week": {
+                            "computed": true,
+                            "description": "The day of week snapshots are taken (`monday` through `sunday`).",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          },
+                          "interval": {
+                            "computed": true,
+                            "description": "The snapshot cadence: `hourly`, `daily`, `weekly`, or `monthly`.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          },
+                          "time_of_day": {
+                            "computed": true,
+                            "description": "The UTC time of day snapshots are taken, in `HH:MMZ` form.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      }
+                    }
+                  },
+                  "nesting_mode": "set"
+                }
               },
               "storage_class_id": {
                 "computed": true,
@@ -1793,6 +1865,13 @@
                 "description_kind": "markdown",
                 "type": "string"
               },
+              "default_snapshot_protection_enabled": {
+                "computed": true,
+                "description": "Whether platform-managed Default Snapshot Protection is enabled for the file storage. This is separate from any user-managed snapshot policies. When omitted or null, the platform default applies and Terraform reads back the resolved value without enforcing it; when set to `true` or `false`, Terraform manages the setting and drift-corrects out-of-band changes.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "bool"
+              },
               "description": {
                 "description": "The description of the file storage.",
                 "description_kind": "markdown",
@@ -1843,6 +1922,73 @@
                 "description": "The amount of storage currently used, in gibibytes.",
                 "description_kind": "markdown",
                 "type": "number"
+              },
+              "snapshot_policies": {
+                "computed": true,
+                "description": "The user-managed snapshot policies for the file storage. These are separate from platform-managed Default Snapshot Protection, which is never represented here. When omitted or null, Terraform observes and preserves whatever policies exist remotely; when set to an empty set (`[]`), Terraform enforces that no user-managed policies exist; when set to one or more policies, Terraform enforces exactly that set. Policies are identified by `name` and ordering is not significant. At most four policies are allowed.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "name": {
+                      "description": "The snapshot policy name. Acts as the policy's stable identity key and must be unique within the file storage.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    },
+                    "retention": {
+                      "description": "How many snapshots this policy retains.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "keep": {
+                            "description": "The number of snapshots to retain.",
+                            "description_kind": "markdown",
+                            "required": true,
+                            "type": "number"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      },
+                      "required": true
+                    },
+                    "schedule": {
+                      "description": "When snapshots are taken for this policy.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "day_of_month": {
+                            "description": "The UTC day of month snapshots are taken (1 through 28). Applies to monthly schedules.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "number"
+                          },
+                          "day_of_week": {
+                            "description": "The UTC day of week snapshots are taken (`monday` through `sunday`). Applies to weekly schedules.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "string"
+                          },
+                          "interval": {
+                            "description": "The snapshot cadence: `hourly`, `daily`, `weekly`, or `monthly`.",
+                            "description_kind": "markdown",
+                            "required": true,
+                            "type": "string"
+                          },
+                          "time_of_day": {
+                            "description": "The UTC time of day snapshots are taken, in `HH:MMZ` form. Applies to daily, weekly, and monthly schedules.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      },
+                      "required": true
+                    }
+                  },
+                  "nesting_mode": "set"
+                },
+                "optional": true
               },
               "storage_class_id": {
                 "description": "The identifier of the storage class used for the file storage.",

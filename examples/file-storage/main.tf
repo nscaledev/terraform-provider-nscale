@@ -33,6 +33,21 @@ resource "nscale_file_storage" "example" {
   capacity         = 20
   root_squash      = true
 
+  # This keeps a daily snapshot taken at 02:00 UTC and retains the seven most recent.
+  # Policies are identified by name; ordering is not significant.
+  snapshot_policies = [
+    {
+      name = "daily"
+      schedule = {
+        interval    = "daily"
+        time_of_day = "02:00Z"
+      }
+      retention = {
+        keep = 7
+      }
+    }
+  ]
+
   network {
     id = nscale_network.example.id
   }

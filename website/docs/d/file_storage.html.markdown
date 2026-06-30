@@ -9,6 +9,11 @@ description: |-
 
 Retrieves information about an existing file storage by its unique identifier.
 
+The data source exposes both snapshot controls as computed values: `default_snapshot_protection_enabled` reflects the
+platform-managed Default Snapshot Protection setting, and `snapshot_policies` reflects the user-managed snapshot
+policy set (the hidden platform-managed default object is never included). See the
+[`nscale_file_storage` resource](../r/file_storage.html.markdown) for how these two controls differ.
+
 ## Example Usage
 
 ```hcl
@@ -28,6 +33,7 @@ data "nscale_file_storage" "example" {
 
 - `capacity` (Number) The total capacity of the file storage, in gibibytes.
 - `creation_time` (String) The timestamp when the file storage was created.
+- `default_snapshot_protection_enabled` (Boolean) Whether platform-managed Default Snapshot Protection is enabled for the file storage. This is separate from any user-managed snapshot policies.
 - `description` (String) The description of the file storage.
 - `name` (String) The name of the file storage.
 - `network` (Block List) The network to which the file storage is attached. (see [below for nested schema](#nestedblock--network))
@@ -35,6 +41,7 @@ data "nscale_file_storage" "example" {
 - `region_id` (String) The identifier of the region where the file storage is provisioned.
 - `root_squash` (Boolean) Indicates whether root squashing is enabled for the file storage.
 - `size` (Number) The amount of storage currently used, in gibibytes.
+- `snapshot_policies` (Attributes Set) The user-managed snapshot policies for the file storage, identified by `name`. (see [below for nested schema](#nestedatt--snapshot_policies))
 - `storage_class_id` (String) The identifier of the storage class assigned to the file storage.
 - `tags` (Map of String) A map of tags assigned to the file storage.
 
@@ -45,3 +52,31 @@ Read-Only:
 
 - `id` (String) The identifier of the network to which the file storage is attached.
 - `mount_source` (String) The network path for mounting the file storage.
+
+
+<a id="nestedatt--snapshot_policies"></a>
+### Nested Schema for `snapshot_policies`
+
+Read-Only:
+
+- `name` (String) The snapshot policy name.
+- `retention` (Attributes) How many snapshots this policy retains. (see [below for nested schema](#nestedatt--snapshot_policies--retention))
+- `schedule` (Attributes) When snapshots are taken for this policy. (see [below for nested schema](#nestedatt--snapshot_policies--schedule))
+
+<a id="nestedatt--snapshot_policies--retention"></a>
+### Nested Schema for `snapshot_policies.retention`
+
+Read-Only:
+
+- `keep` (Number) The number of snapshots to retain.
+
+
+<a id="nestedatt--snapshot_policies--schedule"></a>
+### Nested Schema for `snapshot_policies.schedule`
+
+Read-Only:
+
+- `day_of_month` (Number) The day of month snapshots are taken (1 through 28).
+- `day_of_week` (String) The day of week snapshots are taken (`monday` through `sunday`).
+- `interval` (String) The snapshot cadence: `hourly`, `daily`, `weekly`, or `monthly`.
+- `time_of_day` (String) The UTC time of day snapshots are taken, in `HH:MMZ` form.

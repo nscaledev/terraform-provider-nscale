@@ -314,12 +314,8 @@ func (r *SecurityGroupResource) Update(
 
 	id := data.ID.ValueString()
 
-	securityGroupID, err := regionids.ParseSecurityGroupID(id)
-	if err != nil {
-		response.Diagnostics.AddError(
-			"Invalid Security Group ID",
-			fmt.Sprintf("Could not parse security group ID %q: %s", id, err),
-		)
+	securityGroupID, ok := nscale.ParseID(id, "Security Group", regionids.ParseSecurityGroupID, &response.Diagnostics)
+	if !ok {
 		return
 	}
 
@@ -379,12 +375,8 @@ func (r *SecurityGroupResource) Delete(
 
 	id := data.ID.ValueString()
 
-	securityGroupID, err := regionids.ParseSecurityGroupID(id)
-	if err != nil {
-		response.Diagnostics.AddError(
-			"Invalid Security Group ID",
-			fmt.Sprintf("Could not parse security group ID %q: %s", id, err),
-		)
+	securityGroupID, ok := nscale.ParseID(id, "Security Group", regionids.ParseSecurityGroupID, &response.Diagnostics)
+	if !ok {
 		return
 	}
 
@@ -396,7 +388,7 @@ func (r *SecurityGroupResource) Delete(
 
 	// Retry while the API reports the SG is still in use — typically a parallel
 	// instance update is dropping the reference. See nscale.RetryDelete.
-	err = nscale.RetryDelete(ctx, deleteTimeout, func(ctx context.Context) (error, bool) {
+	err := nscale.RetryDelete(ctx, deleteTimeout, func(ctx context.Context) (error, bool) {
 		deleteResponse, deleteErr := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, securityGroupID)
 		if deleteErr != nil {
 			return deleteErr, false

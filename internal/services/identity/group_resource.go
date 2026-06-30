@@ -195,12 +195,13 @@ func groupCreate(
 		return nil, diagnostics
 	}
 
-	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
-	if err != nil {
-		diagnostics.AddError(
-			"Invalid Organization ID",
-			fmt.Sprintf("Could not parse organization ID %q: %s", client.OrganizationID, err),
-		)
+	organizationID, ok := nscale.ParseID(
+		client.OrganizationID,
+		"Organization",
+		identityids.ParseOrganizationID,
+		&diagnostics,
+	)
+	if !ok {
 		return nil, diagnostics
 	}
 
@@ -242,21 +243,18 @@ func groupUpdate(
 		return "", diagnostics
 	}
 
-	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
-	if err != nil {
-		diagnostics.AddError(
-			"Invalid Organization ID",
-			fmt.Sprintf("Could not parse organization ID %q: %s", client.OrganizationID, err),
-		)
+	organizationID, ok := nscale.ParseID(
+		client.OrganizationID,
+		"Organization",
+		identityids.ParseOrganizationID,
+		&diagnostics,
+	)
+	if !ok {
 		return "", diagnostics
 	}
 
-	groupID, err := identityids.ParseGroupID(id)
-	if err != nil {
-		diagnostics.AddError(
-			"Invalid Group ID",
-			fmt.Sprintf("Could not parse group ID %q: %s", id, err),
-		)
+	groupID, ok := nscale.ParseID(id, "Group", identityids.ParseGroupID, &diagnostics)
+	if !ok {
 		return "", diagnostics
 	}
 

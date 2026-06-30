@@ -18,7 +18,6 @@ package securitygroup
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -124,12 +123,8 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 		rules = append(rules, source.NscaleSecurityGroupRule())
 	}
 
-	networkID, err := regionids.ParseNetworkID(m.NetworkID.ValueString())
-	if err != nil {
-		diagnostics.AddError(
-			"Invalid Network ID",
-			fmt.Sprintf("Could not parse network ID %q: %s", m.NetworkID.ValueString(), err),
-		)
+	networkID, ok := nscale.ParseID(m.NetworkID.ValueString(), "Network", regionids.ParseNetworkID, &diagnostics)
+	if !ok {
 		return regionapi.SecurityGroupV2Create{}, diagnostics
 	}
 

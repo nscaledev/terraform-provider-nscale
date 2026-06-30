@@ -113,12 +113,13 @@ func (s *RegionDataSource) Read(
 		return
 	}
 
-	organizationID, err := identityids.ParseOrganizationID(s.client.OrganizationID)
-	if err != nil {
-		response.Diagnostics.AddError(
-			"Invalid Organization ID",
-			fmt.Sprintf("Could not parse organization ID %q: %s", s.client.OrganizationID, err),
-		)
+	organizationID, ok := nscale.ParseID(
+		s.client.OrganizationID,
+		"Organization",
+		identityids.ParseOrganizationID,
+		&response.Diagnostics,
+	)
+	if !ok {
 		return
 	}
 

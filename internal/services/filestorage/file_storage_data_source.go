@@ -89,6 +89,55 @@ func (s *FileStorageDataSource) Schema(
 				MarkdownDescription: "Indicates whether root squashing is enabled for the file storage.",
 				Computed:            true,
 			},
+			"default_snapshot_protection_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether platform-managed Default Snapshot Protection is enabled for the file storage. " +
+					"This is separate from any user-managed snapshot policies.",
+				Computed: true,
+			},
+			"snapshot_policies": schema.SetNestedAttribute{
+				MarkdownDescription: "The user-managed snapshot policies for the file storage, identified by `name`.",
+				Computed:            true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							MarkdownDescription: "The snapshot policy name.",
+							Computed:            true,
+						},
+						"schedule": schema.SingleNestedAttribute{
+							MarkdownDescription: "When snapshots are taken for this policy.",
+							Computed:            true,
+							Attributes: map[string]schema.Attribute{
+								"interval": schema.StringAttribute{
+									MarkdownDescription: "The snapshot cadence: `hourly`, `daily`, `weekly`, or `monthly`.",
+									Computed:            true,
+								},
+								"time_of_day": schema.StringAttribute{
+									MarkdownDescription: "The UTC time of day snapshots are taken, in `HH:MMZ` form.",
+									Computed:            true,
+								},
+								"day_of_week": schema.StringAttribute{
+									MarkdownDescription: "The day of week snapshots are taken (`monday` through `sunday`).",
+									Computed:            true,
+								},
+								"day_of_month": schema.Int64Attribute{
+									MarkdownDescription: "The day of month snapshots are taken (1 through 28).",
+									Computed:            true,
+								},
+							},
+						},
+						"retention": schema.SingleNestedAttribute{
+							MarkdownDescription: "How many snapshots this policy retains.",
+							Computed:            true,
+							Attributes: map[string]schema.Attribute{
+								"keep": schema.Int64Attribute{
+									MarkdownDescription: "The number of snapshots to retain.",
+									Computed:            true,
+								},
+							},
+						},
+					},
+				},
+			},
 			"tags": schema.MapAttribute{
 				MarkdownDescription: "A map of tags assigned to the file storage.",
 				ElementType:         types.StringType,

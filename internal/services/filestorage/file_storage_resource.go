@@ -23,6 +23,7 @@ import (
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -30,6 +31,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 	regionids "github.com/unikorn-cloud/region/pkg/ids"
@@ -149,6 +151,72 @@ func (r *FileStorageResource) Schema(
 				MarkdownDescription: "Whether root squashing is applied to the file storage to restrict root access for clients.",
 				Required:            true,
 			},
+			"default_snapshot_protection_enabled": schema.BoolAttribute{
+				MarkdownDescription: "Whether platform-managed Default Snapshot Protection is enabled for the file storage. " +
+					"This is separate from any user-managed snapshot policies. When omitted or null, the platform default " +
+					"applies and Terraform reads back the resolved value without enforcing it; when set to `true` or `false`, " +
+					"Terraform manages the setting and drift-corrects out-of-band changes.",
+				Optional: true,
+				Computed: true,
+			},
+			"snapshot_policies": schema.SetNestedAttribute{
+				MarkdownDescription: "The user-managed snapshot policies for the file storage. These are separate from " +
+					"platform-managed Default Snapshot Protection, which is never represented here. When omitted or null, " +
+					"Terraform observes and preserves whatever policies exist remotely; when set to an empty set (`[]`), " +
+					"Terraform enforces that no user-managed policies exist; when set to one or more policies, Terraform " +
+					"enforces exactly that set. Policies are identified by `name` and ordering is not significant. " +
+					"At most four policies are allowed.",
+				Optional:   true,
+				Computed:   true,
+				Validators: snapshotPoliciesSetValidators(),
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"name": schema.StringAttribute{
+							MarkdownDescription: "The snapshot policy name. Acts as the policy's stable identity key and must be unique within the file storage.",
+							Required:            true,
+							Validators:          snapshotPolicyNameValidators(),
+						},
+						"schedule": schema.SingleNestedAttribute{
+							MarkdownDescription: "When snapshots are taken for this policy.",
+							Required:            true,
+							Validators:          snapshotScheduleValidators(),
+							Attributes: map[string]schema.Attribute{
+								"interval": schema.StringAttribute{
+									MarkdownDescription: "The snapshot cadence: `hourly`, `daily`, `weekly`, or `monthly`.",
+									Required:            true,
+									Validators:          snapshotScheduleIntervalValidators(),
+								},
+								"time_of_day": schema.StringAttribute{
+									MarkdownDescription: "The UTC time of day snapshots are taken, in `HH:MMZ` form. Applies to daily, weekly, and monthly schedules.",
+									Optional:            true,
+									Validators:          snapshotTimeOfDayValidators(),
+								},
+								"day_of_week": schema.StringAttribute{
+									MarkdownDescription: "The UTC day of week snapshots are taken (`monday` through `sunday`). Applies to weekly schedules.",
+									Optional:            true,
+									Validators:          snapshotDayOfWeekValidators(),
+								},
+								"day_of_month": schema.Int64Attribute{
+									MarkdownDescription: "The UTC day of month snapshots are taken (1 through 28). Applies to monthly schedules.",
+									Optional:            true,
+									Validators:          snapshotDayOfMonthValidators(),
+								},
+							},
+						},
+						"retention": schema.SingleNestedAttribute{
+							MarkdownDescription: "How many snapshots this policy retains.",
+							Required:            true,
+							Attributes: map[string]schema.Attribute{
+								"keep": schema.Int64Attribute{
+									MarkdownDescription: "The number of snapshots to retain.",
+									Required:            true,
+									Validators:          snapshotRetentionKeepValidators(),
+								},
+							},
+						},
+					},
+				},
+			},
 			"tags": schema.MapAttribute{
 				MarkdownDescription: "A map of tags assigned to the file storage.",
 				ElementType:         types.StringType,
@@ -221,6 +289,37 @@ func (r *FileStorageResource) setDefaults(data *FileStorageResourceModel) {
 	}
 }
 
+// configuredDefaultSnapshotProtection reads the Default Snapshot Protection
+// value exactly as written in configuration. The attribute is optional/computed,
+// so its plan and state values can hold a previously API-resolved value; only
+// the configuration distinguishes a setting the user explicitly manages (a known
+// value, to be enforced) from one they omit (null, to be observed).
+func configuredDefaultSnapshotProtection(
+	ctx context.Context,
+	config tfsdk.Config,
+	diagnostics *diag.Diagnostics,
+) types.Bool {
+	var value types.Bool
+	diagnostics.Append(config.GetAttribute(ctx, path.Root("default_snapshot_protection_enabled"), &value)...)
+	return value
+}
+
+// configuredSnapshotPolicies reads the user-managed Snapshot Policy Set exactly
+// as written in configuration. Like Default Snapshot Protection, the attribute
+// is optional/computed, so its plan and state values can hold an API-read set;
+// only the configuration separates an explicitly managed set — including an
+// explicit empty set (`[]`) that enforces no user-managed policies — from an
+// omitted/null set that merely observes the remote value.
+func configuredSnapshotPolicies(
+	ctx context.Context,
+	config tfsdk.Config,
+	diagnostics *diag.Diagnostics,
+) types.Set {
+	var value types.Set
+	diagnostics.Append(config.GetAttribute(ctx, path.Root("snapshot_policies"), &value)...)
+	return value
+}
+
 func (m *FileStorageResourceModel) preserveSizeIfUsageRefreshDisabled(previousSize types.Int64) {
 	if m.RefreshUsage.ValueBool() {
 		return
@@ -247,7 +346,17 @@ func (r *FileStorageResource) Create(
 	}
 	data.ProjectID = types.StringValue(projectID)
 
-	params, diagnostics := data.NscaleFileStorageCreateParams(r.client.OrganizationID)
+	data.DefaultSnapshotProtectionEnabled = configuredDefaultSnapshotProtection(
+		ctx,
+		request.Config,
+		&response.Diagnostics,
+	)
+	data.SnapshotPolicies = configuredSnapshotPolicies(ctx, request.Config, &response.Diagnostics)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	params, diagnostics := data.NscaleFileStorageCreateParams(ctx, r.client.OrganizationID)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -344,7 +453,17 @@ func (r *FileStorageResource) Update(
 		return
 	}
 
-	params, diagnostics := data.NscaleFileStorageUpdateParams()
+	data.DefaultSnapshotProtectionEnabled = configuredDefaultSnapshotProtection(
+		ctx,
+		request.Config,
+		&response.Diagnostics,
+	)
+	data.SnapshotPolicies = configuredSnapshotPolicies(ctx, request.Config, &response.Diagnostics)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	params, diagnostics := data.NscaleFileStorageUpdateParams(ctx)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -352,12 +471,8 @@ func (r *FileStorageResource) Update(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, err := regionids.ParseFileStorageID(id)
-	if err != nil {
-		response.Diagnostics.AddError(
-			"Invalid File Storage ID",
-			fmt.Sprintf("Could not parse file storage ID %q: %s", id, err),
-		)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", regionids.ParseFileStorageID, &response.Diagnostics)
+	if !ok {
 		return
 	}
 
@@ -415,12 +530,8 @@ func (r *FileStorageResource) Delete(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, err := regionids.ParseFileStorageID(id)
-	if err != nil {
-		response.Diagnostics.AddError(
-			"Invalid File Storage ID",
-			fmt.Sprintf("Could not parse file storage ID %q: %s", id, err),
-		)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", regionids.ParseFileStorageID, &response.Diagnostics)
+	if !ok {
 		return
 	}
 
@@ -435,7 +546,7 @@ func (r *FileStorageResource) Delete(
 	defer fileStorageDeleteResponse.Body.Close()
 
 	if err = nscale.ReadEmptyResponse(fileStorageDeleteResponse); err != nil {
-		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode != http.StatusNotFound {
+		if e, isAPIError := nscale.AsAPIError(err); isAPIError && e.StatusCode != http.StatusNotFound {
 			nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 			response.Diagnostics.AddError(
 				"Failed to Delete File Storage",
