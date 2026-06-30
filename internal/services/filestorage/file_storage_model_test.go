@@ -22,8 +22,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-
-	"github.com/nscaledev/terraform-provider-nscale/internal/utils/pointer"
 )
 
 // A syntactically valid UUID so request-building helpers that parse the region
@@ -37,13 +35,17 @@ const testRegionID = "11111111-1111-1111-1111-111111111111"
 func unsortedSnapshotPolicySet() types.Set {
 	return NewFileStorageSnapshotPolicies(&regionapi.StorageSnapshotPolicyListV2Spec{
 		{
-			Name:      "weekly",
-			Schedule:  regionapi.StorageSnapshotScheduleV2Spec{Interval: regionapi.StorageSnapshotScheduleIntervalV2Weekly},
+			Name: "weekly",
+			Schedule: regionapi.StorageSnapshotScheduleV2Spec{
+				Interval: regionapi.StorageSnapshotScheduleIntervalV2Weekly,
+			},
 			Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 4},
 		},
 		{
-			Name:      "daily",
-			Schedule:  regionapi.StorageSnapshotScheduleV2Spec{Interval: regionapi.StorageSnapshotScheduleIntervalV2Daily},
+			Name: "daily",
+			Schedule: regionapi.StorageSnapshotScheduleV2Spec{
+				Interval: regionapi.StorageSnapshotScheduleIntervalV2Daily,
+			},
 			Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 7},
 		},
 	})
@@ -61,7 +63,7 @@ func singleDailySnapshotPolicySet() types.Set {
 			Name: "daily",
 			Schedule: regionapi.StorageSnapshotScheduleV2Spec{
 				Interval:  regionapi.StorageSnapshotScheduleIntervalV2Daily,
-				TimeOfDay: pointer.Reference("02:00Z"),
+				TimeOfDay: new("02:00Z"),
 			},
 			Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 7},
 		},
@@ -89,7 +91,11 @@ func TestSnapshotPolicySetIsOrderInsensitive(t *testing.T) {
 	dailyThenWeekly := NewFileStorageSnapshotPolicies(&regionapi.StorageSnapshotPolicyListV2Spec{daily, weekly})
 
 	if !weeklyThenDaily.Equal(dailyThenWeekly) {
-		t.Fatalf("snapshot policy sets differing only in order are not equal:\n %v\n %v", weeklyThenDaily, dailyThenWeekly)
+		t.Fatalf(
+			"snapshot policy sets differing only in order are not equal:\n %v\n %v",
+			weeklyThenDaily,
+			dailyThenWeekly,
+		)
 	}
 }
 
@@ -112,8 +118,8 @@ func snapshotPolicyNames(list *regionapi.StorageSnapshotPolicyListV2Spec) []stri
 // assertSnapshotPolicyNames asserts the request list carries exactly want, in
 // order. A nil want means the field must be omitted (null pointer); a non-nil
 // (possibly empty) want means the field must be present with those names. The
-// nil-versus-empty distinction is the whole point, so reflect.DeepEqual is used
-// deliberately (it separates nil from an empty slice).
+// nil-versus-empty distinction is the whole point, so [reflect.DeepEqual] is
+// used deliberately (it separates nil from an empty slice).
 func assertSnapshotPolicyNames(t *testing.T, got *regionapi.StorageSnapshotPolicyListV2Spec, want []string) {
 	t.Helper()
 
@@ -154,8 +160,8 @@ func TestNewFileStorageModelMapsDefaultSnapshotProtectionEnabled(t *testing.T) {
 		resolved *bool
 		want     types.Bool
 	}{
-		{name: "enabled", resolved: pointer.Reference(true), want: types.BoolValue(true)},
-		{name: "disabled", resolved: pointer.Reference(false), want: types.BoolValue(false)},
+		{name: "enabled", resolved: new(true), want: types.BoolValue(true)},
+		{name: "disabled", resolved: new(false), want: types.BoolValue(false)},
 		{name: "absent maps to null", resolved: nil, want: types.BoolNull()},
 	}
 
@@ -189,8 +195,8 @@ func TestNscaleFileStorageCreateParamsDefaultSnapshotProtectionEnabled(t *testin
 	}{
 		{name: "omitted sends API default", configured: types.BoolNull(), want: nil},
 		{name: "explicit null sends API default", configured: types.BoolNull(), want: nil},
-		{name: "explicit true enforces enabled", configured: types.BoolValue(true), want: pointer.Reference(true)},
-		{name: "explicit false enforces disabled", configured: types.BoolValue(false), want: pointer.Reference(false)},
+		{name: "explicit true enforces enabled", configured: types.BoolValue(true), want: new(true)},
+		{name: "explicit false enforces disabled", configured: types.BoolValue(false), want: new(false)},
 	}
 
 	for _, tt := range tests {
@@ -261,7 +267,7 @@ func TestNewFileStorageModelMapsUserManagedSnapshotPolicies(t *testing.T) {
 			Name: "daily",
 			Schedule: regionapi.StorageSnapshotScheduleV2Spec{
 				Interval:  regionapi.StorageSnapshotScheduleIntervalV2Daily,
-				TimeOfDay: pointer.Reference("02:00Z"),
+				TimeOfDay: new("02:00Z"),
 			},
 			Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 7},
 		},
@@ -413,8 +419,10 @@ func TestNscaleFileStorageUpdateParamsSnapshotPolicyOrderIsDeterministic(t *test
 
 	policy := func(name string) regionapi.StorageSnapshotPolicyV2Spec {
 		return regionapi.StorageSnapshotPolicyV2Spec{
-			Name:      name,
-			Schedule:  regionapi.StorageSnapshotScheduleV2Spec{Interval: regionapi.StorageSnapshotScheduleIntervalV2Hourly},
+			Name: name,
+			Schedule: regionapi.StorageSnapshotScheduleV2Spec{
+				Interval: regionapi.StorageSnapshotScheduleIntervalV2Hourly,
+			},
 			Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: 3},
 		}
 	}
@@ -457,8 +465,8 @@ func TestNscaleFileStorageUpdateParamsDefaultSnapshotProtectionEnabled(t *testin
 	}{
 		{name: "omitted observes remote", configured: types.BoolNull(), want: nil},
 		{name: "explicit null observes remote", configured: types.BoolNull(), want: nil},
-		{name: "explicit true enforces enabled", configured: types.BoolValue(true), want: pointer.Reference(true)},
-		{name: "explicit false enforces disabled", configured: types.BoolValue(false), want: pointer.Reference(false)},
+		{name: "explicit true enforces enabled", configured: types.BoolValue(true), want: new(true)},
+		{name: "explicit false enforces disabled", configured: types.BoolValue(false), want: new(false)},
 	}
 
 	for _, tt := range tests {

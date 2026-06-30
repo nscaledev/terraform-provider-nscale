@@ -203,8 +203,10 @@ func (p FileStorageSnapshotPolicyModel) toAPI() regionapi.StorageSnapshotPolicyV
 
 func (s FileStorageSnapshotScheduleModel) toAPI() regionapi.StorageSnapshotScheduleV2Spec {
 	schedule := regionapi.StorageSnapshotScheduleV2Spec{
-		Interval:  regionapi.StorageSnapshotScheduleIntervalV2(s.Interval.ValueString()),
-		TimeOfDay: s.TimeOfDay.ValueStringPointer(),
+		DayOfMonth: nil,
+		DayOfWeek:  nil,
+		Interval:   regionapi.StorageSnapshotScheduleIntervalV2(s.Interval.ValueString()),
+		TimeOfDay:  s.TimeOfDay.ValueStringPointer(),
 	}
 
 	if !s.DayOfWeek.IsNull() && !s.DayOfWeek.IsUnknown() {
@@ -321,15 +323,16 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 		return regionapi.StorageV2Create{}, diagnostics
 	}
 
-	fileStorage := regionapi.StorageV2Create{
-		Metadata: coreapi.ResourceWriteMetadata{
-			Description: m.Description.ValueStringPointer(),
-			Name:        m.Name.ValueString(),
-			Tags:        tags,
-		},
+	var fileStorage regionapi.StorageV2Create
+	fileStorage.Metadata = coreapi.ResourceWriteMetadata{
+		Description: m.Description.ValueStringPointer(),
+		Name:        m.Name.ValueString(),
+		Tags:        tags,
 	}
 	fileStorage.Spec.Attachments = &regionapi.StorageAttachmentV2Spec{NetworkIds: networkIDs}
-	fileStorage.Spec.DefaultSnapshotProtectionEnabled = defaultSnapshotProtectionPointer(m.DefaultSnapshotProtectionEnabled)
+	fileStorage.Spec.DefaultSnapshotProtectionEnabled = defaultSnapshotProtectionPointer(
+		m.DefaultSnapshotProtectionEnabled,
+	)
 	fileStorage.Spec.SnapshotPolicies = snapshotPolicies
 	fileStorage.Spec.OrganizationId = organizationID
 	fileStorage.Spec.ProjectId = m.ProjectID.ValueString()

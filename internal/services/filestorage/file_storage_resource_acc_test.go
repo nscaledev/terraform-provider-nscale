@@ -155,7 +155,7 @@ func TestAccFileStorageResource_customSnapshotPolicy(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccFileStorageResourceConfigCustomSnapshotPolicy(
-					"tf-acc-file-storage-custom-policy", storageClassID, "02:00Z", 7,
+					storageClassID, "02:00Z", 7,
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("nscale_file_storage.test", "snapshot_policies.#", "1"),
@@ -174,7 +174,7 @@ func TestAccFileStorageResource_customSnapshotPolicy(t *testing.T) {
 			// unset (day_of_week, day_of_month).
 			{
 				Config: testAccFileStorageResourceConfigCustomSnapshotPolicy(
-					"tf-acc-file-storage-custom-policy", storageClassID, "02:00Z", 7,
+					storageClassID, "02:00Z", 7,
 				),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
@@ -184,7 +184,7 @@ func TestAccFileStorageResource_customSnapshotPolicy(t *testing.T) {
 				// retention (keep). Because storage_class_id is unchanged this is
 				// an in-place update of the parent File Storage, not a replacement.
 				Config: testAccFileStorageResourceConfigCustomSnapshotPolicy(
-					"tf-acc-file-storage-custom-policy", storageClassID, "03:00Z", 14,
+					storageClassID, "03:00Z", 14,
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("nscale_file_storage.test", "snapshot_policies.#", "1"),
@@ -200,7 +200,7 @@ func TestAccFileStorageResource_customSnapshotPolicy(t *testing.T) {
 			},
 			{
 				Config: testAccFileStorageResourceConfigCustomSnapshotPolicy(
-					"tf-acc-file-storage-custom-policy", storageClassID, "03:00Z", 14,
+					storageClassID, "03:00Z", 14,
 				),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
@@ -272,7 +272,6 @@ const (
 //	re-add  [daily]                   -> empty set replaced with a new policy
 func TestAccFileStorageResource_snapshotPolicyLifecycle(t *testing.T) {
 	storageClassID := os.Getenv("NSCALE_TEST_FILE_STORAGE_CLASS_ID")
-	name := "tf-acc-file-storage-policy-lifecycle"
 
 	var fileStorageID string
 
@@ -283,7 +282,7 @@ func TestAccFileStorageResource_snapshotPolicyLifecycle(t *testing.T) {
 			{
 				// Create with two user-managed policies.
 				Config: testAccFileStorageResourceConfigSnapshotPolicies(
-					name, storageClassID, policyDaily+","+policyWeekly,
+					storageClassID, policyDaily+","+policyWeekly,
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					testAccCaptureFileStorageID("nscale_file_storage.test", &fileStorageID),
@@ -312,7 +311,7 @@ func TestAccFileStorageResource_snapshotPolicyLifecycle(t *testing.T) {
 				// reverse order must produce no plan diff, because the policy
 				// collection is an unordered set.
 				Config: testAccFileStorageResourceConfigSnapshotPolicies(
-					name, storageClassID, policyWeekly+","+policyDaily,
+					storageClassID, policyWeekly+","+policyDaily,
 				),
 				PlanOnly:           true,
 				ExpectNonEmptyPlan: false,
@@ -322,7 +321,7 @@ func TestAccFileStorageResource_snapshotPolicyLifecycle(t *testing.T) {
 				// gone and nightly is present. The id is unchanged, so renaming a
 				// policy did not replace the parent File Storage.
 				Config: testAccFileStorageResourceConfigSnapshotPolicies(
-					name, storageClassID, policyNightly+","+policyWeekly,
+					storageClassID, policyNightly+","+policyWeekly,
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrPtr("nscale_file_storage.test", "id", &fileStorageID),
@@ -347,7 +346,7 @@ func TestAccFileStorageResource_snapshotPolicyLifecycle(t *testing.T) {
 				// Remove one policy from the multi-policy set: dropping nightly
 				// leaves weekly intact. Count is exactly one and it is weekly.
 				Config: testAccFileStorageResourceConfigSnapshotPolicies(
-					name, storageClassID, policyWeekly,
+					storageClassID, policyWeekly,
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrPtr("nscale_file_storage.test", "id", &fileStorageID),
@@ -365,7 +364,7 @@ func TestAccFileStorageResource_snapshotPolicyLifecycle(t *testing.T) {
 				// Replace the configured non-empty set with an explicit empty set:
 				// all user-managed policies are cleared.
 				Config: testAccFileStorageResourceConfigSnapshotPolicies(
-					name, storageClassID, "",
+					storageClassID, "",
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrPtr("nscale_file_storage.test", "id", &fileStorageID),
@@ -376,7 +375,7 @@ func TestAccFileStorageResource_snapshotPolicyLifecycle(t *testing.T) {
 				// Replace the explicit empty set with a non-empty set: the desired
 				// user-managed policy is created.
 				Config: testAccFileStorageResourceConfigSnapshotPolicies(
-					name, storageClassID, policyDaily,
+					storageClassID, policyDaily,
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrPtr("nscale_file_storage.test", "id", &fileStorageID),
@@ -420,7 +419,9 @@ func testAccCaptureFileStorageID(resourceName string, id *string) resource.TestC
 // an explicit snapshot_policies set. policiesHCL is the comma-separated set
 // elements; passing an empty string renders `snapshot_policies = []`, the
 // explicit empty user-managed Snapshot Policy Set.
-func testAccFileStorageResourceConfigSnapshotPolicies(name, storageClassID, policiesHCL string) string {
+func testAccFileStorageResourceConfigSnapshotPolicies(storageClassID, policiesHCL string) string {
+	name := "tf-acc-file-storage-policy-lifecycle"
+
 	return fmt.Sprintf(`
 resource "nscale_network" "test" {
   name       = "%[1]s-net"
@@ -444,9 +445,11 @@ resource "nscale_file_storage" "test" {
 }
 
 func testAccFileStorageResourceConfigCustomSnapshotPolicy(
-	name, storageClassID, timeOfDay string,
+	storageClassID, timeOfDay string,
 	keep int,
 ) string {
+	name := "tf-acc-file-storage-custom-policy"
+
 	return fmt.Sprintf(`
 resource "nscale_network" "test" {
   name       = "%[1]s-net"

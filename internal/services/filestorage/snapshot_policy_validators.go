@@ -184,7 +184,12 @@ func (v uniqueSnapshotPolicyNamesValidator) ValidateSet(
 			response.Diagnostics.AddAttributeError(
 				request.Path,
 				"Duplicate Snapshot Policy Name",
-				fmt.Sprintf("Attribute %s contains more than one policy named %q; %s.", request.Path, name.ValueString(), v.Description(ctx)),
+				fmt.Sprintf(
+					"Attribute %s contains more than one policy named %q; %s.",
+					request.Path,
+					name.ValueString(),
+					v.Description(ctx),
+				),
 			)
 			return
 		}

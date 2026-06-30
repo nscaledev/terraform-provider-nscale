@@ -25,8 +25,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-
-	"github.com/nscaledev/terraform-provider-nscale/internal/utils/pointer"
 )
 
 // runSetValidator drives a set validator the way the framework does and returns
@@ -51,8 +49,10 @@ func policySet(names ...string) types.Set {
 	list := make(regionapi.StorageSnapshotPolicyListV2Spec, 0, len(names))
 	for i, name := range names {
 		list = append(list, regionapi.StorageSnapshotPolicyV2Spec{
-			Name:      name,
-			Schedule:  regionapi.StorageSnapshotScheduleV2Spec{Interval: regionapi.StorageSnapshotScheduleIntervalV2Hourly},
+			Name: name,
+			Schedule: regionapi.StorageSnapshotScheduleV2Spec{
+				Interval: regionapi.StorageSnapshotScheduleIntervalV2Hourly,
+			},
 			Retention: regionapi.StorageSnapshotRetentionV2Spec{Keep: i + 1},
 		})
 	}
@@ -126,14 +126,14 @@ func runInt64Validators(vs []validator.Int64, value types.Int64) validator.Int64
 
 // runObjectValidator drives an object validator the way the framework does and
 // returns the diagnostics it produced.
-func runObjectValidator(v validator.Object, value types.Object) validator.ObjectResponse {
+func runObjectValidator(value types.Object) validator.ObjectResponse {
 	request := validator.ObjectRequest{
 		Path:        path.Root("schedule"),
 		ConfigValue: value,
 	}
 
 	response := validator.ObjectResponse{}
-	v.ValidateObject(context.Background(), request, &response)
+	snapshotScheduleShapeValidator{}.ValidateObject(context.Background(), request, &response)
 
 	return response
 }
@@ -168,9 +168,9 @@ func scheduleObject(interval string, timeOfDay, dayOfWeek *string, dayOfMonth *i
 // An hourly schedule takes snapshots every hour, so a configured time of day is
 // meaningless and must be rejected before apply.
 func TestSnapshotScheduleShapeHourlyRejectsTimeOfDay(t *testing.T) {
-	schedule := scheduleObject("hourly", pointer.Reference("02:00Z"), nil, nil)
+	schedule := scheduleObject("hourly", new("02:00Z"), nil, nil)
 
-	response := runObjectValidator(snapshotScheduleShapeValidator{}, schedule)
+	response := runObjectValidator(schedule)
 
 	if !response.Diagnostics.HasError() {
 		t.Fatal("HasError() = false, want true for an hourly schedule with time_of_day")
@@ -182,7 +182,7 @@ func TestSnapshotScheduleShapeHourlyRejectsTimeOfDay(t *testing.T) {
 func TestSnapshotScheduleShapeDailyRequiresTimeOfDay(t *testing.T) {
 	schedule := scheduleObject("daily", nil, nil, nil)
 
-	response := runObjectValidator(snapshotScheduleShapeValidator{}, schedule)
+	response := runObjectValidator(schedule)
 
 	if !response.Diagnostics.HasError() {
 		t.Fatal("HasError() = false, want true for a daily schedule missing time_of_day")
@@ -192,9 +192,9 @@ func TestSnapshotScheduleShapeDailyRequiresTimeOfDay(t *testing.T) {
 // A weekly snapshot needs a weekday in addition to a time of day; a time alone
 // leaves the weekday ambiguous and must be rejected.
 func TestSnapshotScheduleShapeWeeklyRequiresDayOfWeek(t *testing.T) {
-	schedule := scheduleObject("weekly", pointer.Reference("02:00Z"), nil, nil)
+	schedule := scheduleObject("weekly", new("02:00Z"), nil, nil)
 
-	response := runObjectValidator(snapshotScheduleShapeValidator{}, schedule)
+	response := runObjectValidator(schedule)
 
 	if !response.Diagnostics.HasError() {
 		t.Fatal("HasError() = false, want true for a weekly schedule missing day_of_week")
@@ -204,9 +204,9 @@ func TestSnapshotScheduleShapeWeeklyRequiresDayOfWeek(t *testing.T) {
 // A monthly snapshot needs a day of month in addition to a time of day; a time
 // alone leaves the calendar day ambiguous and must be rejected.
 func TestSnapshotScheduleShapeMonthlyRequiresDayOfMonth(t *testing.T) {
-	schedule := scheduleObject("monthly", pointer.Reference("02:00Z"), nil, nil)
+	schedule := scheduleObject("monthly", new("02:00Z"), nil, nil)
 
-	response := runObjectValidator(snapshotScheduleShapeValidator{}, schedule)
+	response := runObjectValidator(schedule)
 
 	if !response.Diagnostics.HasError() {
 		t.Fatal("HasError() = false, want true for a monthly schedule missing day_of_month")
@@ -223,17 +223,21 @@ func TestSnapshotScheduleShapeAcceptsValidSchedules(t *testing.T) {
 		schedule types.Object
 	}{
 		{"hourly", scheduleObject("hourly", nil, nil, nil)},
-		{"daily", scheduleObject("daily", pointer.Reference("02:00Z"), nil, nil)},
-		{"weekly", scheduleObject("weekly", pointer.Reference("02:00Z"), pointer.Reference("monday"), nil)},
-		{"monthly", scheduleObject("monthly", pointer.Reference("02:00Z"), nil, pointer.Reference(int64(15)))},
+		{"daily", scheduleObject("daily", new("02:00Z"), nil, nil)},
+		{"weekly", scheduleObject("weekly", new("02:00Z"), new("monday"), nil)},
+		{"monthly", scheduleObject("monthly", new("02:00Z"), nil, new(int64(15)))},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response := runObjectValidator(snapshotScheduleShapeValidator{}, tt.schedule)
+			response := runObjectValidator(tt.schedule)
 
 			if response.Diagnostics.HasError() {
-				t.Fatalf("HasError() = true, want false for a valid %s schedule (diags: %v)", tt.name, response.Diagnostics)
+				t.Fatalf(
+					"HasError() = true, want false for a valid %s schedule (diags: %v)",
+					tt.name,
+					response.Diagnostics,
+				)
 			}
 		})
 	}
@@ -246,17 +250,17 @@ func TestSnapshotScheduleShapeRejectsDisallowedFields(t *testing.T) {
 		name     string
 		schedule types.Object
 	}{
-		{"hourly with day_of_week", scheduleObject("hourly", nil, pointer.Reference("monday"), nil)},
-		{"hourly with day_of_month", scheduleObject("hourly", nil, nil, pointer.Reference(int64(15)))},
-		{"daily with day_of_week", scheduleObject("daily", pointer.Reference("02:00Z"), pointer.Reference("monday"), nil)},
-		{"daily with day_of_month", scheduleObject("daily", pointer.Reference("02:00Z"), nil, pointer.Reference(int64(15)))},
-		{"weekly with day_of_month", scheduleObject("weekly", pointer.Reference("02:00Z"), pointer.Reference("monday"), pointer.Reference(int64(15)))},
-		{"monthly with day_of_week", scheduleObject("monthly", pointer.Reference("02:00Z"), pointer.Reference("monday"), pointer.Reference(int64(15)))},
+		{"hourly with day_of_week", scheduleObject("hourly", nil, new("monday"), nil)},
+		{"hourly with day_of_month", scheduleObject("hourly", nil, nil, new(int64(15)))},
+		{"daily with day_of_week", scheduleObject("daily", new("02:00Z"), new("monday"), nil)},
+		{"daily with day_of_month", scheduleObject("daily", new("02:00Z"), nil, new(int64(15)))},
+		{"weekly with day_of_month", scheduleObject("weekly", new("02:00Z"), new("monday"), new(int64(15)))},
+		{"monthly with day_of_week", scheduleObject("monthly", new("02:00Z"), new("monday"), new(int64(15)))},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response := runObjectValidator(snapshotScheduleShapeValidator{}, tt.schedule)
+			response := runObjectValidator(tt.schedule)
 
 			if !response.Diagnostics.HasError() {
 				t.Fatalf("HasError() = false, want true for %s", tt.name)
@@ -271,15 +275,16 @@ func TestSnapshotScheduleShapeRejectsDisallowedFields(t *testing.T) {
 // missing it).
 func TestSnapshotScheduleShapeTreatsNullAsOmitted(t *testing.T) {
 	validHourly := runObjectValidator(
-		snapshotScheduleShapeValidator{},
 		scheduleObject("hourly", types.StringNull().ValueStringPointer(), nil, nil),
 	)
 	if validHourly.Diagnostics.HasError() {
-		t.Fatalf("HasError() = true, want false for an hourly schedule with null timing fields (diags: %v)", validHourly.Diagnostics)
+		t.Fatalf(
+			"HasError() = true, want false for an hourly schedule with null timing fields (diags: %v)",
+			validHourly.Diagnostics,
+		)
 	}
 
 	missingDaily := runObjectValidator(
-		snapshotScheduleShapeValidator{},
 		scheduleObject("daily", types.StringNull().ValueStringPointer(), nil, nil),
 	)
 	if !missingDaily.Diagnostics.HasError() {

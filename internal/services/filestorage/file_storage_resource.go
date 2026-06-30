@@ -346,7 +346,11 @@ func (r *FileStorageResource) Create(
 	}
 	data.ProjectID = types.StringValue(projectID)
 
-	data.DefaultSnapshotProtectionEnabled = configuredDefaultSnapshotProtection(ctx, request.Config, &response.Diagnostics)
+	data.DefaultSnapshotProtectionEnabled = configuredDefaultSnapshotProtection(
+		ctx,
+		request.Config,
+		&response.Diagnostics,
+	)
 	data.SnapshotPolicies = configuredSnapshotPolicies(ctx, request.Config, &response.Diagnostics)
 	if response.Diagnostics.HasError() {
 		return
@@ -449,7 +453,11 @@ func (r *FileStorageResource) Update(
 		return
 	}
 
-	data.DefaultSnapshotProtectionEnabled = configuredDefaultSnapshotProtection(ctx, request.Config, &response.Diagnostics)
+	data.DefaultSnapshotProtectionEnabled = configuredDefaultSnapshotProtection(
+		ctx,
+		request.Config,
+		&response.Diagnostics,
+	)
 	data.SnapshotPolicies = configuredSnapshotPolicies(ctx, request.Config, &response.Diagnostics)
 	if response.Diagnostics.HasError() {
 		return
