@@ -10,6 +10,15 @@ Categories used: `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-07-01
+
+### FEATURES
+
+- Added file storage snapshot policy support to `nscale_file_storage`: a
+  `default_snapshot_protection_enabled` attribute (resource + data source) and a
+  user-managed `snapshot_policies` set (resource + data source)
+  ([#61](https://github.com/nscaledev/terraform-provider-nscale/pull/61)).
+
 ## [1.3.0] - 2026-06-29
 
 ### FEATURES
@@ -89,7 +98,8 @@ breaking changes will increment the major version.
 
 Final pre-1.0 release. See git history for the full 0.0.x series.
 
-[Unreleased]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/nscaledev/terraform-provider-nscale/compare/v1.0.0...v1.1.0
