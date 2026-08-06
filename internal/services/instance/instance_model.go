@@ -51,11 +51,6 @@ type InstanceModel struct {
 }
 
 func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
-	userData := types.StringNull()
-	if source.Spec.UserData != nil {
-		userData = types.StringValue(string(*source.Spec.UserData))
-	}
-
 	powerState := types.StringNull()
 	if source.Status.PowerState != nil {
 		powerState = types.StringValue(string(*source.Status.PowerState))
@@ -68,7 +63,7 @@ func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
 		Name:                      types.StringValue(source.Metadata.Name),
 		Description:               types.StringPointerValue(source.Metadata.Description),
 		NetworkInterface:          NewInstanceNetworkInterfaceModel(source.Spec, source.Status),
-		UserData:                  userData,
+		UserData:                  tftypes.Base64StringValue(source.Spec.UserData),
 		PublicIP:                  types.StringPointerValue(source.Status.PublicIP),
 		PrivateIP:                 types.StringPointerValue(source.Status.PrivateIP),
 		PowerState:                powerState,
@@ -106,10 +101,9 @@ func (m *InstanceModel) NscaleInstanceCreateParams(
 		return computeapi.InstanceCreate{}, diagnostics
 	}
 
-	var userData *[]byte
-	if value := m.UserData.ValueString(); value != "" {
-		temp := []byte(value)
-		userData = &temp
+	userData, diagnostics := tftypes.ValueBase64BytesPointer(m.UserData, "user_data")
+	if diagnostics.HasError() {
+		return computeapi.InstanceCreate{}, diagnostics
 	}
 
 	instance := computeapi.InstanceCreate{
@@ -155,10 +149,9 @@ func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate,
 		return computeapi.InstanceUpdate{}, diagnostics
 	}
 
-	var userData *[]byte
-	if value := m.UserData.ValueString(); value != "" {
-		temp := []byte(value)
-		userData = &temp
+	userData, diagnostics := tftypes.ValueBase64BytesPointer(m.UserData, "user_data")
+	if diagnostics.HasError() {
+		return computeapi.InstanceUpdate{}, diagnostics
 	}
 
 	instance := computeapi.InstanceUpdate{

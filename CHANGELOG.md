@@ -10,6 +10,25 @@ Categories used: `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 
 ## [Unreleased]
 
+### BUG FIXES
+
+- Fixed double-encoding of `user_data` in `nscale_instance` and
+  `nscale_compute_cluster`. Both resources assigned the base64 string's own
+  bytes to the SDK's `[]byte` field, which the SDK base64-encodes again, so the
+  API received `base64(base64(plaintext))` and cloud-init was handed a base64
+  blob instead of a config. The value is now decoded before it is sent, and
+  re-encoded when read back, matching the existing `nscale_placement`
+  behaviour. On the next `terraform apply`, instances and workload pools that
+  already set `user_data` will show an in-place update that rewrites the
+  corrupted value; note that cloud-init only runs at boot, so an instance must
+  be recreated for the corrected `user_data` to actually take effect
+  ([DX-1814](https://linear.app/nscale-workspace/issue/DX-1814)).
+
+### DOCS
+
+- Clarified that `user_data` on `nscale_instance` and `nscale_compute_cluster`
+  is base64-encoded, matching the validator that has always enforced it.
+
 ## [1.4.0] - 2026-07-01
 
 ### FEATURES

@@ -175,11 +175,6 @@ func NewWorkloadPoolModel(
 	spec computeapi.ComputeClusterWorkloadPool,
 	status *computeapi.ComputeClusterWorkloadPoolStatus,
 ) attr.Value {
-	var userData types.String
-	if spec.Machine.UserData != nil {
-		userData = types.StringValue(string(*spec.Machine.UserData))
-	}
-
 	enablePublicIP := types.BoolValue(true)
 	if spec.Machine.PublicIPAllocation != nil {
 		enablePublicIP = types.BoolValue(spec.Machine.PublicIPAllocation.Enabled)
@@ -214,7 +209,7 @@ func NewWorkloadPoolModel(
 			"flavor_id": types.StringValue(spec.Machine.FlavorId),
 			// FIXME: Some machines may not have a disk size specified as it's inherited from the flavor. We need to check whether we could populate the disk size from the flavor.
 			// "disk_size":               types.Int64Value(int64(spec.Machine.Disk.Size)),
-			"user_data":             userData,
+			"user_data":             tftypes.Base64StringValue(spec.Machine.UserData),
 			"enable_public_ip":      enablePublicIP,
 			"allowed_address_pairs": allowedAddressPairs,
 			"firewall_rules":        firewallRules,
@@ -267,16 +262,15 @@ func (m *WorkloadPoolModel) NscaleWorkloadPool() (computeapi.ComputeClusterWorkl
 		firewallRules = append(firewallRules, firewallRule)
 	}
 
-	var userData *[]byte
-	if !m.UserData.IsNull() && !m.UserData.IsUnknown() {
-		temp := []byte(m.UserData.ValueString())
-		userData = &temp
+	userData, diagnostics := tftypes.ValueBase64BytesPointer(m.UserData, "user_data")
+	if diagnostics.HasError() {
+		return computeapi.ComputeClusterWorkloadPool{}, diagnostics
 	}
 
 	var allowedAddressPairs *computeapi.AllowedAddressPairList
 	if !m.AllowedAddressPairs.IsNull() && !m.AllowedAddressPairs.IsUnknown() {
 		var pairModels []AllowedAddressPairModel
-		if diagnostics := m.AllowedAddressPairs.ElementsAs(context.TODO(), &pairModels, false); diagnostics.HasError() {
+		if diagnostics = m.AllowedAddressPairs.ElementsAs(context.TODO(), &pairModels, false); diagnostics.HasError() {
 			return computeapi.ComputeClusterWorkloadPool{}, diagnostics
 		}
 		if len(pairModels) > 0 {

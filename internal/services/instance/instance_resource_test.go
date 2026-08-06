@@ -17,6 +17,7 @@ limitations under the License.
 package instance_test
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"testing"
@@ -25,6 +26,8 @@ import (
 )
 
 const testAccCAPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFq/TD20U9PX0vbuMPpo8MQfjimypEud+BNFUXZXz1uB tf-acc-ca-4"
+
+const testAccUserData = "#cloud-config\nruncmd:\n  - [ touch, /tmp/tf-acc-user-data ]\n"
 
 func TestAccInstanceResource_withSSHCertificateAuthority(t *testing.T) {
 	resource.Test(t, resource.TestCase{
@@ -103,4 +106,57 @@ resource "nscale_instance" "test" {
   ssh_certificate_authority_id = nscale_ssh_certificate_authority.test.id
 }
 `, name, imageID, flavorID, caPublicKey)
+}
+
+// TestAccInstanceResource_userData guards against the double-encoding
+// regression in DX-1814: user_data is configured as base64 and must survive a
+// round-trip through the API, both in state and on re-read after import.
+func TestAccInstanceResource_userData(t *testing.T) {
+	encodedUserData := base64.StdEncoding.EncodeToString([]byte(testAccUserData))
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccInstanceResourceConfigWithUserData(
+					"tf-acc-instance-userdata",
+					os.Getenv("NSCALE_TEST_IMAGE_ID"),
+					os.Getenv("NSCALE_TEST_FLAVOR_ID"),
+					encodedUserData,
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("nscale_instance.test", "id"),
+					resource.TestCheckResourceAttr("nscale_instance.test", "user_data", encodedUserData),
+				),
+			},
+			{
+				ResourceName:            "nscale_instance.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"timeouts"},
+			},
+		},
+	})
+}
+
+func testAccInstanceResourceConfigWithUserData(name, imageID, flavorID, userData string) string {
+	return fmt.Sprintf(`
+resource "nscale_network" "test" {
+  name       = "%[1]s-net"
+  cidr_block = "192.168.241.0/24"
+}
+
+resource "nscale_instance" "test" {
+  name = %[1]q
+
+  network_interface {
+    network_id = nscale_network.test.id
+  }
+
+  image_id  = %[2]q
+  flavor_id = %[3]q
+  user_data = %[4]q
+}
+`, name, imageID, flavorID, userData)
 }

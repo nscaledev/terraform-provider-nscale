@@ -49,7 +49,7 @@ Read-Only:
 - `machines` (Attributes List) A list of machines in this workload pool. (see [below for nested schema](#nestedatt--workload_pools--machines))
 - `name` (String) The name of the workload pool.
 - `replicas` (Number) The number of replicas (VMs) to provision in this workload pool.
-- `user_data` (String) The data to pass to the VMs at boot time.
+- `user_data` (String) Base64-encoded configuration information or scripts passed to the VMs at boot time.
 
 <a id="nestedatt--workload_pools--firewall_rules"></a>
 ### Nested Schema for `workload_pools.firewall_rules`

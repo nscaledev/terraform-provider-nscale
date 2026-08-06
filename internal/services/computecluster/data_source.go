@@ -100,7 +100,7 @@ func (s *ComputeClusterDataSource) Schema(
 						// 	Computed:            true,
 						// },
 						"user_data": schema.StringAttribute{
-							MarkdownDescription: "The data to pass to the VMs at boot time.",
+							MarkdownDescription: "Base64-encoded configuration information or scripts passed to the VMs at boot time.",
 							Computed:            true,
 						},
 						"enable_public_ip": schema.BoolAttribute{

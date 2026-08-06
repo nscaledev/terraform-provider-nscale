@@ -18,8 +18,6 @@ package reservation
 
 import (
 	"context"
-	"encoding/base64"
-	"fmt"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -155,19 +153,12 @@ func newPlacementConstraintsObject(source reservationapi.PlacementConstraintsV2)
 }
 
 func newPlacementServerSpecObject(source reservationapi.PlacementServerSpecV2) types.Object {
-	userData := types.StringNull()
-	if source.UserData != nil {
-		// The API returns the decoded bytes; re-encode to base64 so the value
-		// round-trips against the base64-encoded string supplied in configuration.
-		userData = types.StringValue(base64.StdEncoding.EncodeToString(*source.UserData))
-	}
-
 	return types.ObjectValueMust(
 		PlacementServerSpecModelAttributeType.AttrTypes,
 		map[string]attr.Value{
 			"image_id":                     types.StringValue(source.ImageId),
 			"ssh_certificate_authority_id": types.StringPointerValue(source.SshCertificateAuthorityId),
-			"user_data":                    userData,
+			"user_data":                    tftypes.Base64StringValue(source.UserData),
 			"networking":                   newPlacementServerNetworkingObject(source.Networking),
 		},
 	)
@@ -285,21 +276,9 @@ func (m *PlacementModel) serverSpec(ctx context.Context) (reservationapi.Placeme
 		return reservationapi.PlacementServerSpecV2{}, diagnostics
 	}
 
-	var userData *[]byte
-	if value := model.UserData.ValueString(); value != "" {
-		// user_data is supplied as a base64-encoded string. The SDK serializes the
-		// []byte field as base64 itself, so decode here to avoid double-encoding;
-		// the Base64Validator on the attribute guarantees the value is well-formed.
-		decoded, err := base64.StdEncoding.DecodeString(value)
-		if err != nil {
-			var diagnostics diag.Diagnostics
-			diagnostics.AddError(
-				"Invalid user_data",
-				fmt.Sprintf("Failed to decode base64 user_data: %s", err),
-			)
-			return reservationapi.PlacementServerSpecV2{}, diagnostics
-		}
-		userData = &decoded
+	userData, diagnostics := tftypes.ValueBase64BytesPointer(model.UserData, "user_data")
+	if diagnostics.HasError() {
+		return reservationapi.PlacementServerSpecV2{}, diagnostics
 	}
 
 	networking, diagnostics := model.networking(ctx)

@@ -161,7 +161,7 @@
                     },
                     "user_data": {
                       "computed": true,
-                      "description": "The data to pass to the VMs at boot time.",
+                      "description": "Base64-encoded configuration information or scripts passed to the VMs at boot time.",
                       "description_kind": "markdown",
                       "type": "string"
                     }
@@ -638,7 +638,7 @@
               },
               "user_data": {
                 "computed": true,
-                "description": "The data to pass to the instance at boot time.",
+                "description": "Base64-encoded configuration information or scripts passed to the instance at boot time.",
                 "description_kind": "markdown",
                 "type": "string"
               }
@@ -1805,7 +1805,7 @@
                       "type": "number"
                     },
                     "user_data": {
-                      "description": "The data to pass to the VMs at boot time.",
+                      "description": "Base64-encoded configuration information or scripts to pass to the VMs at boot time.",
                       "description_kind": "markdown",
                       "optional": true,
                       "type": "string"
@@ -2368,7 +2368,7 @@
                 ]
               },
               "user_data": {
-                "description": "The data to pass to the instance at boot time.",
+                "description": "Base64-encoded configuration information or scripts to pass to the instance at boot time.",
                 "description_kind": "markdown",
                 "optional": true,
                 "type": "string"
