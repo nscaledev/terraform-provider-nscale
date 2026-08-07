@@ -74,7 +74,7 @@ func (s *InstanceDataSource) Schema(
 				Computed:            true,
 			},
 			"user_data": schema.StringAttribute{
-				MarkdownDescription: "The data to pass to the instance at boot time.",
+				MarkdownDescription: "Base64-encoded configuration information or scripts passed to the instance at boot time.",
 				Computed:            true,
 			},
 			"public_ip": schema.StringAttribute{

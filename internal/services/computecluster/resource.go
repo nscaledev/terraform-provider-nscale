@@ -155,7 +155,7 @@ func (r *ComputeClusterResource) Schema(
 						// 	},
 						// },
 						"user_data": schema.StringAttribute{
-							MarkdownDescription: "The data to pass to the VMs at boot time.",
+							MarkdownDescription: "Base64-encoded configuration information or scripts to pass to the VMs at boot time.",
 							Optional:            true,
 							Validators: []validator.String{
 								validators.Base64Validator{},
