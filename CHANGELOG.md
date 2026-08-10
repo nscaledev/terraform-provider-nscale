@@ -10,6 +10,15 @@ Categories used: `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-10
+
+### FEATURES
+
+- Added file storage snapshot policy support to `nscale_file_storage`: a
+  `default_snapshot_protection_enabled` attribute (resource + data source) and a
+  user-managed `snapshot_policies` set (resource + data source)
+  ([#61](https://github.com/nscaledev/terraform-provider-nscale/pull/61)).
+
 ### BUG FIXES
 
 - Fixed double-encoding of `user_data` in `nscale_instance` and
@@ -22,21 +31,12 @@ Categories used: `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
   already set `user_data` will show an in-place update that rewrites the
   corrupted value; note that cloud-init only runs at boot, so an instance must
   be recreated for the corrected `user_data` to actually take effect
-  ([DX-1814](https://linear.app/nscale-workspace/issue/DX-1814)).
+  (DX-1814, [#72](https://github.com/nscaledev/terraform-provider-nscale/pull/72)).
 
 ### DOCS
 
 - Clarified that `user_data` on `nscale_instance` and `nscale_compute_cluster`
   is base64-encoded, matching the validator that has always enforced it.
-
-## [1.4.0] - 2026-07-01
-
-### FEATURES
-
-- Added file storage snapshot policy support to `nscale_file_storage`: a
-  `default_snapshot_protection_enabled` attribute (resource + data source) and a
-  user-managed `snapshot_policies` set (resource + data source)
-  ([#61](https://github.com/nscaledev/terraform-provider-nscale/pull/61)).
 
 ## [1.3.0] - 2026-06-29
 
