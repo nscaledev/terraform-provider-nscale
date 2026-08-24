@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -103,7 +104,12 @@ func (s *InstanceSSHKeyDataSource) Read(
 		return
 	}
 
-	instanceID := data.InstanceID.ValueString()
+	instanceID, parsed := nscale.ParseID(
+		data.InstanceID.ValueString(), "Instance", uuid.Parse, &response.Diagnostics,
+	)
+	if !parsed {
+		return
+	}
 
 	sshKeyResponse, err := s.client.Compute.GetApiV2InstancesInstanceIDSshkey(ctx, instanceID)
 	if err != nil {
@@ -138,6 +144,6 @@ func (s *InstanceSSHKeyDataSource) Read(
 		return
 	}
 
-	data = NewInstanceSSHKeyModel(instanceID, sshKey)
+	data = NewInstanceSSHKeyModel(data.InstanceID.ValueString(), sshKey)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }

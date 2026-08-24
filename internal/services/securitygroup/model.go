@@ -20,12 +20,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
@@ -123,16 +122,16 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 		rules = append(rules, source.NscaleSecurityGroupRule())
 	}
 
-	networkID, ok := nscale.ParseID(m.NetworkID.ValueString(), "Network", regionids.ParseNetworkID, &diagnostics)
+	networkID, ok := nscale.ParseID(m.NetworkID.ValueString(), "Network", uuid.Parse, &diagnostics)
 	if !ok {
 		return regionapi.SecurityGroupV2Create{}, diagnostics
 	}
 
 	securityGroup := regionapi.SecurityGroupV2Create{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
+			Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 		},
 		Spec: regionapi.SecurityGroupV2CreateSpec{
 			NetworkId: networkID,
@@ -162,10 +161,10 @@ func (m *SecurityGroupModel) NscaleSecurityGroupUpdateParams() (regionapi.Securi
 	}
 
 	securityGroup := regionapi.SecurityGroupV2Update{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
+			Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 		},
 		Spec: regionapi.SecurityGroupV2Spec{
 			Rules: rules,

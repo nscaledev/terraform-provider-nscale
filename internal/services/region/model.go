@@ -18,7 +18,7 @@ package region
 
 import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 )
 
 type RegionModel struct {
@@ -27,7 +27,7 @@ type RegionModel struct {
 	Description types.String `tfsdk:"description"`
 }
 
-func NewRegionModel(source *regionapi.RegionRead) RegionModel {
+func NewRegionModel(source *computeapi.RegionRead) RegionModel {
 	return RegionModel{
 		ID:          types.StringValue(source.Metadata.Id),
 		Name:        types.StringValue(source.Metadata.Name),

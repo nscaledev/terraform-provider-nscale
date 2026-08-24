@@ -21,14 +21,13 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 )
 
 func TestNewObjectStorageEndpointClassModel(t *testing.T) {
 	created := time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)
 	source := &storageapi.ObjectStorageEndpointClassRead{
-		Metadata: coreapi.ResourceReadMetadata{
+		Metadata: storageapi.ResourceReadMetadata{
 			Id:           "class-1",
 			Name:         "standard",
 			Description:  new("Standard public exposure"),
@@ -77,7 +76,7 @@ func TestNewObjectStorageEndpointClassModel(t *testing.T) {
 // branch on the optional Description field.
 func TestNewObjectStorageEndpointClassModel_NilDescription(t *testing.T) {
 	source := &storageapi.ObjectStorageEndpointClassRead{
-		Metadata: coreapi.ResourceReadMetadata{
+		Metadata: storageapi.ResourceReadMetadata{
 			Id:           "class-bare",
 			Name:         "bare",
 			Description:  nil,

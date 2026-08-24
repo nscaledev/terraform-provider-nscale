@@ -24,7 +24,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 )
 
@@ -40,16 +39,16 @@ func TestNewPlacementModelFull(t *testing.T) {
 	publicIP := true
 
 	source := &reservationapi.PlacementV2Read{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: reservationapi.ProjectScopedResourceReadMetadata{
 			Id:                 "placement-1",
 			Name:               "training-workers",
 			Description:        new("host placement"),
 			OrganizationId:     "org-1",
 			ProjectId:          "project-1",
 			CreationTime:       creationTime,
-			ProvisioningStatus: coreapi.ResourceProvisioningStatusProvisioned,
-			HealthStatus:       coreapi.ResourceHealthStatusHealthy,
-			Tags: &[]coreapi.Tag{
+			ProvisioningStatus: reservationapi.ResourceProvisioningStatusProvisioned,
+			HealthStatus:       reservationapi.ResourceHealthStatusHealthy,
+			Tags: &[]reservationapi.Tag{
 				{Name: "workload", Value: "training"},
 			},
 		},
@@ -140,14 +139,14 @@ func TestNewPlacementModelMinimal(t *testing.T) {
 	creationTime := time.Date(2026, time.April, 28, 11, 3, 12, 0, time.UTC)
 
 	source := &reservationapi.PlacementV2Read{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: reservationapi.ProjectScopedResourceReadMetadata{
 			Id:                 "placement-2",
 			Name:               "bare",
 			OrganizationId:     "org-1",
 			ProjectId:          "project-1",
 			CreationTime:       creationTime,
-			ProvisioningStatus: coreapi.ResourceProvisioningStatusPending,
-			HealthStatus:       coreapi.ResourceHealthStatusHealthy,
+			ProvisioningStatus: reservationapi.ResourceProvisioningStatusPending,
+			HealthStatus:       reservationapi.ResourceHealthStatusHealthy,
 		},
 		Spec: reservationapi.PlacementV2Spec{
 			Count: 1,
@@ -400,14 +399,14 @@ func TestNscalePlacementCreateParamsUnknownNetworkingLists(t *testing.T) {
 // empty (known) lists rather than null, matching a configured `[]`.
 func TestNewPlacementModelNetworkingNilLists(t *testing.T) {
 	source := &reservationapi.PlacementV2Read{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: reservationapi.ProjectScopedResourceReadMetadata{
 			Id:                 "placement-3",
 			Name:               "n",
 			OrganizationId:     "org-1",
 			ProjectId:          "project-1",
 			CreationTime:       time.Date(2026, time.April, 28, 11, 3, 12, 0, time.UTC),
-			ProvisioningStatus: coreapi.ResourceProvisioningStatusProvisioned,
-			HealthStatus:       coreapi.ResourceHealthStatusHealthy,
+			ProvisioningStatus: reservationapi.ResourceProvisioningStatusProvisioned,
+			HealthStatus:       reservationapi.ResourceHealthStatusHealthy,
 		},
 		Spec: reservationapi.PlacementV2Spec{
 			Count:       1,

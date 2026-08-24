@@ -19,8 +19,8 @@ package identity
 import (
 	"context"
 
+	"github.com/google/uuid"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
-	identityids "github.com/unikorn-cloud/identity/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -30,12 +30,12 @@ func getGroup(
 	id string,
 	client *nscale.Client,
 ) (*identityapi.GroupRead, error) {
-	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
+	organizationID, err := uuid.Parse(client.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
 
-	groupID, err := identityids.ParseGroupID(id)
+	groupID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
 	}

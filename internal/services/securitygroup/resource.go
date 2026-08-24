@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
@@ -33,7 +34,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -314,7 +314,7 @@ func (r *SecurityGroupResource) Update(
 
 	id := data.ID.ValueString()
 
-	securityGroupID, ok := nscale.ParseID(id, "Security Group", regionids.ParseSecurityGroupID, &response.Diagnostics)
+	securityGroupID, ok := nscale.ParseID(id, "Security Group", uuid.Parse, &response.Diagnostics)
 	if !ok {
 		return
 	}
@@ -376,7 +376,7 @@ func (r *SecurityGroupResource) Delete(
 
 	id := data.ID.ValueString()
 
-	securityGroupID, ok := nscale.ParseID(id, "Security Group", regionids.ParseSecurityGroupID, &response.Diagnostics)
+	securityGroupID, ok := nscale.ParseID(id, "Security Group", uuid.Parse, &response.Diagnostics)
 	if !ok {
 		return
 	}

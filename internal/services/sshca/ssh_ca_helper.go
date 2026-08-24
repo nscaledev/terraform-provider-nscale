@@ -19,8 +19,8 @@ package sshca
 import (
 	"context"
 
+	"github.com/google/uuid"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -30,7 +30,7 @@ func getSSHCA(
 	id string,
 	client *nscale.Client,
 ) (*regionapi.SshCertificateAuthorityV2Read, nscale.ResourceStatus, error) {
-	sshCAID, err := regionids.ParseSSHCertificateAuthorityID(id)
+	sshCAID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, nscale.ResourceStatus{}, err
 	}

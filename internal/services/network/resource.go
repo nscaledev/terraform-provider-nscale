@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
@@ -15,7 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -250,7 +250,7 @@ func networkUpdate(
 		return "", diagnostics
 	}
 
-	networkID, ok := nscale.ParseID(id, "Network", regionids.ParseNetworkID, &diagnostics)
+	networkID, ok := nscale.ParseID(id, "Network", uuid.Parse, &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}
@@ -283,7 +283,7 @@ func networkUpdate(
 }
 
 func networkDelete(ctx context.Context, client *nscale.Client, id string) error {
-	networkID, err := regionids.ParseNetworkID(id)
+	networkID, err := uuid.Parse(id)
 	if err != nil {
 		return err
 	}

@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -85,10 +84,10 @@ func (m *ProjectModel) NscaleProjectCreateParams(ctx context.Context) (identitya
 	}
 
 	return identityapi.ProjectWrite{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: identityapi.ResourceMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
-			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
+			Tags:        nscale.TagsToAPI[identityapi.Tag](tags),
 		},
 		Spec: identityapi.ProjectSpec{
 			GroupIDs: groupIDs,

@@ -19,6 +19,8 @@ package instance
 import (
 	"context"
 
+	"github.com/google/uuid"
+
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -29,7 +31,12 @@ func getInstance(
 	id string,
 	client *nscale.Client,
 ) (*computeapi.InstanceRead, nscale.ResourceStatus, error) {
-	instanceResponse, err := client.Compute.GetApiV2InstancesInstanceID(ctx, id)
+	instanceID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, nscale.ResourceStatus{}, err
+	}
+
+	instanceResponse, err := client.Compute.GetApiV2InstancesInstanceID(ctx, instanceID)
 	if err != nil {
 		return nil, nscale.ResourceStatus{}, err
 	}

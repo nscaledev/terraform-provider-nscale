@@ -17,7 +17,7 @@ limitations under the License.
 package reservation
 
 import (
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -28,7 +28,7 @@ import (
 // Reservations and placements are both project-scoped and carry the same
 // metadata type, so the field mapping is written once here rather than repeated
 // in each resource's get helper.
-func statusOf(metadata *coreapi.ProjectScopedResourceReadMetadata) nscale.ResourceStatus {
+func statusOf(metadata *reservationapi.ProjectScopedResourceReadMetadata) nscale.ResourceStatus {
 	return nscale.NewResourceStatus(
 		metadata.Id,
 		metadata.Name,

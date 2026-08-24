@@ -19,8 +19,8 @@ package network
 import (
 	"context"
 
+	"github.com/google/uuid"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -33,7 +33,7 @@ func getNetwork(
 	id string,
 	client *nscale.Client,
 ) (*regionapi.NetworkV2Read, nscale.ResourceStatus, error) {
-	networkID, err := regionids.ParseNetworkID(id)
+	networkID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, nscale.ResourceStatus{}, err
 	}

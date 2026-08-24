@@ -18,13 +18,30 @@ package instance
 
 import (
 	"encoding/base64"
+	"slices"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
+)
+
+// The compute API types every spec identifier as a UUID, so these fixtures
+// must be parseable — a placeholder like "flavor-1" is now rejected before the
+// request is built.
+const (
+	testFlavorIDString       = "2f8a1d4e-6b3c-4f5a-9e0d-7c1b8a2f3d40"
+	testImageIDString        = "5c9b2e7f-1a4d-4b8c-8f2e-3d6a9b0c1e52"
+	testNetworkIDString      = "8e3f4a1b-2c5d-4e7f-9a0b-1c2d3e4f5a60"
+	testProjectIDString      = "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d50"
+	testOrganizationIDString = "d4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f70"
+)
+
+var (
+	testFlavorID = uuid.MustParse(testFlavorIDString)
+	testImageID  = uuid.MustParse(testImageIDString)
 )
 
 const testUserDataPlaintext = "#cloud-config\nruncmd:\n  - [ echo, hello ]\n"
@@ -33,7 +50,7 @@ func testNetworkInterfaceObject() types.Object {
 	return types.ObjectValueMust(
 		InstanceNetworkInterfaceModelAttributeType.AttrTypes,
 		map[string]attr.Value{
-			"network_id":           types.StringValue("network-1"),
+			"network_id":           types.StringValue(testNetworkIDString),
 			"enable_public_ip":     types.BoolValue(true),
 			"security_group_ids":   types.ListNull(types.StringType),
 			"allowed_destinations": types.ListNull(types.StringType),
@@ -46,9 +63,9 @@ func testInstanceModel(userData types.String) InstanceModel {
 		Name:             types.StringValue("test-instance"),
 		UserData:         userData,
 		NetworkInterface: testNetworkInterfaceObject(),
-		ImageID:          types.StringValue("image-1"),
-		FlavorID:         types.StringValue("flavor-1"),
-		ProjectID:        types.StringValue("project-1"),
+		ImageID:          types.StringValue(testImageIDString),
+		FlavorID:         types.StringValue(testFlavorIDString),
+		ProjectID:        types.StringValue(testProjectIDString),
 		Tags:             types.MapNull(types.StringType),
 	}
 }
@@ -59,7 +76,7 @@ func TestNscaleInstanceCreateParamsDecodesUserData(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString([]byte(testUserDataPlaintext))
 	model := testInstanceModel(types.StringValue(encoded))
 
-	params, diagnostics := model.NscaleInstanceCreateParams("org-1")
+	params, diagnostics := model.NscaleInstanceCreateParams(testOrganizationIDString)
 	if diagnostics.HasError() {
 		t.Fatalf("NscaleInstanceCreateParams() diagnostics = %v", diagnostics)
 	}
@@ -76,7 +93,7 @@ func TestNscaleInstanceCreateParamsDecodesUserData(t *testing.T) {
 func TestNscaleInstanceCreateParamsRejectsInvalidUserData(t *testing.T) {
 	model := testInstanceModel(types.StringValue("not!valid!base64"))
 
-	if _, diagnostics := model.NscaleInstanceCreateParams("org-1"); !diagnostics.HasError() {
+	if _, diagnostics := model.NscaleInstanceCreateParams(testOrganizationIDString); !diagnostics.HasError() {
 		t.Error("NscaleInstanceCreateParams() diagnostics = none, want an error for malformed base64")
 	}
 }
@@ -84,7 +101,7 @@ func TestNscaleInstanceCreateParamsRejectsInvalidUserData(t *testing.T) {
 func TestNscaleInstanceCreateParamsOmitsEmptyUserData(t *testing.T) {
 	model := testInstanceModel(types.StringNull())
 
-	params, diagnostics := model.NscaleInstanceCreateParams("org-1")
+	params, diagnostics := model.NscaleInstanceCreateParams(testOrganizationIDString)
 	if diagnostics.HasError() {
 		t.Fatalf("NscaleInstanceCreateParams() diagnostics = %v", diagnostics)
 	}
@@ -112,6 +129,47 @@ func TestNscaleInstanceUpdateParamsDecodesUserData(t *testing.T) {
 	}
 }
 
+// The compute API types identifiers as UUIDs, so a malformed one is reported
+// against the attribute that carries it instead of being sent to the API as an
+// opaque string. All of them are checked in one pass, so a config with several
+// bad identifiers reports them together rather than one per apply.
+func TestNscaleInstanceCreateParamsRejectsNonUUIDIdentifiers(t *testing.T) {
+	model := testInstanceModel(types.StringNull())
+	model.FlavorID = types.StringValue("flavor-1")
+	model.ImageID = types.StringValue("image-1")
+
+	_, diagnostics := model.NscaleInstanceCreateParams(testOrganizationIDString)
+	if !diagnostics.HasError() {
+		t.Fatal("diagnostics = none, want errors for the malformed identifiers")
+	}
+
+	var summaries []string
+	for _, diagnostic := range diagnostics.Errors() {
+		summaries = append(summaries, diagnostic.Summary())
+	}
+
+	for _, want := range []string{"Invalid flavor_id", "Invalid image_id"} {
+		if !slices.Contains(summaries, want) {
+			t.Errorf("diagnostics %v missing %q", summaries, want)
+		}
+	}
+}
+
+// An optional identifier left unset must stay unset rather than becoming the
+// zero UUID, which the API would read as a real reference.
+func TestNscaleInstanceCreateParamsOmitsUnsetSSHCertificateAuthority(t *testing.T) {
+	model := testInstanceModel(types.StringNull())
+
+	params, diagnostics := model.NscaleInstanceCreateParams(testOrganizationIDString)
+	if diagnostics.HasError() {
+		t.Fatalf("diagnostics = %v", diagnostics)
+	}
+
+	if params.Spec.SshCertificateAuthorityId != nil {
+		t.Errorf("SshCertificateAuthorityId = %v, want nil", params.Spec.SshCertificateAuthorityId)
+	}
+}
+
 func TestNscaleInstanceUpdateParamsRejectsInvalidUserData(t *testing.T) {
 	model := testInstanceModel(types.StringValue("not!valid!base64"))
 
@@ -125,15 +183,15 @@ func TestNscaleInstanceUpdateParamsRejectsInvalidUserData(t *testing.T) {
 func TestNewInstanceModelEncodesUserData(t *testing.T) {
 	userData := []byte(testUserDataPlaintext)
 	source := &computeapi.InstanceRead{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: computeapi.ProjectScopedResourceReadMetadata{
 			Id:           "instance-1",
 			Name:         "test-instance",
 			ProjectId:    "project-1",
 			CreationTime: time.Date(2026, time.April, 28, 11, 3, 12, 0, time.UTC),
 		},
 		Spec: computeapi.InstanceSpec{
-			FlavorId:   "flavor-1",
-			ImageId:    "image-1",
+			FlavorId:   testFlavorID,
+			ImageId:    testImageID,
 			Networking: &computeapi.InstanceNetworking{},
 			UserData:   &userData,
 		},
@@ -153,15 +211,15 @@ func TestNewInstanceModelEncodesUserData(t *testing.T) {
 
 func TestNewInstanceModelNullUserData(t *testing.T) {
 	source := &computeapi.InstanceRead{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: computeapi.ProjectScopedResourceReadMetadata{
 			Id:           "instance-1",
 			Name:         "test-instance",
 			ProjectId:    "project-1",
 			CreationTime: time.Date(2026, time.April, 28, 11, 3, 12, 0, time.UTC),
 		},
 		Spec: computeapi.InstanceSpec{
-			FlavorId:   "flavor-1",
-			ImageId:    "image-1",
+			FlavorId:   testFlavorID,
+			ImageId:    testImageID,
 			Networking: &computeapi.InstanceNetworking{},
 		},
 		Status: computeapi.InstanceStatus{

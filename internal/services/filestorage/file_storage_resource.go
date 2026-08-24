@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -34,7 +35,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -471,7 +471,7 @@ func (r *FileStorageResource) Update(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, ok := nscale.ParseID(id, "File Storage", regionids.ParseFileStorageID, &response.Diagnostics)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", uuid.Parse, &response.Diagnostics)
 	if !ok {
 		return
 	}
@@ -531,7 +531,7 @@ func (r *FileStorageResource) Delete(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, ok := nscale.ParseID(id, "File Storage", regionids.ParseFileStorageID, &response.Diagnostics)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", uuid.Parse, &response.Diagnostics)
 	if !ok {
 		return
 	}

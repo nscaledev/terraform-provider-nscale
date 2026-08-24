@@ -19,7 +19,7 @@ package tags_test
 import (
 	"testing"
 
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 	legacycore "github.com/unikorn-cloud/core/pkg/openapi"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tags"
@@ -38,9 +38,9 @@ type sdkTag struct {
 // deprecated compute_cluster resource still bridges. A shape change upstream
 // fails to build here rather than at the call sites.
 var (
-	_ = tags.FromAPI[coreapi.Tag]
+	_ = tags.FromAPI[regionapi.Tag]
 	_ = tags.FromAPI[legacycore.Tag]
-	_ = tags.ToAPI[coreapi.Tag]
+	_ = tags.ToAPI[regionapi.Tag]
 	_ = tags.ToAPI[legacycore.Tag]
 )
 

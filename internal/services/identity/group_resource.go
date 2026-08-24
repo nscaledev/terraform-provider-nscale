@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -30,7 +31,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
-	identityids "github.com/unikorn-cloud/identity/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -198,7 +198,7 @@ func groupCreate(
 	organizationID, ok := nscale.ParseID(
 		client.OrganizationID,
 		"Organization",
-		identityids.ParseOrganizationID,
+		uuid.Parse,
 		&diagnostics,
 	)
 	if !ok {
@@ -246,14 +246,14 @@ func groupUpdate(
 	organizationID, ok := nscale.ParseID(
 		client.OrganizationID,
 		"Organization",
-		identityids.ParseOrganizationID,
+		uuid.Parse,
 		&diagnostics,
 	)
 	if !ok {
 		return "", diagnostics
 	}
 
-	groupID, ok := nscale.ParseID(id, "Group", identityids.ParseGroupID, &diagnostics)
+	groupID, ok := nscale.ParseID(id, "Group", uuid.Parse, &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}
@@ -291,12 +291,12 @@ func groupUpdate(
 }
 
 func groupDelete(ctx context.Context, client *nscale.Client, id string) error {
-	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
+	organizationID, err := uuid.Parse(client.OrganizationID)
 	if err != nil {
 		return err
 	}
 
-	groupID, err := identityids.ParseGroupID(id)
+	groupID, err := uuid.Parse(id)
 	if err != nil {
 		return err
 	}

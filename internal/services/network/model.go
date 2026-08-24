@@ -20,12 +20,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
@@ -102,16 +101,16 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 		nonEmptyRoutes = &routes
 	}
 
-	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", regionids.ParseRegionID, &diagnostics)
+	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", uuid.Parse, &diagnostics)
 	if !ok {
 		return regionapi.NetworkV2Create{}, diagnostics
 	}
 
 	network := regionapi.NetworkV2Create{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
+			Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 		},
 		Spec: regionapi.NetworkV2CreateSpec{
 			DnsNameservers: dnsNameservers,
@@ -160,10 +159,10 @@ func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, d
 	}
 
 	network := regionapi.NetworkV2Update{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
+			Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 		},
 		Spec: regionapi.NetworkV2Spec{
 			DnsNameservers: dnsNameservers,

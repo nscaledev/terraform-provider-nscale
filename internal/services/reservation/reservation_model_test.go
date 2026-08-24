@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 )
 
@@ -31,16 +30,16 @@ func TestNewReservationModelFull(t *testing.T) {
 	topologyHash := "sha256:abc123"
 
 	source := &reservationapi.ReservationV2Read{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: reservationapi.ProjectScopedResourceReadMetadata{
 			Id:                 "reservation-1",
 			Name:               "gb300-nvl72",
 			Description:        new("training capacity"),
 			OrganizationId:     "org-1",
 			ProjectId:          "project-1",
 			CreationTime:       creationTime,
-			ProvisioningStatus: coreapi.ResourceProvisioningStatusProvisioned,
-			HealthStatus:       coreapi.ResourceHealthStatusHealthy,
-			Tags: &[]coreapi.Tag{
+			ProvisioningStatus: reservationapi.ResourceProvisioningStatusProvisioned,
+			HealthStatus:       reservationapi.ResourceHealthStatusHealthy,
+			Tags: &[]reservationapi.Tag{
 				{Name: "workload", Value: "training"},
 			},
 		},
@@ -96,14 +95,14 @@ func TestNewReservationModelMinimal(t *testing.T) {
 	creationTime := time.Date(2026, time.May, 14, 10, 0, 0, 0, time.UTC)
 
 	source := &reservationapi.ReservationV2Read{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: reservationapi.ProjectScopedResourceReadMetadata{
 			Id:                 "reservation-2",
 			Name:               "bare",
 			OrganizationId:     "org-1",
 			ProjectId:          "project-1",
 			CreationTime:       creationTime,
-			ProvisioningStatus: coreapi.ResourceProvisioningStatusPending,
-			HealthStatus:       coreapi.ResourceHealthStatusHealthy,
+			ProvisioningStatus: reservationapi.ResourceProvisioningStatusPending,
+			HealthStatus:       reservationapi.ResourceHealthStatusHealthy,
 		},
 		Spec: reservationapi.ReservationV2Spec{
 			RegionId:    "region-1",
