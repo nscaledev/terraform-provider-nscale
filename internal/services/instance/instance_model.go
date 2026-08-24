@@ -110,7 +110,7 @@ func (m *InstanceModel) NscaleInstanceCreateParams(
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: computeapi.InstanceCreateSpec{
 			FlavorId:                  m.FlavorID.ValueString(),
@@ -158,7 +158,7 @@ func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate,
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: computeapi.InstanceSpec{
 			FlavorId:                  m.FlavorID.ValueString(),

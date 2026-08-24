@@ -325,7 +325,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 	fileStorage.Metadata = coreapi.ResourceWriteMetadata{
 		Description: m.Description.ValueStringPointer(),
 		Name:        m.Name.ValueString(),
-		Tags:        tags,
+		Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 	}
 	fileStorage.Spec.Attachments = &regionapi.StorageAttachmentV2Spec{NetworkIds: networkIDs}
 	fileStorage.Spec.DefaultSnapshotProtectionEnabled = defaultSnapshotProtectionPointer(
@@ -370,7 +370,7 @@ func (m *FileStorageModel) NscaleFileStorageUpdateParams(
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: regionapi.StorageV2Spec{
 			Attachments: &regionapi.StorageAttachmentV2Spec{

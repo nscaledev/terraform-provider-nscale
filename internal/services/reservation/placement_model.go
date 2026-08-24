@@ -223,7 +223,7 @@ func (m *PlacementModel) NscalePlacementCreateParams(
 		Metadata: coreapi.ResourceWriteMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: reservationapi.PlacementV2CreateSpec{
 			ReservationId: m.ReservationID.ValueString(),

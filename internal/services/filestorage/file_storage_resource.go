@@ -393,7 +393,7 @@ func (r *FileStorageResource) Create(
 		ResourceName:  "file storage",
 		GetFunc: func(ctx context.Context) (*regionapi.StorageV2Read, nscale.ResourceStatus, error) {
 			targetID := fileStorage.Metadata.Id
-			return nscale.AdaptProjectScoped(getFileStorage(ctx, targetID, r.client))
+			return getFileStorage(ctx, targetID, r.client)
 		},
 	}
 
@@ -418,7 +418,7 @@ func (r *FileStorageResource) Read(ctx context.Context, request resource.ReadReq
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
 		GetFunc: func(ctx context.Context, id string) (*regionapi.StorageV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getFileStorage(ctx, id, r.client))
+			return getFileStorage(ctx, id, r.client)
 		},
 	}
 
@@ -476,7 +476,8 @@ func (r *FileStorageResource) Update(
 		return
 	}
 
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
 	fileStorageUpdateResponse, err := r.client.Region.PutApiV2FilestorageFilestorageID(ctx, fileStorageID, params)
 	if err != nil {
@@ -503,7 +504,7 @@ func (r *FileStorageResource) Update(
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
 		GetFunc: func(ctx context.Context) (*regionapi.StorageV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getFileStorage(ctx, id, r.client))
+			return getFileStorage(ctx, id, r.client)
 		},
 	}
 
@@ -560,7 +561,7 @@ func (r *FileStorageResource) Delete(
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
 		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getFileStorage(ctx, id, r.client))
+			return getFileStorage(ctx, id, r.client)
 		},
 	}
 

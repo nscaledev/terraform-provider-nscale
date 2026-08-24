@@ -26,8 +26,8 @@ on its own base URL — needs provider wiring (see "Provider plumbing" below).
 
 Auth scoping: standard. Create body carries `organizationId` + `projectId` (from
 the provider-configured client) and `regionId` (from `region_id`, defaulting to
-the provider region). Metadata read is **project-scoped** → use
-`nscale.StatusFromProjectScoped` / `AdaptProjectScoped`.
+the provider region). Metadata read is **project-scoped** → project it onto
+`nscale.ResourceStatus` in the get helper via the package's `statusOf`.
 
 ## Provider plumbing (one-time, this PR)
 

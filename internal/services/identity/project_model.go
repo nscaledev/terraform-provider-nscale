@@ -88,7 +88,7 @@ func (m *ProjectModel) NscaleProjectCreateParams(ctx context.Context) (identitya
 		Metadata: coreapi.ResourceWriteMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: identityapi.ProjectSpec{
 			GroupIDs: groupIDs,

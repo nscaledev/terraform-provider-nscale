@@ -95,7 +95,7 @@ func (m *ReservationModel) NscaleReservationCreateParams(
 		Metadata: coreapi.ResourceWriteMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: reservationapi.ReservationV2CreateSpec{
 			OrganizationId: organizationID,

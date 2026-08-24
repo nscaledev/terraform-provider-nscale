@@ -234,7 +234,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointCreateParams(
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: struct {
 			IdentityPolicies             *storageapi.ObjectStorageIdentityPolicyList `json:"identityPolicies,omitempty"`
@@ -277,7 +277,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointUpdateParams(
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: &storageapi.ObjectStorageEndpointUpdateSpec{IdentityPolicies: nil},
 	}

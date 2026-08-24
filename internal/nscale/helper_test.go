@@ -10,7 +10,6 @@ import (
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 )
 
 type waitTestResource struct {
@@ -65,19 +64,19 @@ func TestParseIDAddsDiagnostic(t *testing.T) {
 func TestCreateStateWatcherWaitHandlesTransientProvisioningStates(t *testing.T) {
 	testCases := []struct {
 		name          string
-		initialStatus coreapi.ResourceProvisioningStatus
+		initialStatus ProvisioningStatus
 	}{
 		{
 			name:          "pending",
-			initialStatus: coreapi.ResourceProvisioningStatusPending,
+			initialStatus: ProvisioningStatusPending,
 		},
 		{
 			name:          "unknown",
-			initialStatus: coreapi.ResourceProvisioningStatusUnknown,
+			initialStatus: ProvisioningStatusUnknown,
 		},
 		{
 			name:          "provisioning",
-			initialStatus: coreapi.ResourceProvisioningStatusProvisioning,
+			initialStatus: ProvisioningStatusProvisioning,
 		},
 	}
 
@@ -96,16 +95,14 @@ func TestCreateStateWatcherWaitHandlesTransientProvisioningStates(t *testing.T) 
 					if calls == 1 {
 						return &waitTestResource{
 								name: "creating",
-							}, StatusFromProjectScoped(
-								&coreapi.ProjectScopedResourceReadMetadata{
-									ProvisioningStatus: testCase.initialStatus,
-								},
-							), nil
+							}, ResourceStatus{
+								ProvisioningStatus: testCase.initialStatus,
+							}, nil
 					}
 
-					return finalResult, StatusFromProjectScoped(&coreapi.ProjectScopedResourceReadMetadata{
-						ProvisioningStatus: coreapi.ResourceProvisioningStatusProvisioned,
-					}), nil
+					return finalResult, ResourceStatus{
+						ProvisioningStatus: ProvisioningStatusProvisioned,
+					}, nil
 				},
 			}
 
@@ -160,22 +157,18 @@ func TestCreateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
 			if calls == 1 {
 				return &waitTestResource{
 						name: "creating",
-					}, StatusFromProjectScoped(
-						&coreapi.ProjectScopedResourceReadMetadata{
-							Id:                 resourceID,
-							ProvisioningStatus: coreapi.ResourceProvisioningStatusProvisioning,
-						},
-					), nil
+					}, ResourceStatus{
+						ID:                 resourceID,
+						ProvisioningStatus: ProvisioningStatusProvisioning,
+					}, nil
 			}
 
 			return &waitTestResource{
 					name: "failed",
-				}, StatusFromProjectScoped(
-					&coreapi.ProjectScopedResourceReadMetadata{
-						Id:                 resourceID,
-						ProvisioningStatus: coreapi.ResourceProvisioningStatusError,
-					},
-				), nil
+				}, ResourceStatus{
+					ID:                 resourceID,
+					ProvisioningStatus: ProvisioningStatusError,
+				}, nil
 		},
 	}
 
@@ -236,12 +229,10 @@ func TestUpdateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
 		GetFunc: func(ctx context.Context) (*waitTestResource, ResourceStatus, error) {
 			return &waitTestResource{
 					name: "failed",
-				}, StatusFromProjectScoped(
-					&coreapi.ProjectScopedResourceReadMetadata{
-						Id:                 resourceID,
-						ProvisioningStatus: coreapi.ResourceProvisioningStatusError,
-					},
-				), nil
+				}, ResourceStatus{
+					ID:                 resourceID,
+					ProvisioningStatus: ProvisioningStatusError,
+				}, nil
 		},
 	}
 
@@ -292,10 +283,10 @@ func TestDeleteStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
 		ResourceTitle: "Instance",
 		ResourceName:  "instance",
 		GetFunc: func(ctx context.Context) (any, ResourceStatus, error) {
-			return struct{}{}, StatusFromProjectScoped(&coreapi.ProjectScopedResourceReadMetadata{
-				Id:                 resourceID,
-				ProvisioningStatus: coreapi.ResourceProvisioningStatusError,
-			}), nil
+			return struct{}{}, ResourceStatus{
+				ID:                 resourceID,
+				ProvisioningStatus: ProvisioningStatusError,
+			}, nil
 		},
 	}
 

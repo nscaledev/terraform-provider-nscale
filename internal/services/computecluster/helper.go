@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 
-	common "github.com/nscaledev/nscale-sdk-go/common"
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -31,25 +30,30 @@ func getComputeCluster(
 	ctx context.Context,
 	organizationID, id string,
 	client *nscale.Client,
-) (*computeapi.ComputeClusterRead, *common.ProjectScopedResourceReadMetadata, error) {
+) (*computeapi.ComputeClusterRead, nscale.ResourceStatus, error) {
 	computeClusterListResponse, err := client.LegacyCompute.GetApiV1OrganizationsOrganizationIDClusters(
 		ctx,
 		organizationID,
 		nil,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 	defer computeClusterListResponse.Body.Close()
 
 	computeClusters, err := nscale.ReadJSONResponseValue[[]computeapi.ComputeClusterRead](computeClusterListResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
 	for _, computeCluster := range computeClusters {
 		if computeCluster.Metadata.Id == id {
-			return &computeCluster, commonReadMetadataFromLegacy(&computeCluster.Metadata), nil
+			return &computeCluster, nscale.NewResourceStatus(
+				computeCluster.Metadata.Id,
+				computeCluster.Metadata.Name,
+				computeCluster.Metadata.ProvisioningStatus,
+				computeCluster.Metadata.Tags,
+			), nil
 		}
 	}
 
@@ -58,5 +62,5 @@ func getComputeCluster(
 		Message:    fmt.Sprintf("failed to find compute cluster '%s' in the list response", id),
 	}
 
-	return nil, nil, err
+	return nil, nscale.ResourceStatus{}, err
 }

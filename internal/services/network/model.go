@@ -111,7 +111,7 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: regionapi.NetworkV2CreateSpec{
 			DnsNameservers: dnsNameservers,
@@ -163,7 +163,7 @@ func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, d
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: regionapi.NetworkV2Spec{
 			DnsNameservers: dnsNameservers,

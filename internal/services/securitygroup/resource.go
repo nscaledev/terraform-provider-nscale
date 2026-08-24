@@ -254,7 +254,7 @@ func (r *SecurityGroupResource) Create(
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
 			targetID := securityGroup.Metadata.Id
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, targetID, r.client))
+			return getSecurityGroup(ctx, targetID, r.client)
 		},
 	}
 
@@ -282,7 +282,7 @@ func (r *SecurityGroupResource) Read(
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context, id string) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
+			return getSecurityGroup(ctx, id, r.client)
 		},
 	}
 
@@ -319,7 +319,8 @@ func (r *SecurityGroupResource) Update(
 		return
 	}
 
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
 	securityGroupUpdateResponse, err := r.client.Region.PutApiV2SecuritygroupsSecurityGroupID(
 		ctx,
@@ -349,7 +350,7 @@ func (r *SecurityGroupResource) Update(
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
+			return getSecurityGroup(ctx, id, r.client)
 		},
 	}
 
@@ -414,7 +415,7 @@ func (r *SecurityGroupResource) Delete(
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
+			return getSecurityGroup(ctx, id, r.client)
 		},
 	}
 

@@ -76,7 +76,7 @@ func instanceAdapter() nscale.ResourceAdapter[InstanceResourceModel, computeapi.
 			client *nscale.Client,
 			id string,
 		) (*computeapi.InstanceRead, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getInstance(ctx, id, client))
+			return getInstance(ctx, id, client)
 		},
 		ToModel: func(api *computeapi.InstanceRead, dst *InstanceResourceModel) {
 			dst.InstanceModel = NewInstanceModel(api)
@@ -283,7 +283,8 @@ func instanceUpdate(
 
 	// Tag the update so the watcher can confirm the PUT has propagated through
 	// the cache-backed API before reading back a terminal status.
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
 	updateResponse, err := client.Compute.PutApiV2InstancesInstanceID(ctx, id, params)
 	if err != nil {

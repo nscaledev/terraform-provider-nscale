@@ -25,7 +25,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tags"
 )
 
 // Base64StringValue renders raw bytes returned by the API as the base64 string
@@ -84,20 +85,26 @@ func NullableSetValueMust(elementType attr.Type, elements []attr.Value) basetype
 	return basetypes.NewSetValueMust(elementType, elements)
 }
 
-func TagMapValueMust(tags *[]coreapi.Tag) basetypes.MapValue {
-	if tags == nil || len(*tags) == 0 {
+// TagMapValueMust renders tags as the map attribute held in state. It is generic
+// over the tag type so it accepts a response's tags straight from any service
+// package as well as the provider's own tags.List.
+func TagMapValueMust[T tags.SDKTag](tagList *[]T) basetypes.MapValue {
+	if tagList == nil || len(*tagList) == 0 {
 		return basetypes.NewMapNull(types.StringType)
 	}
 
-	elements := make(map[string]attr.Value, len(*tags))
-	for _, tag := range *tags {
+	elements := make(map[string]attr.Value, len(*tagList))
+	for _, tag := range *tags.FromAPI(tagList) {
 		elements[tag.Name] = types.StringValue(tag.Value)
 	}
 
 	return basetypes.NewMapValueMust(types.StringType, elements)
 }
 
-func ValueTagListPointer(tagMap basetypes.MapValue) (*[]coreapi.Tag, diag.Diagnostics) {
+// ValueTagListPointer reads a map attribute into the provider's own tag list.
+// Callers building a request body convert to their service's tag type at the
+// point of use, with nscale.TagsToAPI.
+func ValueTagListPointer(tagMap basetypes.MapValue) (*tags.List, diag.Diagnostics) {
 	if tagMap.IsNull() || tagMap.IsUnknown() {
 		return nil, nil
 	}
@@ -111,13 +118,13 @@ func ValueTagListPointer(tagMap basetypes.MapValue) (*[]coreapi.Tag, diag.Diagno
 		return nil, nil
 	}
 
-	tags := make([]coreapi.Tag, 0, len(data))
+	tagList := make(tags.List, 0, len(data))
 	for name, value := range data {
-		tags = append(tags, coreapi.Tag{
+		tagList = append(tagList, tags.Tag{
 			Name:  name,
 			Value: value,
 		})
 	}
 
-	return &tags, nil
+	return &tagList, nil
 }

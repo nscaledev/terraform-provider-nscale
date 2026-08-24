@@ -60,7 +60,8 @@ func getGroup(
 
 // getGroupStatus reads a group and adapts it to the shared watchers'
 // (resource, ResourceStatus, error) shape. Identity reads are
-// organization-scoped, so it uses StatusFromOrgScoped.
+// organization-scoped, which the projection absorbs: ResourceStatus carries no
+// project, so both scopes' metadata map onto it identically.
 func getGroupStatus(
 	ctx context.Context,
 	id string,
@@ -71,5 +72,10 @@ func getGroupStatus(
 		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return group, nscale.StatusFromOrgScoped(&group.Metadata), nil
+	return group, nscale.NewResourceStatus(
+		group.Metadata.Id,
+		group.Metadata.Name,
+		group.Metadata.ProvisioningStatus,
+		group.Metadata.Tags,
+	), nil
 }

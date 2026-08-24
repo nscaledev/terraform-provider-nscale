@@ -28,7 +28,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tags"
 )
 
 const (
@@ -88,7 +89,7 @@ func addProvisioningErrorDiagnostic(
 	found bool,
 	detail string,
 ) bool {
-	if !found || status.ProvisioningStatus != coreapi.ResourceProvisioningStatusError {
+	if !found || status.ProvisioningStatus != ProvisioningStatusError {
 		return false
 	}
 
@@ -123,20 +124,20 @@ func (w *CreateStateWatcher[T]) Wait(
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
 		Pending: []string{
-			string(coreapi.ResourceProvisioningStatusProvisioning),
-			string(coreapi.ResourceProvisioningStatusPending),
-			string(coreapi.ResourceProvisioningStatusUnknown),
+			string(ProvisioningStatusProvisioning),
+			string(ProvisioningStatusPending),
+			string(ProvisioningStatusUnknown),
 		},
 		Target: []string{
-			string(coreapi.ResourceProvisioningStatusProvisioned),
-			string(coreapi.ResourceProvisioningStatusError),
+			string(ProvisioningStatusProvisioned),
+			string(ProvisioningStatusError),
 		},
 		Refresh: func() (any, string, error) {
 			result, status, err := w.GetFunc(ctx)
 			if err != nil {
 				if e, ok := AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 					// FIXME: Temporary workaround for resources that might not yet be visible in the cache-backed client. Should be revisited once API consistency is guaranteed.
-					return nil, string(coreapi.ResourceProvisioningStatusUnknown), nil
+					return nil, string(ProvisioningStatusUnknown), nil
 				}
 				return nil, "", err
 			}
@@ -213,28 +214,36 @@ func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resou
 	return result, true
 }
 
-func WriteOperationTag(metadata *coreapi.ResourceWriteMetadata) string {
+// AppendOperationTag returns tagList with a freshly minted operation tag
+// appended, along with that tag's key for the update watcher to poll for.
+//
+// It takes and returns the tags alone rather than the enclosing write metadata:
+// every service declares its own metadata struct, and a generic function cannot
+// reach a field on one. Callers assign the result back:
+//
+//	params.Metadata.Tags, operationTagKey = nscale.AppendOperationTag(params.Metadata.Tags)
+func AppendOperationTag[T tags.SDKTag](tagList *[]T) (*[]T, string) {
 	operationKey := TerraformOperationTagPrefix + uuid.NewString()
 
-	if metadata.Tags == nil {
-		var tags []coreapi.Tag
-		metadata.Tags = &tags
+	appended := TagList{}
+	if existing := tags.FromAPI(tagList); existing != nil {
+		appended = append(appended, *existing...)
 	}
 
-	*metadata.Tags = append(*metadata.Tags, coreapi.Tag{
+	appended = append(appended, Tag{
 		Name:  operationKey,
 		Value: time.Now().Format(time.RFC3339),
 	})
 
-	return operationKey
+	return TagsToAPI[T](&appended), operationKey
 }
 
-func HasOperationTag(tags *[]coreapi.Tag, operationTag string) bool {
-	if tags == nil {
+func HasOperationTag(tagList *TagList, operationTag string) bool {
+	if tagList == nil {
 		return false
 	}
 
-	for _, tag := range *tags {
+	for _, tag := range *tagList {
 		if tag.Name == operationTag {
 			return true
 		}
@@ -243,8 +252,9 @@ func HasOperationTag(tags *[]coreapi.Tag, operationTag string) bool {
 	return false
 }
 
-func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
-	if tags == nil {
+func RemoveOperationTags[T tags.SDKTag](tagList *[]T) *TagList {
+	converted := tags.FromAPI(tagList)
+	if converted == nil {
 		return nil
 	}
 
@@ -253,8 +263,8 @@ func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
 	// schema forbids users from setting reserved-prefix tags), otherwise an update
 	// that wrote one produces an "inconsistent result after apply" on the tags
 	// attribute. Strip every operation tag regardless of age.
-	var filtered []coreapi.Tag
-	for _, tag := range *tags {
+	var filtered TagList
+	for _, tag := range *converted {
 		if strings.HasPrefix(tag.Name, TerraformOperationTagPrefix) {
 			continue
 		}
@@ -305,7 +315,7 @@ func (w *UpdateStateWatcher[T]) Wait(
 			lastStatus = status
 			haveStatus = true
 
-			if status.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+			if status.ProvisioningStatus == ProvisioningStatusError {
 				return result, UpdateStateProvisioningError, nil
 			}
 
@@ -378,7 +388,7 @@ func (w *DeleteStateWatcher) Wait(
 			if err == nil {
 				lastStatus = status
 				haveStatus = true
-				if status.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+				if status.ProvisioningStatus == ProvisioningStatusError {
 					return struct{}{}, DeleteStateProvisioningError, nil
 				}
 				return struct{}{}, DeleteStateDeleting, nil

@@ -19,33 +19,42 @@ package network
 import (
 	"context"
 
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
+// getNetwork returns the network alongside the ResourceStatus the shared
+// watchers consume. Projecting the metadata here, where the region package's
+// concrete type is still in scope, keeps that type out of the shared layer.
 func getNetwork(
 	ctx context.Context,
 	id string,
 	client *nscale.Client,
-) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
+) (*regionapi.NetworkV2Read, nscale.ResourceStatus, error) {
 	networkID, err := regionids.ParseNetworkID(id)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
 	networkResponse, err := client.Region.GetApiV2NetworksNetworkID(ctx, networkID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 	defer networkResponse.Body.Close()
 
 	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return network, &network.Metadata, nil
+	metadata := network.Metadata
+
+	return network, nscale.NewResourceStatus(
+		metadata.Id,
+		metadata.Name,
+		metadata.ProvisioningStatus,
+		metadata.Tags,
+	), nil
 }

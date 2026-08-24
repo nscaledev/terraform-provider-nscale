@@ -22,7 +22,8 @@
 - **OpenAPI types used:** `reservationapi.PlacementV2Read`, `PlacementV2Create`, `PlacementV2CreateSpec`, `PlacementConstraintsV2`, `PlacementServerSpecV2`, `PlacementServerNetworkingV2`, `PlacementPolicyV2`, `WhenUnsatisfiableV2`.
 
 Create body needs no org/project — placement is scoped through its reservation.
-Metadata read is **project-scoped** → `nscale.StatusFromProjectScoped`.
+Metadata read is **project-scoped** → project it onto `nscale.ResourceStatus` in
+the get helper via the package's `statusOf`.
 
 ## Attributes
 

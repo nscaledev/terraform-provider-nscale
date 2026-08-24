@@ -77,7 +77,7 @@ func sshCAAdapter() nscale.ResourceAdapter[SSHCertificateAuthorityResourceModel,
 			client *nscale.Client,
 			id string,
 		) (*regionapi.SshCertificateAuthorityV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSSHCA(ctx, id, client))
+			return getSSHCA(ctx, id, client)
 		},
 		ToModel: func(api *regionapi.SshCertificateAuthorityV2Read, dst *SSHCertificateAuthorityResourceModel) {
 			dst.SSHCertificateAuthorityModel = NewSSHCertificateAuthorityModel(api)

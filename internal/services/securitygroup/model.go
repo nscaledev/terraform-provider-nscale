@@ -132,7 +132,7 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: regionapi.SecurityGroupV2CreateSpec{
 			NetworkId: networkID,
@@ -165,7 +165,7 @@ func (m *SecurityGroupModel) NscaleSecurityGroupUpdateParams() (regionapi.Securi
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[coreapi.Tag](tags),
 		},
 		Spec: regionapi.SecurityGroupV2Spec{
 			Rules: rules,

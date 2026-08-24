@@ -260,7 +260,8 @@ func groupUpdate(
 
 	// Tag the update so the watcher can confirm the PUT has propagated through
 	// the cache-backed API before reading back a terminal status.
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
 	updateResponse, err := client.Identity.PutApiV1OrganizationsOrganizationIDGroupsGroupid(
 		ctx,
