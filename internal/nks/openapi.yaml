@@ -1,0 +1,2016 @@
+openapi: 3.0.3
+info:
+  title: NKS API
+  description: |-
+    The NKS API provides Kubernetes clusters, node pools, and
+    platform release catalog entries.
+  version: 0.1.0
+paths:
+  /api/v1/clusters:
+    description: Manages project-scoped Kubernetes clusters.
+    get:
+      operationId: listClusters
+      description: |-
+        List clusters. Results are ordered by exact display name and then by
+        public resource ID. Repeated values within one status filter are
+        combined with OR; different filter classes are combined with AND.
+      summary: List clusters
+      tags:
+        - Clusters
+      security:
+        - oauth2Authentication: []
+      parameters:
+        - $ref: "#/components/parameters/tagSelectorParameter"
+        - $ref: "#/components/parameters/organizationIDQueryParameter"
+        - $ref: "#/components/parameters/projectIDQueryParameter"
+        - $ref: "#/components/parameters/regionIDQueryParameter"
+        - $ref: "#/components/parameters/networkIDQueryParameter"
+        - $ref: "#/components/parameters/nameQueryParameter"
+        - $ref: "#/components/parameters/provisioningStatusQueryParameter"
+        - $ref: "#/components/parameters/healthStatusQueryParameter"
+        - $ref: "#/components/parameters/deletingQueryParameter"
+      responses:
+        "200":
+          $ref: "#/components/responses/clustersV1Response"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+    post:
+      operationId: createCluster
+      description: Create a cluster.
+      summary: Create cluster
+      tags:
+        - Clusters
+      security:
+        - oauth2Authentication: []
+      requestBody:
+        $ref: "#/components/requestBodies/clusterV1CreateRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/clusterV1Created"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "413":
+          $ref: "#/components/responses/requestEntityTooLargeResponse"
+        "422":
+          $ref: "#/components/responses/unprocessableContentResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+  /api/v1/clusters/{clusterID}:
+    description: Manages one project-scoped Kubernetes cluster.
+    parameters:
+      - $ref: "#/components/parameters/clusterIDParameter"
+    get:
+      operationId: getCluster
+      description: Get a cluster.
+      summary: Get cluster
+      tags:
+        - Clusters
+      security:
+        - oauth2Authentication: []
+      responses:
+        "200":
+          $ref: "#/components/responses/clusterV1Response"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "404":
+          $ref: "#/components/responses/notFoundResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+    put:
+      operationId: updateCluster
+      description: Update a cluster.
+      summary: Update cluster
+      tags:
+        - Clusters
+      security:
+        - oauth2Authentication: []
+      requestBody:
+        $ref: "#/components/requestBodies/clusterV1UpdateRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/clusterV1Response"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "404":
+          $ref: "#/components/responses/notFoundResponse"
+        "409":
+          $ref: "#/components/responses/conflictResponse"
+        "413":
+          $ref: "#/components/responses/requestEntityTooLargeResponse"
+        "422":
+          $ref: "#/components/responses/unprocessableContentResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+    delete:
+      operationId: deleteCluster
+      description: Delete a cluster and its node pools.
+      summary: Delete cluster
+      tags:
+        - Clusters
+      security:
+        - oauth2Authentication: []
+      responses:
+        "202":
+          $ref: "#/components/responses/acceptedResponse"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "404":
+          $ref: "#/components/responses/notFoundResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+  /api/v1/nodepools:
+    description: Manages top-level project-scoped cluster node pools.
+    get:
+      operationId: listNodePools
+      description: |-
+        List node pools. Results are ordered by exact display name and then by
+        public resource ID. Repeated values within one status filter are
+        combined with OR; different filter classes are combined with AND.
+      summary: List node pools
+      tags:
+        - Node Pools
+      security:
+        - oauth2Authentication: []
+      parameters:
+        - $ref: "#/components/parameters/tagSelectorParameter"
+        - $ref: "#/components/parameters/organizationIDQueryParameter"
+        - $ref: "#/components/parameters/projectIDQueryParameter"
+        - $ref: "#/components/parameters/clusterIDQueryParameter"
+        - $ref: "#/components/parameters/regionIDQueryParameter"
+        - $ref: "#/components/parameters/nameQueryParameter"
+        - $ref: "#/components/parameters/provisioningStatusQueryParameter"
+        - $ref: "#/components/parameters/healthStatusQueryParameter"
+        - $ref: "#/components/parameters/deletingQueryParameter"
+      responses:
+        "200":
+          $ref: "#/components/responses/nodePoolsV1Response"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+    post:
+      operationId: createNodePool
+      description: Create a node pool.
+      summary: Create node pool
+      tags:
+        - Node Pools
+      security:
+        - oauth2Authentication: []
+      requestBody:
+        $ref: "#/components/requestBodies/nodePoolV1CreateRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/nodePoolV1Created"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "413":
+          $ref: "#/components/responses/requestEntityTooLargeResponse"
+        "422":
+          $ref: "#/components/responses/unprocessableContentResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+  /api/v1/nodepools/{nodePoolID}:
+    description: Manages one top-level project-scoped node pool.
+    parameters:
+      - $ref: "#/components/parameters/nodePoolIDParameter"
+    get:
+      operationId: getNodePool
+      description: Get a node pool.
+      summary: Get node pool
+      tags:
+        - Node Pools
+      security:
+        - oauth2Authentication: []
+      responses:
+        "200":
+          $ref: "#/components/responses/nodePoolV1Response"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "404":
+          $ref: "#/components/responses/notFoundResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+    put:
+      operationId: updateNodePool
+      description: Update a node pool.
+      summary: Update node pool
+      tags:
+        - Node Pools
+      security:
+        - oauth2Authentication: []
+      requestBody:
+        $ref: "#/components/requestBodies/nodePoolV1UpdateRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/nodePoolV1Response"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "404":
+          $ref: "#/components/responses/notFoundResponse"
+        "409":
+          $ref: "#/components/responses/conflictResponse"
+        "413":
+          $ref: "#/components/responses/requestEntityTooLargeResponse"
+        "422":
+          $ref: "#/components/responses/unprocessableContentResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+    delete:
+      operationId: deleteNodePool
+      description: Delete a node pool.
+      summary: Delete node pool
+      tags:
+        - Node Pools
+      security:
+        - oauth2Authentication: []
+      responses:
+        "202":
+          $ref: "#/components/responses/acceptedResponse"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "404":
+          $ref: "#/components/responses/notFoundResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+  /api/v1/platformreleases:
+    description: Lists NKS platform releases.
+    get:
+      operationId: listPlatformReleases
+      description: List platform releases.
+      summary: List platform releases
+      tags:
+        - Platform Releases
+      security:
+        - oauth2Authentication: []
+      parameters:
+        - $ref: "#/components/parameters/organizationIDQueryParameter"
+        - $ref: "#/components/parameters/regionIDQueryParameter"
+        - $ref: "#/components/parameters/platformReleaseArchitectureQueryParameter"
+        - $ref: "#/components/parameters/prereleaseQueryParameter"
+        - $ref: "#/components/parameters/deprecatedQueryParameter"
+        - $ref: "#/components/parameters/withdrawnQueryParameter"
+      responses:
+        "200":
+          $ref: "#/components/responses/platformReleasesV1Response"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+  /api/v1/platformreleases/{releaseID}:
+    description: Reads one NKS platform release.
+    parameters:
+      - $ref: "#/components/parameters/releaseIDParameter"
+    get:
+      operationId: getPlatformRelease
+      description: Get a platform release.
+      summary: Get platform release
+      tags:
+        - Platform Releases
+      security:
+        - oauth2Authentication: []
+      responses:
+        "200":
+          $ref: "#/components/responses/platformReleaseV1Response"
+        "400":
+          $ref: "#/components/responses/badRequestResponse"
+        "401":
+          $ref: "#/components/responses/unauthorizedResponse"
+        "403":
+          $ref: "#/components/responses/forbiddenResponse"
+        "404":
+          $ref: "#/components/responses/notFoundResponse"
+        "500":
+          $ref: "#/components/responses/internalServerErrorResponse"
+components:
+  parameters:
+    clusterIDParameter:
+      name: clusterID
+      in: path
+      description: Opaque public cluster ID.
+      required: true
+      schema:
+        $ref: "#/components/schemas/resourceID"
+    nodePoolIDParameter:
+      name: nodePoolID
+      in: path
+      description: Opaque public node pool ID.
+      required: true
+      schema:
+        $ref: "#/components/schemas/resourceID"
+    releaseIDParameter:
+      name: releaseID
+      in: path
+      description: Opaque public platform release ID.
+      required: true
+      schema:
+        $ref: "#/components/schemas/resourceID"
+    organizationIDQueryParameter:
+      name: organizationID
+      in: query
+      description: Allows resources to be filtered by organization.
+      schema:
+        type: array
+        items:
+          type: string
+    projectIDQueryParameter:
+      name: projectID
+      in: query
+      description: Allows resources to be filtered by project.
+      schema:
+        type: array
+        items:
+          type: string
+    regionIDQueryParameter:
+      name: regionID
+      in: query
+      description: Allows resources to be filtered by region. For platform releases,
+        matches releases available in any supplied region.
+      schema:
+        type: array
+        items:
+          type: string
+    networkIDQueryParameter:
+      name: networkID
+      in: query
+      description: Allows resources to be filtered by network.
+      schema:
+        type: array
+        items:
+          type: string
+    clusterIDQueryParameter:
+      name: clusterID
+      in: query
+      description: Allows node pools to be filtered by cluster.
+      schema:
+        type: array
+        items:
+          type: string
+    nameQueryParameter:
+      name: name
+      in: query
+      description: Filters resources by exact, case-sensitive display name. Every
+        matching resource is returned because display names are not unique.
+      schema:
+        $ref: "#/components/schemas/kubernetesLabelValue"
+    provisioningStatusQueryParameter:
+      name: provisioningStatus
+      in: query
+      description: Filters resources by UNI provisioning status. Repeat the parameter
+        to match any supplied value.
+      style: form
+      explode: true
+      schema:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: "#/components/schemas/resourceProvisioningStatus"
+    healthStatusQueryParameter:
+      name: healthStatus
+      in: query
+      description: Filters resources by UNI health status. Repeat the parameter to
+        match any supplied value.
+      style: form
+      explode: true
+      schema:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: "#/components/schemas/resourceHealthStatus"
+    deletingQueryParameter:
+      name: deleting
+      in: query
+      description: Filters by deletion state. True returns terminating resources,
+        false returns non-terminating resources, and omission returns both.
+      schema:
+        type: boolean
+    prereleaseQueryParameter:
+      name: prerelease
+      in: query
+      description: Allows platform releases to be filtered by prerelease state.
+      schema:
+        type: boolean
+    deprecatedQueryParameter:
+      name: deprecated
+      in: query
+      description: Allows platform releases to be filtered by deprecation state.
+      schema:
+        type: boolean
+    withdrawnQueryParameter:
+      name: withdrawn
+      in: query
+      description: Allows platform releases to be filtered by withdrawn state.
+      schema:
+        type: boolean
+    platformReleaseArchitectureQueryParameter:
+      name: architecture
+      in: query
+      description: Allows platform releases to be filtered by supported architecture.
+      schema:
+        type: array
+        items:
+          $ref: "#/components/schemas/platformReleaseArchitectureV1"
+    tagSelectorParameter:
+      name: tag
+      in: query
+      description: |-
+        A set of tags to match against resources in the form "name=value",
+        thus when encoded you get "?tag=foo%3Dcat&tag=bar%3Ddog".
+      schema:
+        type: array
+        items:
+          type: string
+  headers:
+    locationHeader:
+      description: Canonical URI of the newly created resource.
+      schema:
+        type: string
+        format: uri-reference
+  requestBodies:
+    clusterV1CreateRequest:
+      description: Cluster creation request.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/clusterV1Create"
+          example:
+            metadata:
+              name: production-cluster
+              description: Production Kubernetes cluster
+              tags:
+                - name: environment
+                  value: production
+            spec:
+              networkId: 61f0ad85-3001-41cb-824a-e6a047668dfe
+              platformReleaseId: nks-1-32-3
+              apiServer:
+                publicIP: false
+    clusterV1UpdateRequest:
+      description: Cluster update request.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/clusterV1Update"
+          example:
+            metadata:
+              name: production-cluster
+            spec:
+              networkId: 61f0ad85-3001-41cb-824a-e6a047668dfe
+              platformReleaseId: nks-1-32-4
+              clusterNetwork:
+                podCidr: 10.240.0.0/12
+                serviceCidr: 10.96.0.0/16
+              apiServer:
+                publicIP: true
+                allowedCidrs:
+                  - 203.0.113.0/24
+    nodePoolV1CreateRequest:
+      description: Node pool creation request.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/nodePoolV1Create"
+          example:
+            metadata:
+              name: workers-a
+              description: Default worker node pool
+              tags:
+                - name: role
+                  value: worker
+            spec:
+              clusterId: 1e44f19a-21a9-43cc-a460-5d6f21247f65
+              provisioningMode: compute
+              replicas: 3
+              compute:
+                flavorId: g.8.standard
+              taints:
+                - key: nvidia.com/gpu
+                  effect: NoSchedule
+              labels:
+                accelerator: nvidia-h100
+    nodePoolV1UpdateRequest:
+      description: Node pool update request.
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/nodePoolV1Update"
+          example:
+            metadata:
+              name: workers-a
+            spec:
+              clusterId: 1e44f19a-21a9-43cc-a460-5d6f21247f65
+              provisioningMode: compute
+              replicas: 5
+              compute:
+                flavorId: g.8.standard
+              taints:
+                - key: nvidia.com/gpu
+                  effect: NoSchedule
+              labels:
+                accelerator: nvidia-h100
+  responses:
+    clustersV1Response:
+      description: A list of clusters.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/clustersV1Read"
+          example:
+            - metadata:
+                id: 1e44f19a-21a9-43cc-a460-5d6f21247f65
+                generation: 3
+                name: production-cluster
+                organizationId: 9a8c6370-4065-4d4a-9da0-7678df40cd9d
+                projectId: e36c058a-8eba-4f5b-91f4-f6ffb983795c
+                creationTime: 2026-05-14T10:00:00Z
+                provisioningStatus: provisioned
+                provisioningStatusDetail:
+                  reason: Provisioned
+                  message: cluster is available
+                healthStatus: healthy
+                healthStatusDetail:
+                  reason: Healthy
+                  message: cluster is healthy
+                tags:
+                  - name: environment
+                    value: production
+              spec:
+                networkId: 61f0ad85-3001-41cb-824a-e6a047668dfe
+                platformReleaseId: nks-1-32-3
+                apiServer:
+                  publicIP: false
+                addons:
+                  hardware: true
+              status:
+                regionId: uk-lon-1
+                observedGeneration: 3
+                kubernetesVersion:
+                  target: v1.32.3
+                  observed: v1.32.3
+                apiServer:
+                  certificateAuthorityData: dGVzdC1jYQ==
+                  endpoints:
+                    private:
+                      address: api.production-cluster.private.example.com
+                      port: 6443
+                controlPlane:
+                  readyReplicas: 3
+                  desiredReplicas: 3
+                nodePools:
+                  count: 1
+                  totalDesiredReplicas: 3
+                  totalCurrentReplicas: 3
+                  totalReadyReplicas: 3
+                addons:
+                  core:
+                    status: ready
+                    components:
+                      - name: cilium
+                        version: 1.16.6
+                        status: ready
+                      - name: metrics-server
+                        version: 0.7.2
+                        status: ready
+                  hardware:
+                    status: ready
+                    components:
+                      - name: nvidia-gpu-operator
+                        version: 24.9.2
+                        status: ready
+                release:
+                  appliedId: nks-1-32-3
+                  deprecated: false
+                  upgradeAvailable: true
+                  eligibleTargets:
+                    - nks-1-32-4
+    clusterV1Response:
+      description: A cluster. The example shows a newly accepted release update before
+        its generation has converged.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/clusterV1Read"
+          example:
+            metadata:
+              id: 1e44f19a-21a9-43cc-a460-5d6f21247f65
+              generation: 4
+              name: production-cluster
+              organizationId: 9a8c6370-4065-4d4a-9da0-7678df40cd9d
+              projectId: e36c058a-8eba-4f5b-91f4-f6ffb983795c
+              creationTime: 2026-05-14T10:00:00Z
+              provisioningStatus: provisioning
+              healthStatus: unknown
+              tags:
+                - name: environment
+                  value: production
+            spec:
+              networkId: 61f0ad85-3001-41cb-824a-e6a047668dfe
+              platformReleaseId: nks-1-32-4
+              apiServer:
+                publicIP: false
+              addons:
+                hardware: true
+            status:
+              regionId: uk-lon-1
+              observedGeneration: 3
+              kubernetesVersion:
+                target: v1.32.3
+                observed: v1.32.3
+              apiServer:
+                certificateAuthorityData: dGVzdC1jYQ==
+                endpoints:
+                  private:
+                    address: api.production-cluster.private.example.com
+                    port: 6443
+              controlPlane:
+                readyReplicas: 3
+                desiredReplicas: 3
+              nodePools:
+                count: 1
+                totalDesiredReplicas: 3
+                totalCurrentReplicas: 3
+                totalReadyReplicas: 3
+              addons:
+                core:
+                  status: ready
+                  components:
+                    - name: cilium
+                      version: 1.16.6
+                      status: ready
+                    - name: metrics-server
+                      version: 0.7.2
+                      status: ready
+                hardware:
+                  status: ready
+                  components:
+                    - name: nvidia-gpu-operator
+                      version: 24.9.2
+                      status: ready
+              release:
+                appliedId: nks-1-32-3
+                deprecated: false
+                upgradeAvailable: true
+                eligibleTargets:
+                  - nks-1-32-4
+    clusterV1Created:
+      description: A newly created cluster whose desired state has been persisted but
+        not yet observed.
+      headers:
+        Location:
+          $ref: "#/components/headers/locationHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/clusterV1Read"
+          example:
+            metadata:
+              id: 1e44f19a-21a9-43cc-a460-5d6f21247f65
+              generation: 1
+              name: production-cluster
+              organizationId: 9a8c6370-4065-4d4a-9da0-7678df40cd9d
+              projectId: e36c058a-8eba-4f5b-91f4-f6ffb983795c
+              creationTime: 2026-05-14T10:00:00Z
+              provisioningStatus: provisioning
+              healthStatus: unknown
+            spec:
+              networkId: 61f0ad85-3001-41cb-824a-e6a047668dfe
+              platformReleaseId: nks-1-32-3
+              apiServer:
+                publicIP: false
+              addons:
+                hardware: true
+            status:
+              regionId: uk-lon-1
+    nodePoolsV1Response:
+      description: A list of node pools.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/nodePoolsV1Read"
+          example:
+            - metadata:
+                id: 600f9b41-1a97-4b85-b69f-901839678772
+                generation: 5
+                name: workers-a
+                organizationId: 9a8c6370-4065-4d4a-9da0-7678df40cd9d
+                projectId: e36c058a-8eba-4f5b-91f4-f6ffb983795c
+                creationTime: 2026-05-14T10:15:00Z
+                provisioningStatus: provisioned
+                provisioningStatusDetail:
+                  reason: Provisioned
+                  message: node pool is available
+                healthStatus: healthy
+                healthStatusDetail:
+                  reason: Healthy
+                  message: node pool workers are ready
+                tags:
+                  - name: role
+                    value: worker
+              spec:
+                clusterId: 1e44f19a-21a9-43cc-a460-5d6f21247f65
+                provisioningMode: compute
+                replicas: 3
+                compute:
+                  flavorId: g.8.standard
+                taints:
+                  - key: nvidia.com/gpu
+                    effect: NoSchedule
+                labels:
+                  accelerator: nvidia-h100
+              status:
+                regionId: uk-lon-1
+                observedGeneration: 5
+                kubernetesVersion: v1.32.3
+                desiredReplicas: 3
+                currentReplicas: 3
+                readyReplicas: 3
+    nodePoolV1Response:
+      description: A node pool. The example shows a newly accepted resize before its
+        generation has converged.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/nodePoolV1Read"
+          example:
+            metadata:
+              id: 600f9b41-1a97-4b85-b69f-901839678772
+              generation: 6
+              name: workers-a
+              organizationId: 9a8c6370-4065-4d4a-9da0-7678df40cd9d
+              projectId: e36c058a-8eba-4f5b-91f4-f6ffb983795c
+              creationTime: 2026-05-14T10:15:00Z
+              provisioningStatus: provisioning
+              healthStatus: unknown
+              tags:
+                - name: role
+                  value: worker
+            spec:
+              clusterId: 1e44f19a-21a9-43cc-a460-5d6f21247f65
+              provisioningMode: compute
+              replicas: 5
+              compute:
+                flavorId: g.8.standard
+              taints:
+                - key: nvidia.com/gpu
+                  effect: NoSchedule
+              labels:
+                accelerator: nvidia-h100
+            status:
+              regionId: uk-lon-1
+              observedGeneration: 5
+              kubernetesVersion: v1.32.3
+              desiredReplicas: 3
+              currentReplicas: 3
+              readyReplicas: 3
+    nodePoolV1Created:
+      description: A newly created node pool whose desired state has been persisted
+        but not yet observed.
+      headers:
+        Location:
+          $ref: "#/components/headers/locationHeader"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/nodePoolV1Read"
+          example:
+            metadata:
+              id: 600f9b41-1a97-4b85-b69f-901839678772
+              generation: 1
+              name: workers-a
+              organizationId: 9a8c6370-4065-4d4a-9da0-7678df40cd9d
+              projectId: e36c058a-8eba-4f5b-91f4-f6ffb983795c
+              creationTime: 2026-05-14T10:15:00Z
+              provisioningStatus: provisioning
+              healthStatus: unknown
+            spec:
+              clusterId: 1e44f19a-21a9-43cc-a460-5d6f21247f65
+              provisioningMode: compute
+              replicas: 3
+              compute:
+                flavorId: g.8.standard
+            status:
+              regionId: uk-lon-1
+    platformReleasesV1Response:
+      description: A list of platform releases.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/platformReleasesV1Read"
+          example:
+            - metadata:
+                id: nks-1-32-3
+                name: NKS 1.32.3
+                creationTime: 2026-05-14T10:00:00Z
+              status:
+                kubernetesVersion: v1.32.3
+                availableRegionIds:
+                  - uk-lon-1
+                deprecated: false
+                withdrawn: false
+                addons:
+                  core:
+                    components:
+                      - name: cilium
+                        version: 1.16.6
+                      - name: metrics-server
+                        version: 0.7.2
+                  hardware:
+                    components:
+                      - name: nvidia-gpu-operator
+                        version: 24.9.2
+    platformReleaseV1Response:
+      description: A platform release.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/platformReleaseV1Read"
+          example:
+            metadata:
+              id: nks-1-32-3
+              name: NKS 1.32.3
+              creationTime: 2026-05-14T10:00:00Z
+            status:
+              kubernetesVersion: v1.32.3
+              availableRegionIds:
+                - uk-lon-1
+              deprecated: false
+              withdrawn: false
+              addons:
+                core:
+                  components:
+                    - name: cilium
+                      version: 1.16.6
+                    - name: metrics-server
+                      version: 0.7.2
+                hardware:
+                  components:
+                    - name: nvidia-gpu-operator
+                      version: 24.9.2
+    acceptedResponse:
+      description: |-
+        The request has been accepted and will be fulfilled asynchronously.
+        You may poll the resource and monitor its provisioning and health status
+        to await completion of the operation.
+    requestEntityTooLargeResponse:
+      description: The request body exceeds the maximum accepted size.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error"
+          example:
+            error: request_entity_too_large
+            error_description: request body exceeds the maximum allowed size
+            trace_id: 57bc14d9bd461f0b5a72db830149b67a
+    badRequestResponse:
+      description: |-
+        Request body failed schema validation, or the request does not contain
+        all the required fields.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error"
+          example:
+            error: invalid_request
+            error_description: request body invalid
+            trace_id: 57bc14d9bd461f0b5a72db830149b67a
+    unauthorizedResponse:
+      description: Authentication failed or the access token has expired.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error"
+          example:
+            error: access_denied
+            error_description: authentication failed
+            trace_id: 57bc14d9bd461f0b5a72db830149b67a
+    forbiddenResponse:
+      description: >-
+        Request was denied by authorization, this may be caused by the
+        authorization
+
+        token not having the required scope for an API, or the user doesn't have
+        the
+
+        necessary privileges on the provider platform.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error"
+          example:
+            error: forbidden
+            error_description: user credentials do not have the required privileges
+            trace_id: 57bc14d9bd461f0b5a72db830149b67a
+    internalServerErrorResponse:
+      description: >-
+        An unexpected or unhandled error occurred. This may be a transient error
+        and
+
+        may succeed on a retry.  If this isn't the case, please report it as an
+        issue.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error"
+          example:
+            error: server_error
+            error_description: failed to token claim
+            trace_id: 57bc14d9bd461f0b5a72db830149b67a
+    unprocessableContentResponse:
+      description: >-
+        The provided request was syntactically correct but the instruction was
+        unable to
+
+        be processed due to semantic errors.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error"
+          example:
+            error: unprocessable_content
+            error_description: the request body was in the wrong format
+            trace_id: 57bc14d9bd461f0b5a72db830149b67a
+    notFoundResponse:
+      description: Unable to find a resource.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error"
+          example:
+            error: not_found
+            error_description: the requested resource does not exist
+            trace_id: 57bc14d9bd461f0b5a72db830149b67a
+    conflictResponse:
+      description: Resource conflicts with another, usually this means they have the
+        same name.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/error"
+          example:
+            error: conflict
+            error_description: a resource with the same name already exists
+            trace_id: 57bc14d9bd461f0b5a72db830149b67a
+  securitySchemes:
+    oauth2Authentication:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: /oauth2/v2/authorization
+          tokenUrl: /oauth2/v2/token
+          scopes: {}
+  schemas:
+    resourceID:
+      description: Opaque public resource ID.
+      type: string
+      minLength: 1
+      maxLength: 128
+    projectScopedResourceReadMetadataV1:
+      description: Project-scoped resource read metadata with Kubernetes generation
+        freshness.
+      type: object
+      required:
+        - id
+        - name
+        - organizationId
+        - projectId
+        - creationTime
+        - generation
+        - provisioningStatus
+        - healthStatus
+      properties:
+        id:
+          description: Unique resource ID.
+          type: string
+        name:
+          $ref: "#/components/schemas/kubernetesLabelValue"
+        description:
+          description: Optional human-readable resource description.
+          type: string
+        tags:
+          $ref: "#/components/schemas/tagList"
+        organizationId:
+          description: Organization identifier the resource belongs to.
+          type: string
+        projectId:
+          description: Project identifier the resource belongs to.
+          type: string
+        creationTime:
+          description: Time the resource was created.
+          type: string
+          format: date-time
+        createdBy:
+          description: User who created the resource.
+          type: string
+        modifiedTime:
+          description: Time the resource was updated.
+          type: string
+          format: date-time
+        modifiedBy:
+          description: User who updated the resource.
+          type: string
+        deletionTime:
+          description: Time deletion was requested.
+          type: string
+          format: date-time
+        generation:
+          description: Current desired-state generation of the resource.
+          type: integer
+          format: int64
+          minimum: 0
+        provisioningStatus:
+          $ref: "#/components/schemas/resourceProvisioningStatus"
+        provisioningStatusDetail:
+          $ref: "#/components/schemas/provisioningStatusDetail"
+        healthStatus:
+          $ref: "#/components/schemas/resourceHealthStatus"
+        healthStatusDetail:
+          $ref: "#/components/schemas/healthStatusDetail"
+    clusterApiServerAccessV1:
+      description: API server network exposure requested for a cluster.
+      type: object
+      properties:
+        publicIP:
+          description: Whether to expose the API server through a public endpoint.
+          type: boolean
+          default: false
+        allowedCidrs:
+          description: Source IPv4 CIDR allowlist for the cluster API endpoint, including
+            private endpoints. If publicIP is true and this field is omitted,
+            the API server is reachable from 0.0.0.0/0.
+          type: array
+          minItems: 1
+          maxItems: 32
+          uniqueItems: true
+          default:
+            - 0.0.0.0/0
+          items:
+            type: string
+            pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/([0-9]|[12][0-9]|3[0-2])$
+    clusterAddonsV1:
+      description: Addon profiles configured for a cluster.
+      type: object
+      properties:
+        hardware:
+          description: Whether the optional hardware addon profile is enabled.
+          type: boolean
+    clusterAddonsCreateV1:
+      description: Addon profiles requested during cluster creation.
+      type: object
+      properties:
+        hardware:
+          description: Whether the optional hardware addon profile is enabled. Defaults to
+            true when omitted during cluster creation.
+          type: boolean
+          default: true
+    clusterNetworkV1:
+      description: Kubernetes cluster pod and service network configuration.
+      type: object
+      properties:
+        podCidr:
+          description: IPv4 network CIDR used for Kubernetes pod addresses.
+          type: string
+          default: 10.240.0.0/12
+        serviceCidr:
+          description: IPv4 network CIDR used for Kubernetes service addresses.
+          type: string
+          default: 10.96.0.0/16
+    clusterControlPlaneSummaryV1:
+      description: Observed control plane summary.
+      type: object
+      properties:
+        readyReplicas:
+          description: Number of ready control plane replicas.
+          type: integer
+          minimum: 0
+        desiredReplicas:
+          description: Desired number of control plane replicas.
+          type: integer
+          minimum: 0
+    clusterNodePoolSummaryV1:
+      description: Last-observed node pool summary. Replica totals retain values from
+        each child NodePool's latest status while a new child generation is
+        being projected.
+      type: object
+      properties:
+        count:
+          description: Number of node pools attached to the cluster.
+          type: integer
+          minimum: 0
+        totalDesiredReplicas:
+          description: Sum of desired worker replicas from each child NodePool's latest
+            status; omitted if any child has no observed value.
+          type: integer
+          minimum: 0
+        totalCurrentReplicas:
+          description: Sum of current worker replicas from each child NodePool's latest
+            status; omitted if any child has no observed value.
+          type: integer
+          minimum: 0
+        totalReadyReplicas:
+          description: Sum of ready worker replicas from each child NodePool's latest
+            status; omitted if any child has no observed value.
+          type: integer
+          minimum: 0
+    clusterAddonComponentStatusV1:
+      description: Observed addon component rollout status.
+      type: string
+      enum:
+        - pending
+        - installing
+        - upgrading
+        - ready
+        - degraded
+        - removing
+    clusterAddonComponentV1:
+      description: Observed addon component rollout state.
+      type: object
+      required:
+        - name
+        - version
+        - status
+      properties:
+        name:
+          description: Component name.
+          type: string
+        version:
+          description: Component version selected for this cluster.
+          type: string
+        status:
+          $ref: "#/components/schemas/clusterAddonComponentStatusV1"
+        reason:
+          description: Stable machine-readable reason for the component state.
+          type: string
+        message:
+          description: Human-readable customer-safe message for the component state.
+          type: string
+    clusterAddonProfileStatusV1:
+      description: Observed addon profile rollout state.
+      type: object
+      required:
+        - status
+        - components
+      properties:
+        status:
+          $ref: "#/components/schemas/clusterAddonComponentStatusV1"
+        reason:
+          description: Stable machine-readable reason for the profile state.
+          type: string
+        message:
+          description: Human-readable customer-safe message for the profile state.
+          type: string
+        components:
+          description: Observed addon component rollout states.
+          type: array
+          items:
+            $ref: "#/components/schemas/clusterAddonComponentV1"
+    clusterAddonsStatusV1:
+      description: Observed addon rollout state grouped by profile. Hardware remains
+        visible while a previous installation is being removed and is omitted
+        only after removal is confirmed.
+      type: object
+      required:
+        - core
+      properties:
+        core:
+          $ref: "#/components/schemas/clusterAddonProfileStatusV1"
+        hardware:
+          $ref: "#/components/schemas/clusterAddonProfileStatusV1"
+    clusterSpecV1:
+      description: Desired cluster state.
+      type: object
+      required:
+        - networkId
+        - platformReleaseId
+      properties:
+        networkId:
+          description: Region network ID attached to the cluster.
+          type: string
+        platformReleaseId:
+          description: Platform release selected for the cluster.
+          type: string
+        clusterNetwork:
+          $ref: "#/components/schemas/clusterNetworkV1"
+        apiServer:
+          $ref: "#/components/schemas/clusterApiServerAccessV1"
+        addons:
+          $ref: "#/components/schemas/clusterAddonsV1"
+    clusterCreateSpecV1:
+      description: Desired cluster state for creation.
+      type: object
+      additionalProperties: false
+      required:
+        - networkId
+        - platformReleaseId
+      properties:
+        networkId:
+          description: Region network ID attached to the cluster.
+          type: string
+        platformReleaseId:
+          description: Platform release selected for the cluster.
+          type: string
+        clusterNetwork:
+          $ref: "#/components/schemas/clusterNetworkV1"
+        apiServer:
+          $ref: "#/components/schemas/clusterApiServerAccessV1"
+        addons:
+          $ref: "#/components/schemas/clusterAddonsCreateV1"
+    clusterUpdateSpecV1:
+      description: Desired cluster replacement state.
+      type: object
+      additionalProperties: false
+      required:
+        - networkId
+        - platformReleaseId
+      properties:
+        networkId:
+          description: Region network ID attached to the cluster. Immutable after creation.
+          type: string
+        platformReleaseId:
+          description: Platform release selected for the cluster.
+          type: string
+        clusterNetwork:
+          $ref: "#/components/schemas/clusterNetworkV1"
+        apiServer:
+          $ref: "#/components/schemas/clusterApiServerAccessV1"
+        addons:
+          $ref: "#/components/schemas/clusterAddonsCreateV1"
+    clusterKubernetesVersionStatusV1:
+      description: Kubernetes versions in the applied control-plane template and
+        observed managed control plane.
+      type: object
+      additionalProperties: false
+      properties:
+        target:
+          description: Kubernetes version applied to the cluster's control plane.
+          type: string
+        observed:
+          description: Kubernetes version reported by the managed control plane.
+          type: string
+    clusterApiServerEndpointStatusV1:
+      description: Customer-facing Kubernetes API server endpoint.
+      type: object
+      additionalProperties: false
+      required:
+        - address
+        - port
+      properties:
+        address:
+          description: IPv4, IPv6, or DNS address clients dial.
+          type: string
+          minLength: 1
+        port:
+          description: TCP port clients dial.
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+    clusterApiServerEndpointsStatusV1:
+      description: Customer-facing Kubernetes API server endpoints.
+      type: object
+      additionalProperties: false
+      required:
+        - private
+      properties:
+        private:
+          $ref: "#/components/schemas/clusterApiServerEndpointStatusV1"
+        public:
+          $ref: "#/components/schemas/clusterApiServerEndpointStatusV1"
+    clusterApiServerStatusV1:
+      description: Credential-free Kubernetes API server connection data.
+      type: object
+      additionalProperties: false
+      required:
+        - certificateAuthorityData
+        - endpoints
+      properties:
+        certificateAuthorityData:
+          description: Complete Kubernetes API server CA bundle encoded as one base64
+            string.
+          type: string
+          minLength: 1
+        endpoints:
+          $ref: "#/components/schemas/clusterApiServerEndpointsStatusV1"
+    clusterReleaseStatusV1:
+      description: Applied platform release and observed upgrade eligibility.
+      type: object
+      additionalProperties: false
+      required:
+        - appliedId
+      properties:
+        appliedId:
+          description: Platform release last observed as applied to the remote cluster.
+          type: string
+        deprecated:
+          description: Whether the applied platform release is currently deprecated.
+          type: boolean
+        withdrawn:
+          description: Whether operators have withdrawn the applied platform release. Like
+            deprecation it is an explicit, reversible operator decision, but
+            withdrawal also carries a reason and message.
+          type: boolean
+        withdrawalReason:
+          description: Stable machine-readable reason operators withdrew the applied
+            platform release.
+          $ref: "#/components/schemas/platformReleaseWithdrawalReasonV1"
+        withdrawalMessage:
+          description: Customer-safe explanation of why operators withdrew the applied
+            platform release.
+          type: string
+          maxLength: 32768
+        upgradeAvailable:
+          description: Whether at least one eligible target was observed.
+          type: boolean
+        eligibleTargets:
+          description: Eligible platform release IDs in upgrade order. Present as an empty
+            array when eligibility was observed and no upgrade is available.
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+    clusterStatusV1:
+      description: Product-specific observed cluster state.
+      type: object
+      required:
+        - regionId
+      properties:
+        regionId:
+          description: Resolved region inherited from the attached network.
+          type: string
+        observedGeneration:
+          description: Most recent resource generation coherently projected into status.
+            Omitted until a status projection completes.
+          type: integer
+          format: int64
+          minimum: 0
+        kubernetesVersion:
+          $ref: "#/components/schemas/clusterKubernetesVersionStatusV1"
+        apiServer:
+          $ref: "#/components/schemas/clusterApiServerStatusV1"
+        controlPlane:
+          $ref: "#/components/schemas/clusterControlPlaneSummaryV1"
+        nodePools:
+          $ref: "#/components/schemas/clusterNodePoolSummaryV1"
+        addons:
+          $ref: "#/components/schemas/clusterAddonsStatusV1"
+        release:
+          $ref: "#/components/schemas/clusterReleaseStatusV1"
+    clusterV1Read:
+      description: A Kubernetes cluster.
+      type: object
+      required:
+        - metadata
+        - spec
+        - status
+      properties:
+        metadata:
+          $ref: "#/components/schemas/projectScopedResourceReadMetadataV1"
+        spec:
+          $ref: "#/components/schemas/clusterSpecV1"
+        status:
+          $ref: "#/components/schemas/clusterStatusV1"
+    clustersV1Read:
+      description: A list of clusters.
+      type: array
+      items:
+        $ref: "#/components/schemas/clusterV1Read"
+    clusterV1Create:
+      description: A cluster creation request.
+      type: object
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          $ref: "#/components/schemas/resourceMetadata"
+        spec:
+          $ref: "#/components/schemas/clusterCreateSpecV1"
+    clusterV1Update:
+      description: A cluster update request.
+      type: object
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          $ref: "#/components/schemas/resourceMetadata"
+        spec:
+          $ref: "#/components/schemas/clusterUpdateSpecV1"
+    nodePoolProvisioningModeV1:
+      description: Capacity source used to provision node pool workers.
+      type: string
+      enum:
+        - compute
+        - reservation
+    nodePoolTaintV1:
+      description: Kubernetes taint applied to a node pool worker as it joins the
+        cluster. The taint is applied during worker node registration, so it
+        takes effect once during node initialization and is not reconciled onto
+        running nodes afterwards.
+      type: object
+      required:
+        - key
+        - effect
+      properties:
+        key:
+          description: Taint key.
+          type: string
+          minLength: 1
+          maxLength: 317
+          pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*\/)?([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$
+        value:
+          description: Taint value.
+          type: string
+          maxLength: 63
+          pattern: ^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$
+        effect:
+          description: Taint effect.
+          type: string
+          enum:
+            - NoSchedule
+            - PreferNoSchedule
+            - NoExecute
+    nodePoolLabelsV1:
+      description: Kubernetes labels applied to node pool workers as they join the
+        cluster. Labels are not continuously reconciled onto running nodes, so a
+        change applies to newly created workers only and rolls the pool's
+        existing workers so the new labels take effect.
+      type: object
+      maxProperties: 64
+      additionalProperties:
+        description: Label value. Kubernetes permits an empty value, so an omitted value
+          registers the label with the empty string.
+        type: string
+        maxLength: 63
+        pattern: ^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$
+    nodePoolReservationV1:
+      description: Reservation-backed worker capacity selector.
+      type: object
+      properties:
+        reservationId:
+          description: Reservation ID to consume capacity from. Required when
+            provisioningMode is reservation.
+          type: string
+    nodePoolComputeV1:
+      description: Compute-backed worker capacity selector.
+      type: object
+      properties:
+        flavorId:
+          description: Compute flavor ID. Required when provisioningMode is compute.
+          type: string
+          minLength: 1
+          maxLength: 128
+    nodePoolSpecV1:
+      description: Desired node pool state.
+      type: object
+      additionalProperties: false
+      required:
+        - clusterId
+        - provisioningMode
+        - replicas
+      properties:
+        clusterId:
+          description: Cluster this node pool belongs to.
+          type: string
+        provisioningMode:
+          $ref: "#/components/schemas/nodePoolProvisioningModeV1"
+        replicas:
+          description: Desired worker replica count.
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        compute:
+          $ref: "#/components/schemas/nodePoolComputeV1"
+        reservation:
+          $ref: "#/components/schemas/nodePoolReservationV1"
+        taints:
+          description: Kubernetes taints applied to node pool workers as they join the
+            cluster. Taints are not continuously reconciled onto running nodes,
+            so a change applies to newly created workers only and rolls the
+            pool's existing workers so the new taints take effect.
+          type: array
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/nodePoolTaintV1"
+        labels:
+          $ref: "#/components/schemas/nodePoolLabelsV1"
+    nodePoolCreateSpecV1:
+      description: Desired node pool state for creation.
+      allOf:
+        - $ref: "#/components/schemas/nodePoolRequestSpecV1"
+    nodePoolUpdateSpecV1:
+      description: Desired node pool replacement state.
+      allOf:
+        - $ref: "#/components/schemas/nodePoolRequestSpecV1"
+    nodePoolRequestSpecV1:
+      description: Desired node pool state for write requests.
+      type: object
+      additionalProperties: false
+      required:
+        - clusterId
+        - provisioningMode
+        - replicas
+      properties:
+        clusterId:
+          description: Cluster this node pool belongs to.
+          type: string
+        provisioningMode:
+          $ref: "#/components/schemas/nodePoolProvisioningModeV1"
+        replicas:
+          description: Desired worker replica count.
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        compute:
+          $ref: "#/components/schemas/nodePoolComputeV1"
+        reservation:
+          $ref: "#/components/schemas/nodePoolReservationV1"
+        taints:
+          description: Kubernetes taints applied to node pool workers as they join the
+            cluster. Taints are not continuously reconciled onto running nodes,
+            so a change applies to newly created workers only and rolls the
+            pool's existing workers so the new taints take effect.
+          type: array
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/nodePoolTaintV1"
+        labels:
+          $ref: "#/components/schemas/nodePoolLabelsV1"
+    nodePoolReservationStatusV1:
+      description: Observed reservation-backed worker capacity.
+      type: object
+      properties:
+        reservationId:
+          description: Selected Reservation ID.
+          type: string
+        placementId:
+          description: Node-pool-managed Reservation placement ID.
+          type: string
+    nodePoolReleaseStatusV1:
+      description: Pinned platform release's identity, deprecation, and withdrawal state.
+      type: object
+      additionalProperties: false
+      required:
+        - appliedId
+        - kubernetesVersion
+      properties:
+        appliedId:
+          description: Pinned platform release ID.
+          type: string
+        kubernetesVersion:
+          description: Pinned platform release's Kubernetes version.
+          type: string
+        deprecated:
+          description: Whether the pinned platform release is currently deprecated.
+          type: boolean
+        withdrawn:
+          description: Whether operators have withdrawn the pinned platform release.
+          type: boolean
+        withdrawalReason:
+          description: Stable machine-readable reason operators withdrew the pinned
+            platform release.
+          $ref: "#/components/schemas/platformReleaseWithdrawalReasonV1"
+        withdrawalMessage:
+          description: Customer-safe explanation of why operators withdrew the pinned
+            platform release.
+          type: string
+          maxLength: 32768
+    nodePoolStatusV1:
+      description: Product-specific resolved placement and observed node pool state.
+      type: object
+      required:
+        - regionId
+      properties:
+        regionId:
+          description: Resolved region inherited from the parent cluster.
+          type: string
+        observedGeneration:
+          description: Most recent resource generation coherently projected into status.
+            Omitted until a status projection completes.
+          type: integer
+          format: int64
+          minimum: 0
+        kubernetesVersion:
+          description: Kubernetes version applied to the node pool's workers.
+          type: string
+        desiredReplicas:
+          description: Desired worker replica count for the node pool.
+          type: integer
+          minimum: 0
+        currentReplicas:
+          description: Current worker replica count.
+          type: integer
+          minimum: 0
+        readyReplicas:
+          description: Ready worker replica count.
+          type: integer
+          minimum: 0
+        upToDateReplicas:
+          description: Worker replica count running the current node pool template.
+          type: integer
+          minimum: 0
+        reservation:
+          $ref: "#/components/schemas/nodePoolReservationStatusV1"
+        release:
+          $ref: "#/components/schemas/nodePoolReleaseStatusV1"
+    nodePoolV1Read:
+      description: A cluster node pool.
+      type: object
+      required:
+        - metadata
+        - spec
+        - status
+      properties:
+        metadata:
+          $ref: "#/components/schemas/projectScopedResourceReadMetadataV1"
+        spec:
+          $ref: "#/components/schemas/nodePoolSpecV1"
+        status:
+          $ref: "#/components/schemas/nodePoolStatusV1"
+    nodePoolsV1Read:
+      description: A list of node pools.
+      type: array
+      items:
+        $ref: "#/components/schemas/nodePoolV1Read"
+    nodePoolV1Create:
+      description: A node pool creation request.
+      type: object
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          $ref: "#/components/schemas/resourceMetadata"
+        spec:
+          $ref: "#/components/schemas/nodePoolCreateSpecV1"
+    nodePoolV1Update:
+      description: A node pool update request.
+      type: object
+      required:
+        - metadata
+        - spec
+      properties:
+        metadata:
+          $ref: "#/components/schemas/resourceMetadata"
+        spec:
+          $ref: "#/components/schemas/nodePoolUpdateSpecV1"
+    platformReleaseComponentV1:
+      description: Component version included in a platform release profile.
+      type: object
+      required:
+        - name
+        - version
+      properties:
+        name:
+          description: Component name.
+          type: string
+        version:
+          description: Component version.
+          type: string
+    platformReleaseWithdrawalReasonV1:
+      description: Stable machine-readable reason operators withdrew a platform release.
+      type: string
+      enum:
+        - SecurityIssue
+        - FunctionalRegression
+        - CompatibilityIssue
+        - ComplianceIssue
+        - OperationalIssue
+        - Other
+    platformReleaseArchitectureV1:
+      description: CPU architecture supported by a platform release.
+      type: string
+      enum:
+        - x86_64
+        - aarch64
+    platformReleaseAddonProfileV1:
+      description: Component versions included in one platform release profile.
+      type: object
+      required:
+        - components
+      properties:
+        components:
+          description: Component versions installed by this profile.
+          type: array
+          items:
+            $ref: "#/components/schemas/platformReleaseComponentV1"
+    platformReleaseAddonsV1:
+      description: Component versions grouped by platform release addon profile.
+      type: object
+      required:
+        - core
+        - hardware
+      properties:
+        core:
+          $ref: "#/components/schemas/platformReleaseAddonProfileV1"
+        hardware:
+          $ref: "#/components/schemas/platformReleaseAddonProfileV1"
+    platformReleaseStatusV1:
+      description: Product-specific observed platform release state. A release is
+        selectable in a region when that region is present in availableRegionIds
+        and deprecated and withdrawn are both false. usableOrganizationIds lists
+        which of the caller's own organizations may select the release.
+      type: object
+      required:
+        - kubernetesVersion
+        - availableRegionIds
+        - usableOrganizationIds
+        - supportedArchitectures
+        - prerelease
+        - deprecated
+        - withdrawn
+        - addons
+      properties:
+        kubernetesVersion:
+          description: Kubernetes version provided by the release.
+          type: string
+        availableRegionIds:
+          description: Region IDs where this release is available.
+          type: array
+          items:
+            type: string
+        usableOrganizationIds:
+          description: Organization IDs, among the caller's own organizations, that may
+            select this platform release.
+          type: array
+          items:
+            type: string
+        supportedArchitectures:
+          description: CPU architectures supported by the release compute images.
+          type: array
+          items:
+            $ref: "#/components/schemas/platformReleaseArchitectureV1"
+        prerelease:
+          description: Whether the release Kubernetes version is a semver prerelease, such
+            as v1.37.0-beta.0. Prerelease releases are selectable and are
+            offered as upgrade targets.
+          type: boolean
+        deprecated:
+          description: Whether existing clusters should upgrade away from this release.
+            Deprecation is an explicit operator decision and may be reversed.
+          type: boolean
+        withdrawn:
+          description: Whether operators have withdrawn the release from selection.
+          type: boolean
+        withdrawalReason:
+          description: Stable machine-readable reason operators withdrew the release.
+          $ref: "#/components/schemas/platformReleaseWithdrawalReasonV1"
+        withdrawalMessage:
+          description: Customer-safe explanation of why operators withdrew the release.
+          type: string
+          maxLength: 32768
+        addons:
+          $ref: "#/components/schemas/platformReleaseAddonsV1"
+    platformReleaseV1Read:
+      description: An NKS platform release.
+      type: object
+      required:
+        - metadata
+        - status
+      properties:
+        metadata:
+          $ref: "#/components/schemas/staticResourceMetadata"
+        status:
+          $ref: "#/components/schemas/platformReleaseStatusV1"
+    platformReleasesV1Read:
+      description: A list of platform releases.
+      type: array
+      items:
+        $ref: "#/components/schemas/platformReleaseV1Read"
+    kubernetesLabelValue:
+      description: >-
+        A valid Kubernetes label value, typically used for resource names that
+        can be
+
+        indexed in the database.
+      type: string
+      pattern: ^[0-9A-Za-z](?:[0-9A-Za-z-_.]{0,61}[0-9A-Za-z])?$
+    resourceProvisioningStatus:
+      description: The provisioning state of a resource.
+      type: string
+      enum:
+        - pending
+        - provisioning
+        - provisioned
+        - deprovisioning
+        - error
+    resourceHealthStatus:
+      description: The health state of a resource.
+      type: string
+      enum:
+        - unknown
+        - healthy
+        - degraded
+        - error
+    tag:
+      description: >-
+        A tag mapping arbitrary names to values.  These have no special meaning
+
+        for any component are are intended for use by end users to add
+        additional
+
+        context to a resource, for example to categorize it.
+      type: object
+      required:
+        - name
+        - value
+      properties:
+        name:
+          description: A unique tag name.
+          type: string
+        value:
+          description: The value of the tag.
+          type: string
+    tagList:
+      description: A list of tags.
+      type: array
+      items:
+        $ref: "#/components/schemas/tag"
+    provisioningStatusReason:
+      description: |-
+        A closed, generic classification of a resource's provisioning state,
+        finer-grained than provisioningStatus. This vocabulary is owned by the
+        platform and is the same across all resources; domain-specific state
+        (e.g. an instance's lifecycle phase) is carried on other mechanisms and
+        never appears here.
+      type: string
+      enum:
+        - Provisioning
+        - Provisioned
+        - Errored
+        - Deprovisioning
+        - Deprovisioned
+        - DependencyNotReady
+        - DependencyFailed
+        - DependencyNotFound
+    provisioningStatusDetail:
+      description: |-
+        Human-facing detail about the current provisioning state: a
+        machine-classifiable reason drawn from a closed vocabulary, and a
+        user-safe human-readable message. Derived from the resource's status and
+        supplements the coarse provisioningStatus; never stored.
+      type: object
+      required:
+        - reason
+        - message
+      properties:
+        reason:
+          $ref: "#/components/schemas/provisioningStatusReason"
+        message:
+          description: A user-safe, human-readable description of the provisioning state.
+          type: string
+    healthStatusReason:
+      description: >-
+        A closed, generic classification of a resource's health — the raw health
+
+        condition reason, finer-grained than the coarse healthStatus. Owned by
+        the
+
+        platform and the same across all resources.
+      type: string
+      enum:
+        - Healthy
+        - Degraded
+        - Unknown
+    healthStatusDetail:
+      description: >-
+        Human-facing detail about the current health state: a
+        machine-classifiable
+
+        reason drawn from a closed vocabulary, and a user-safe human-readable
+
+        message (e.g. "2/12 nodes are down"). Derived from the resource's status
+        and
+
+        supplements the coarse healthStatus; never stored.
+      type: object
+      required:
+        - reason
+        - message
+      properties:
+        reason:
+          $ref: "#/components/schemas/healthStatusReason"
+        message:
+          description: A user-safe, human-readable description of the health state.
+          type: string
+    error:
+      description: Generic error message, compatible with oauth2.
+      type: object
+      required:
+        - error
+        - error_description
+      properties:
+        error:
+          description: A terse error string expanding on the HTTP error code. Errors are
+            based on the OAuth 2.02 specification, but are expanded with
+            proprietary status codes for APIs other than those specified by
+            OAuth 2.02.
+          type: string
+          enum:
+            - invalid_request
+            - server_error
+            - access_denied
+            - not_found
+            - conflict
+            - method_not_allowed
+            - unsupported_media_type
+            - request_entity_too_large
+            - unprocessable_content
+            - forbidden
+        error_description:
+          description: Verbose message describing the error.
+          type: string
+        trace_id:
+          description: Unique trace identifier for the request.
+          type: string
+    resourceMetadata:
+      description: Metadata required for all API resource reads and writes.
+      required:
+        - name
+      properties:
+        name:
+          $ref: "#/components/schemas/kubernetesLabelValue"
+        description:
+          description: The resource description, this optionally augments the name with
+            more context.
+          type: string
+        tags:
+          $ref: "#/components/schemas/tagList"
+    staticResourceMetadata:
+      description: |
+        This metadata is for resources that just exist, and don't require
+        any provisioning and health status, but benefit from a standardized
+        metadata format.
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/resourceMetadata"
+        - type: object
+          required:
+            - id
+            - creationTime
+          properties:
+            id:
+              description: The unique resource ID.
+              type: string
+            creationTime:
+              description: The time the resource was created.
+              type: string
+              format: date-time
+            createdBy:
+              description: The user who created the resource.
+              type: string
+            modifiedTime:
+              description: The time a resource was updated.
+              type: string
+              format: date-time
+            modifiedBy:
+              description: The user who updated the resource.
+              type: string
