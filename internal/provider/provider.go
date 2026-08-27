@@ -32,6 +32,7 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/filestorage"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/identity"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/instance"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/kubernetescluster"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/objectstorage"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/region"
@@ -47,6 +48,16 @@ const (
 	DefaultNscaleIdentityServiceAPIEndpoint    = "https://identity.unikorn.nscale.com"
 	DefaultNscaleReservationServiceAPIEndpoint = "https://reservation.unikorn.nscale.com"
 	DefaultNscaleStorageServiceAPIEndpoint     = "https://storage.unikorn.nscale.com"
+
+	// DefaultNscaleNKSServiceAPIEndpoint is deliberately empty: NKS is pending a
+	// migration and its production hostname is not settled, so there is nothing
+	// honest to default to. Until then nks_service_api_endpoint (or
+	// NSCALE_NKS_SERVICE_API_ENDPOINT) must be set explicitly to use the
+	// nscale_kubernetes_* types. An empty value is not a configuration error — it
+	// only fails if an NKS-backed resource is actually used, which keeps
+	// configurations that touch no Kubernetes resources working untouched. See
+	// Client.RequireNKS.
+	DefaultNscaleNKSServiceAPIEndpoint = ""
 )
 
 var _ provider.Provider = NscaleProvider{}
@@ -57,6 +68,7 @@ type NscaleProviderModel struct {
 	IdentityServiceAPIEndpoint    types.String `tfsdk:"identity_service_api_endpoint"`
 	ReservationServiceAPIEndpoint types.String `tfsdk:"reservation_service_api_endpoint"`
 	StorageServiceAPIEndpoint     types.String `tfsdk:"storage_service_api_endpoint"`
+	NKSServiceAPIEndpoint         types.String `tfsdk:"nks_service_api_endpoint"`
 	ServiceToken                  types.String `tfsdk:"service_token"`
 	RegionID                      types.String `tfsdk:"region_id"`
 	OrganizationID                types.String `tfsdk:"organization_id"`
@@ -101,6 +113,10 @@ func (p NscaleProvider) Schema(ctx context.Context, request provider.SchemaReque
 				MarkdownDescription: "The endpoint of the Nscale Storage Service API server.",
 				Optional:            true,
 			},
+			"nks_service_api_endpoint": schema.StringAttribute{
+				MarkdownDescription: "The endpoint of the Nscale Kubernetes Service (NKS) API server. Required to use the `nscale_kubernetes_*` resources and data sources; there is no default yet.",
+				Optional:            true,
+			},
 			"service_token": schema.StringAttribute{
 				MarkdownDescription: "The service token for authenticating with the Nscale API server.",
 				Optional:            true,
@@ -136,6 +152,56 @@ func resolveValue(configValue, envVar, fallback string) string {
 	return value
 }
 
+// serviceEndpoints holds the resolved per-service base URLs. Grouping them keeps
+// Configure readable and keeps the resolution order in one place, next to the
+// defaults it draws on.
+type serviceEndpoints struct {
+	region      string
+	compute     string
+	identity    string
+	reservation string
+	storage     string
+	nks         string
+}
+
+func resolveServiceEndpoints(data NscaleProviderModel) serviceEndpoints {
+	return serviceEndpoints{
+		region: resolveValue(
+			data.RegionServiceAPIEndpoint.ValueString(),
+			"NSCALE_REGION_SERVICE_API_ENDPOINT",
+			DefaultNscaleRegionServiceAPIEndpoint,
+		),
+		compute: resolveValue(
+			data.ComputeServiceAPIEndpoint.ValueString(),
+			"NSCALE_COMPUTE_SERVICE_API_ENDPOINT",
+			DefaultNscaleComputeServiceAPIEndpoint,
+		),
+		identity: resolveValue(
+			data.IdentityServiceAPIEndpoint.ValueString(),
+			"NSCALE_IDENTITY_SERVICE_API_ENDPOINT",
+			DefaultNscaleIdentityServiceAPIEndpoint,
+		),
+		reservation: resolveValue(
+			data.ReservationServiceAPIEndpoint.ValueString(),
+			"NSCALE_RESERVATION_SERVICE_API_ENDPOINT",
+			DefaultNscaleReservationServiceAPIEndpoint,
+		),
+		storage: resolveValue(
+			data.StorageServiceAPIEndpoint.ValueString(),
+			"NSCALE_STORAGE_SERVICE_API_ENDPOINT",
+			DefaultNscaleStorageServiceAPIEndpoint,
+		),
+		// NKS alone can legitimately resolve to the empty string — it has no
+		// default endpoint yet. nscale.NewClient skips building the client in
+		// that case; see Client.RequireNKS.
+		nks: resolveValue(
+			data.NKSServiceAPIEndpoint.ValueString(),
+			"NSCALE_NKS_SERVICE_API_ENDPOINT",
+			DefaultNscaleNKSServiceAPIEndpoint,
+		),
+	}
+}
+
 func (p NscaleProvider) Configure(
 	ctx context.Context,
 	request provider.ConfigureRequest,
@@ -148,32 +214,7 @@ func (p NscaleProvider) Configure(
 		return
 	}
 
-	regionServiceAPIEndpoint := resolveValue(
-		data.RegionServiceAPIEndpoint.ValueString(),
-		"NSCALE_REGION_SERVICE_API_ENDPOINT",
-		DefaultNscaleRegionServiceAPIEndpoint,
-	)
-	computeServiceAPIEndpoint := resolveValue(
-		data.ComputeServiceAPIEndpoint.ValueString(),
-		"NSCALE_COMPUTE_SERVICE_API_ENDPOINT",
-		DefaultNscaleComputeServiceAPIEndpoint,
-	)
-	identityServiceAPIEndpoint := resolveValue(
-		data.IdentityServiceAPIEndpoint.ValueString(),
-		"NSCALE_IDENTITY_SERVICE_API_ENDPOINT",
-		DefaultNscaleIdentityServiceAPIEndpoint,
-	)
-	reservationServiceAPIEndpoint := resolveValue(
-		data.ReservationServiceAPIEndpoint.ValueString(),
-		"NSCALE_RESERVATION_SERVICE_API_ENDPOINT",
-		DefaultNscaleReservationServiceAPIEndpoint,
-	)
-
-	storageServiceAPIEndpoint := resolveValue(
-		data.StorageServiceAPIEndpoint.ValueString(),
-		"NSCALE_STORAGE_SERVICE_API_ENDPOINT",
-		DefaultNscaleStorageServiceAPIEndpoint,
-	)
+	endpoints := resolveServiceEndpoints(data)
 
 	serviceToken := resolveValue(data.ServiceToken.ValueString(), "NSCALE_SERVICE_TOKEN", "")
 	if serviceToken == "" {
@@ -215,11 +256,12 @@ func (p NscaleProvider) Configure(
 	)
 
 	client, err := nscale.NewClient(
-		regionServiceAPIEndpoint,
-		computeServiceAPIEndpoint,
-		identityServiceAPIEndpoint,
-		reservationServiceAPIEndpoint,
-		storageServiceAPIEndpoint,
+		endpoints.region,
+		endpoints.compute,
+		endpoints.identity,
+		endpoints.reservation,
+		endpoints.storage,
+		endpoints.nks,
 		serviceToken,
 		organizationID,
 		projectID,
@@ -257,6 +299,8 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		identity.NewGroupDataSource,
 		reservation.NewReservationDataSource,
 		reservation.NewPlacementDataSource,
+		kubernetescluster.NewKubernetesClusterDataSource,
+		kubernetescluster.NewKubernetesPlatformReleasesDataSource,
 	}
 }
 
@@ -274,5 +318,6 @@ func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resourc
 		identity.NewGroupResource,
 		reservation.NewReservationResource,
 		reservation.NewPlacementResource,
+		kubernetescluster.NewKubernetesClusterResource,
 	}
 }

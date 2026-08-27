@@ -804,6 +804,368 @@
           },
           "version": 0
         },
+        "nscale_kubernetes_cluster": {
+          "block": {
+            "attributes": {
+              "addons": {
+                "computed": true,
+                "description": "Addon profiles enabled on the cluster.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "hardware": {
+                      "computed": true,
+                      "description": "Whether the optional hardware addon profile is enabled.",
+                      "description_kind": "markdown",
+                      "type": "bool"
+                    }
+                  },
+                  "nesting_mode": "single"
+                }
+              },
+              "api_server": {
+                "computed": true,
+                "description": "Network exposure configured for the cluster's Kubernetes API server.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "allowed_cidrs": {
+                      "computed": true,
+                      "description": "Source IPv4 CIDR allowlist for the cluster API endpoint.",
+                      "description_kind": "markdown",
+                      "type": [
+                        "set",
+                        "string"
+                      ]
+                    },
+                    "public_ip": {
+                      "computed": true,
+                      "description": "Whether the API server is exposed through a public endpoint.",
+                      "description_kind": "markdown",
+                      "type": "bool"
+                    }
+                  },
+                  "nesting_mode": "single"
+                }
+              },
+              "api_server_endpoint": {
+                "computed": true,
+                "description": "Credential-free connection data for the cluster's Kubernetes API server. Null until the control plane is reachable.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "certificate_authority_data": {
+                      "computed": true,
+                      "description": "The complete Kubernetes API server CA bundle, base64-encoded.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "private_host": {
+                      "computed": true,
+                      "description": "The address of the private API server endpoint.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "private_port": {
+                      "computed": true,
+                      "description": "The TCP port of the private API server endpoint.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    },
+                    "public_host": {
+                      "computed": true,
+                      "description": "The address of the public API server endpoint.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "public_port": {
+                      "computed": true,
+                      "description": "The TCP port of the public API server endpoint.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    }
+                  },
+                  "nesting_mode": "single"
+                }
+              },
+              "applied_platform_release_id": {
+                "computed": true,
+                "description": "The platform release last observed as applied to the cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "cluster_network": {
+                "computed": true,
+                "description": "Pod and service network CIDRs for the cluster.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "pod_cidr": {
+                      "computed": true,
+                      "description": "IPv4 CIDR used for Kubernetes pod addresses.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "service_cidr": {
+                      "computed": true,
+                      "description": "IPv4 CIDR used for Kubernetes service addresses.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "single"
+                }
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the cluster was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "computed": true,
+                "description": "The description of the cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "eligible_upgrade_target_ids": {
+                "computed": true,
+                "description": "Eligible platform release IDs, in upgrade order.",
+                "description_kind": "markdown",
+                "type": [
+                  "list",
+                  "string"
+                ]
+              },
+              "health_status": {
+                "computed": true,
+                "description": "The health state of the cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "description": "The unique identifier of the cluster to look up.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "kubernetes_version_observed": {
+                "computed": true,
+                "description": "The Kubernetes version reported by the managed control plane.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "kubernetes_version_target": {
+                "computed": true,
+                "description": "The Kubernetes version applied to the cluster's control plane.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "computed": true,
+                "description": "The name of the cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "network_id": {
+                "computed": true,
+                "description": "The identifier of the region network the cluster attaches to.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "organization_id": {
+                "computed": true,
+                "description": "The identifier of the organization the cluster belongs to.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "platform_release_deprecated": {
+                "computed": true,
+                "description": "Whether the applied platform release is currently deprecated.",
+                "description_kind": "markdown",
+                "type": "bool"
+              },
+              "platform_release_id": {
+                "computed": true,
+                "description": "The identifier of the NKS platform release the cluster runs.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "platform_release_withdrawn": {
+                "computed": true,
+                "description": "Whether operators have withdrawn the applied platform release.",
+                "description_kind": "markdown",
+                "type": "bool"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project the cluster belongs to.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning state of the cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region the cluster is provisioned in.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the cluster.",
+                "description_kind": "markdown",
+                "type": [
+                  "map",
+                  "string"
+                ]
+              },
+              "upgrade_available": {
+                "computed": true,
+                "description": "Whether at least one eligible platform release upgrade target was observed.",
+                "description_kind": "markdown",
+                "type": "bool"
+              }
+            },
+            "description": "Nscale Kubernetes Cluster",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_kubernetes_platform_releases": {
+          "block": {
+            "attributes": {
+              "architecture": {
+                "description": "Only return releases supporting this CPU architecture. One of `x86_64` or `aarch64`.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "deprecated": {
+                "description": "Filter by deprecation state. Set to `false` to return only releases that are still current. Omit to return both.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "bool"
+              },
+              "organization_id": {
+                "description": "Only return releases usable by this organization. Defaults to the organization configured on the provider.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "prerelease": {
+                "description": "Filter by prerelease state. Omit to return both prerelease and non-prerelease releases.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "bool"
+              },
+              "region_id": {
+                "description": "Only return releases available in this region.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "releases": {
+                "computed": true,
+                "description": "The matching platform releases, in the order returned by the API.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "available_region_ids": {
+                      "computed": true,
+                      "description": "The region IDs where this release is available.",
+                      "description_kind": "markdown",
+                      "type": [
+                        "list",
+                        "string"
+                      ]
+                    },
+                    "deprecated": {
+                      "computed": true,
+                      "description": "Whether existing clusters should upgrade away from this release.",
+                      "description_kind": "markdown",
+                      "type": "bool"
+                    },
+                    "id": {
+                      "computed": true,
+                      "description": "The unique identifier of the platform release. Use this for `platform_release_id` on a `nscale_kubernetes_cluster`.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "kubernetes_version": {
+                      "computed": true,
+                      "description": "The Kubernetes version provided by the release.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "name": {
+                      "computed": true,
+                      "description": "The name of the platform release.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "prerelease": {
+                      "computed": true,
+                      "description": "Whether the release's Kubernetes version is a semver prerelease.",
+                      "description_kind": "markdown",
+                      "type": "bool"
+                    },
+                    "supported_architectures": {
+                      "computed": true,
+                      "description": "The CPU architectures supported by the release's compute images.",
+                      "description_kind": "markdown",
+                      "type": [
+                        "list",
+                        "string"
+                      ]
+                    },
+                    "usable_organization_ids": {
+                      "computed": true,
+                      "description": "The organization IDs, among your own, that may select this release.",
+                      "description_kind": "markdown",
+                      "type": [
+                        "list",
+                        "string"
+                      ]
+                    },
+                    "withdrawal_message": {
+                      "computed": true,
+                      "description": "The explanation of why operators withdrew the release.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "withdrawal_reason": {
+                      "computed": true,
+                      "description": "The machine-readable reason operators withdrew the release.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "withdrawn": {
+                      "computed": true,
+                      "description": "Whether operators have withdrawn the release from selection.",
+                      "description_kind": "markdown",
+                      "type": "bool"
+                    }
+                  },
+                  "nesting_mode": "list"
+                }
+              },
+              "withdrawn": {
+                "description": "Filter by withdrawal state. Set to `false` to exclude releases operators have withdrawn. Omit to return both.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "bool"
+              }
+            },
+            "description": "Nscale Kubernetes Platform Releases",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
         "nscale_network": {
           "block": {
             "attributes": {
@@ -1570,6 +1932,12 @@
             },
             "identity_service_api_endpoint": {
               "description": "The endpoint of the Nscale Identity Service API server.",
+              "description_kind": "markdown",
+              "optional": true,
+              "type": "string"
+            },
+            "nks_service_api_endpoint": {
+              "description": "The endpoint of the Nscale Kubernetes Service (NKS) API server. Required to use the `nscale_kubernetes_*` resources and data sources; there is no default yet.",
               "description_kind": "markdown",
               "optional": true,
               "type": "string"
@@ -2442,6 +2810,275 @@
               }
             },
             "description": "Nscale Instance",
+            "description_kind": "markdown"
+          },
+          "version": 0
+        },
+        "nscale_kubernetes_cluster": {
+          "block": {
+            "attributes": {
+              "addons": {
+                "computed": true,
+                "description": "Addon profiles enabled on the cluster. Omit to accept the API defaults.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "hardware": {
+                      "computed": true,
+                      "description": "Whether the optional hardware addon profile is enabled. Defaults to `true`.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "bool"
+                    }
+                  },
+                  "nesting_mode": "single"
+                },
+                "optional": true
+              },
+              "api_server": {
+                "computed": true,
+                "description": "Network exposure for the cluster's Kubernetes API server. Omit to accept the API defaults.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "allowed_cidrs": {
+                      "computed": true,
+                      "description": "Source IPv4 CIDR allowlist for the cluster API endpoint, including the private endpoint. Defaults to `[\"0.0.0.0/0\"]`, so if `public_ip` is `true` and this is omitted the API server is reachable from anywhere.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": [
+                        "set",
+                        "string"
+                      ]
+                    },
+                    "public_ip": {
+                      "computed": true,
+                      "description": "Whether to expose the API server through a public endpoint. Defaults to `false`.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "bool"
+                    }
+                  },
+                  "nesting_mode": "single"
+                },
+                "optional": true
+              },
+              "api_server_endpoint": {
+                "computed": true,
+                "description": "Credential-free connection data for the cluster's Kubernetes API server. Null until the control plane is reachable.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "certificate_authority_data": {
+                      "computed": true,
+                      "description": "The complete Kubernetes API server CA bundle, base64-encoded. Public key material, not a secret.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "private_host": {
+                      "computed": true,
+                      "description": "The address of the private API server endpoint.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "private_port": {
+                      "computed": true,
+                      "description": "The TCP port of the private API server endpoint.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    },
+                    "public_host": {
+                      "computed": true,
+                      "description": "The address of the public API server endpoint. Null unless `api_server.public_ip` is enabled.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    },
+                    "public_port": {
+                      "computed": true,
+                      "description": "The TCP port of the public API server endpoint. Null unless `api_server.public_ip` is enabled.",
+                      "description_kind": "markdown",
+                      "type": "number"
+                    }
+                  },
+                  "nesting_mode": "single"
+                }
+              },
+              "applied_platform_release_id": {
+                "computed": true,
+                "description": "The platform release last observed as applied to the cluster. Lags `platform_release_id` while an upgrade is in progress.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "cluster_network": {
+                "computed": true,
+                "description": "Pod and service network CIDRs for the cluster. Omit to accept the API defaults.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "pod_cidr": {
+                      "computed": true,
+                      "description": "IPv4 CIDR used for Kubernetes pod addresses. Defaults to `10.240.0.0/12`.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "service_cidr": {
+                      "computed": true,
+                      "description": "IPv4 CIDR used for Kubernetes service addresses. Defaults to `10.96.0.0/16`.",
+                      "description_kind": "markdown",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "single"
+                },
+                "optional": true
+              },
+              "creation_time": {
+                "computed": true,
+                "description": "The timestamp when the cluster was created.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "description": {
+                "description": "The description of the cluster.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "string"
+              },
+              "eligible_upgrade_target_ids": {
+                "computed": true,
+                "description": "Eligible platform release IDs, in upgrade order. Empty when eligibility was observed and no upgrade is available.",
+                "description_kind": "markdown",
+                "type": [
+                  "list",
+                  "string"
+                ]
+              },
+              "health_status": {
+                "computed": true,
+                "description": "The health state of the cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "id": {
+                "computed": true,
+                "description": "A unique identifier for the cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "kubernetes_version_observed": {
+                "computed": true,
+                "description": "The Kubernetes version reported by the managed control plane.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "kubernetes_version_target": {
+                "computed": true,
+                "description": "The Kubernetes version applied to the cluster's control plane.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "name": {
+                "description": "The name of the cluster.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "network_id": {
+                "description": "The identifier of the region network the cluster attaches to. The cluster's project, organization and region are all inherited from this network. Immutable: changing this forces a new cluster to be created.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "organization_id": {
+                "computed": true,
+                "description": "The identifier of the organization the cluster belongs to. Inherited from `network_id` and cannot be set.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "platform_release_deprecated": {
+                "computed": true,
+                "description": "Whether the applied platform release is currently deprecated.",
+                "description_kind": "markdown",
+                "type": "bool"
+              },
+              "platform_release_id": {
+                "description": "The identifier of the NKS platform release the cluster runs. Changing this performs an in-place cluster upgrade. Use the `nscale_kubernetes_platform_releases` data source to select an eligible release.",
+                "description_kind": "markdown",
+                "required": true,
+                "type": "string"
+              },
+              "platform_release_withdrawn": {
+                "computed": true,
+                "description": "Whether operators have withdrawn the applied platform release.",
+                "description_kind": "markdown",
+                "type": "bool"
+              },
+              "project_id": {
+                "computed": true,
+                "description": "The identifier of the project the cluster belongs to. Inherited from `network_id` and cannot be set: the NKS API derives cluster scope from the network.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "provisioning_status": {
+                "computed": true,
+                "description": "The provisioning state of the cluster.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "region_id": {
+                "computed": true,
+                "description": "The identifier of the region the cluster is provisioned in. Inherited from `network_id` and cannot be set.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "tags": {
+                "computed": true,
+                "description": "A map of tags assigned to the cluster.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": [
+                  "map",
+                  "string"
+                ]
+              },
+              "upgrade_available": {
+                "computed": true,
+                "description": "Whether at least one eligible platform release upgrade target was observed.",
+                "description_kind": "markdown",
+                "type": "bool"
+              }
+            },
+            "block_types": {
+              "timeouts": {
+                "block": {
+                  "attributes": {
+                    "create": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "delete": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "update": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    }
+                  },
+                  "description_kind": "plain"
+                },
+                "nesting_mode": "single"
+              }
+            },
+            "description": "Nscale Kubernetes Cluster",
             "description_kind": "markdown"
           },
           "version": 0
