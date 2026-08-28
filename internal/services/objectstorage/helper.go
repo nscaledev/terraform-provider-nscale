@@ -19,7 +19,6 @@ package objectstorage
 import (
 	"context"
 
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -29,40 +28,50 @@ func getObjectStorageEndpoint(
 	ctx context.Context,
 	id string,
 	client *nscale.Client,
-) (*storageapi.ObjectStorageEndpointRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
+) (*storageapi.ObjectStorageEndpointRead, nscale.ResourceStatus, error) {
 	resp, err := client.Storage.GetApiV1ObjectstorageendpointsObjectStorageEndpointID(ctx, id)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 	defer resp.Body.Close()
 
 	endpoint, err := nscale.ReadJSONResponsePointer[storageapi.ObjectStorageEndpointRead](resp)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return endpoint, &endpoint.Metadata, nil
+	return endpoint, nscale.NewResourceStatus(
+		endpoint.Metadata.Id,
+		endpoint.Metadata.Name,
+		string(endpoint.Metadata.ProvisioningStatus),
+		endpoint.Metadata.Tags,
+	), nil
 }
 
 func getObjectStorageAccessKey(
 	ctx context.Context,
 	endpointID, accessKeyID string,
 	client *nscale.Client,
-) (*storageapi.ObjectStorageAccessKeyRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
+) (*storageapi.ObjectStorageAccessKeyRead, nscale.ResourceStatus, error) {
 	resp, err := client.Storage.GetApiV1ObjectstorageendpointsObjectStorageEndpointIDAccesskeysObjectStorageAccessKeyID(
 		ctx,
 		endpointID,
 		accessKeyID,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 	defer resp.Body.Close()
 
 	accessKey, err := nscale.ReadJSONResponsePointer[storageapi.ObjectStorageAccessKeyRead](resp)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return accessKey, &accessKey.Metadata, nil
+	return accessKey, nscale.NewResourceStatus(
+		accessKey.Metadata.Id,
+		accessKey.Metadata.Name,
+		string(accessKey.Metadata.ProvisioningStatus),
+		accessKey.Metadata.Tags,
+	), nil
 }

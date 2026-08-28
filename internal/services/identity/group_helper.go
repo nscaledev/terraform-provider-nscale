@@ -42,8 +42,8 @@ func getGroup(
 
 	groupResponse, err := client.Identity.GetApiV1OrganizationsOrganizationIDGroupsGroupid(
 		ctx,
-		organizationID,
-		groupID,
+		identityapi.OrganizationIDParameter(organizationID),
+		identityapi.GroupidParameter(groupID),
 	)
 	if err != nil {
 		return nil, err
@@ -59,8 +59,7 @@ func getGroup(
 }
 
 // getGroupStatus reads a group and adapts it to the shared watchers'
-// (resource, ResourceStatus, error) shape. Identity reads are
-// organization-scoped, so it uses StatusFromOrgScoped.
+// (resource, ResourceStatus, error) shape.
 func getGroupStatus(
 	ctx context.Context,
 	id string,
@@ -71,5 +70,10 @@ func getGroupStatus(
 		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return group, nscale.StatusFromOrgScoped(&group.Metadata), nil
+	return group, nscale.NewResourceStatus(
+		group.Metadata.Id,
+		group.Metadata.Name,
+		string(group.Metadata.ProvisioningStatus),
+		group.Metadata.Tags,
+	), nil
 }

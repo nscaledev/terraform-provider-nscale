@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	regionapi "github.com/nscaledev/nscale-sdk-go/region"
+	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -103,9 +104,20 @@ func (s *InstanceSSHKeyDataSource) Read(
 		return
 	}
 
-	instanceID := data.InstanceID.ValueString()
+	instanceID, ok := nscale.ParseID(
+		data.InstanceID.ValueString(),
+		"Instance",
+		uuid.Parse,
+		&response.Diagnostics,
+	)
+	if !ok {
+		return
+	}
 
-	sshKeyResponse, err := s.client.Compute.GetApiV2InstancesInstanceIDSshkey(ctx, instanceID)
+	sshKeyResponse, err := s.client.Compute.GetApiV2InstancesInstanceIDSshkey(
+		ctx,
+		instanceID,
+	)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Instance SSH Key",
@@ -115,14 +127,14 @@ func (s *InstanceSSHKeyDataSource) Read(
 	}
 	defer sshKeyResponse.Body.Close()
 
-	sshKey, err := nscale.ReadJSONResponsePointer[regionapi.SshKey](sshKeyResponse)
+	sshKey, err := nscale.ReadJSONResponsePointer[computeapi.SshKey](sshKeyResponse)
 	if err != nil {
-		if e, ok := nscale.AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
+		if e, isAPIError := nscale.AsAPIError(err); isAPIError && e.StatusCode == http.StatusNotFound {
 			response.Diagnostics.AddWarning(
 				"Instance SSH Key Not Available",
 				fmt.Sprintf(
 					"The instance with ID %s has no auto-generated SSH key, likely because it was created with an SSH certificate authority. The private_key attribute will be null.",
-					instanceID,
+					data.InstanceID.ValueString(),
 				),
 			)
 			data.PrivateKey = types.StringNull()
@@ -138,6 +150,6 @@ func (s *InstanceSSHKeyDataSource) Read(
 		return
 	}
 
-	data = NewInstanceSSHKeyModel(instanceID, sshKey)
+	data = NewInstanceSSHKeyModel(data.InstanceID.ValueString(), sshKey)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }

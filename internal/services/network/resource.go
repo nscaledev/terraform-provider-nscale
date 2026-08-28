@@ -60,7 +60,7 @@ func networkAdapter() nscale.ResourceAdapter[NetworkResourceModel, regionapi.Net
 			client *nscale.Client,
 			id string,
 		) (*regionapi.NetworkV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getNetwork(ctx, id, client))
+			return getNetwork(ctx, id, client)
 		},
 		ToModel: func(api *regionapi.NetworkV2Read, dst *NetworkResourceModel) {
 			dst.NetworkModel = NewNetworkModel(api)
@@ -257,9 +257,13 @@ func networkUpdate(
 
 	// Tag the update so the watcher can confirm the PUT has propagated through
 	// the cache-backed API before reading back a terminal status.
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	operationTagKey := nscale.WriteOperationTag(&params.Metadata.Tags)
 
-	updateResponse, err := client.Region.PutApiV2NetworksNetworkID(ctx, networkID, params)
+	updateResponse, err := client.Region.PutApiV2NetworksNetworkID(
+		ctx,
+		regionapi.NetworkIDParameter(networkID),
+		params,
+	)
 	if err != nil {
 		diagnostics.AddError(
 			"Failed to Update Network",
@@ -287,7 +291,7 @@ func networkDelete(ctx context.Context, client *nscale.Client, id string) error 
 		return err
 	}
 
-	deleteResponse, err := client.Region.DeleteApiV2NetworksNetworkID(ctx, networkID)
+	deleteResponse, err := client.Region.DeleteApiV2NetworksNetworkID(ctx, regionapi.NetworkIDParameter(networkID))
 	if err != nil {
 		return err
 	}

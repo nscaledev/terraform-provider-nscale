@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
@@ -106,7 +105,7 @@ func NewSecurityGroupRuleModel(source regionapi.SecurityGroupRuleV2) attr.Value 
 }
 
 func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.SecurityGroupV2Create, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.SecurityGroupV2Create{}, diagnostics
 	}
@@ -129,13 +128,13 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 	}
 
 	securityGroup := regionapi.SecurityGroupV2Create{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
 			Tags:        tags,
 		},
 		Spec: regionapi.SecurityGroupV2CreateSpec{
-			NetworkId: networkID,
+			NetworkId: regionapi.NetworkId(networkID),
 			Rules:     rules,
 		},
 	}
@@ -144,7 +143,7 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 }
 
 func (m *SecurityGroupModel) NscaleSecurityGroupUpdateParams() (regionapi.SecurityGroupV2Update, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.SecurityGroupV2Update{}, diagnostics
 	}
@@ -162,7 +161,7 @@ func (m *SecurityGroupModel) NscaleSecurityGroupUpdateParams() (regionapi.Securi
 	}
 
 	securityGroup := regionapi.SecurityGroupV2Update{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
 			Tags:        tags,

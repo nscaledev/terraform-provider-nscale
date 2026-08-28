@@ -24,8 +24,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
+	identityids "github.com/unikorn-cloud/identity/pkg/ids"
+	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/pointer"
@@ -57,6 +58,10 @@ func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
 	}
 
 	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
+	sshCertificateAuthorityID := types.StringNull()
+	if source.Spec.SshCertificateAuthorityId != nil {
+		sshCertificateAuthorityID = types.StringValue(source.Spec.SshCertificateAuthorityId.String())
+	}
 
 	return InstanceModel{
 		ID:                        types.StringValue(source.Metadata.Id),
@@ -67,9 +72,9 @@ func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
 		PublicIP:                  types.StringPointerValue(source.Status.PublicIP),
 		PrivateIP:                 types.StringPointerValue(source.Status.PrivateIP),
 		PowerState:                powerState,
-		ImageID:                   types.StringValue(source.Spec.ImageId),
-		FlavorID:                  types.StringValue(source.Spec.FlavorId),
-		SSHCertificateAuthorityID: types.StringPointerValue(source.Spec.SshCertificateAuthorityId),
+		ImageID:                   types.StringValue(source.Spec.ImageId.String()),
+		FlavorID:                  types.StringValue(source.Spec.FlavorId.String()),
+		SSHCertificateAuthorityID: sshCertificateAuthorityID,
 		Tags:                      tftypes.TagMapValueMust(tags),
 		ProjectID:                 types.StringValue(source.Metadata.ProjectId),
 		RegionID:                  types.StringValue(source.Status.RegionId),
@@ -80,7 +85,7 @@ func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
 func (m *InstanceModel) NscaleInstanceCreateParams(
 	organizationID string,
 ) (computeapi.InstanceCreate, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[computeapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return computeapi.InstanceCreate{}, diagnostics
 	}
@@ -106,20 +111,55 @@ func (m *InstanceModel) NscaleInstanceCreateParams(
 		return computeapi.InstanceCreate{}, diagnostics
 	}
 
+	flavorID, imageID, sshCertificateAuthorityID, ok := m.instanceSpecIDs(&diagnostics)
+	if !ok {
+		return computeapi.InstanceCreate{}, diagnostics
+	}
+
+	networkID, ok := nscale.ParseID(
+		sourceNetworkInterface.NetworkID.ValueString(),
+		"Network",
+		regionids.ParseNetworkID,
+		&diagnostics,
+	)
+	if !ok {
+		return computeapi.InstanceCreate{}, diagnostics
+	}
+
+	parsedOrganizationID, ok := nscale.ParseID(
+		organizationID,
+		"Organization",
+		identityids.ParseOrganizationID,
+		&diagnostics,
+	)
+	if !ok {
+		return computeapi.InstanceCreate{}, diagnostics
+	}
+
+	projectID, ok := nscale.ParseID(
+		m.ProjectID.ValueString(),
+		"Project",
+		identityids.ParseProjectID,
+		&diagnostics,
+	)
+	if !ok {
+		return computeapi.InstanceCreate{}, diagnostics
+	}
+
 	instance := computeapi.InstanceCreate{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: computeapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
 			Tags:        tags,
 		},
 		Spec: computeapi.InstanceCreateSpec{
-			FlavorId:                  m.FlavorID.ValueString(),
-			ImageId:                   m.ImageID.ValueString(),
-			NetworkId:                 sourceNetworkInterface.NetworkID.ValueString(),
+			FlavorId:                  flavorID,
+			ImageId:                   imageID,
+			NetworkId:                 computeapi.NetworkId(networkID),
 			Networking:                &networking,
-			OrganizationId:            organizationID,
-			ProjectId:                 m.ProjectID.ValueString(),
-			SshCertificateAuthorityId: m.SSHCertificateAuthorityID.ValueStringPointer(),
+			OrganizationId:            computeapi.OrganizationId(parsedOrganizationID),
+			ProjectId:                 computeapi.ProjectId(projectID),
+			SshCertificateAuthorityId: sshCertificateAuthorityID,
 			UserData:                  userData,
 		},
 	}
@@ -128,7 +168,7 @@ func (m *InstanceModel) NscaleInstanceCreateParams(
 }
 
 func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[computeapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return computeapi.InstanceUpdate{}, diagnostics
 	}
@@ -154,22 +194,59 @@ func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate,
 		return computeapi.InstanceUpdate{}, diagnostics
 	}
 
+	flavorID, imageID, sshCertificateAuthorityID, ok := m.instanceSpecIDs(&diagnostics)
+	if !ok {
+		return computeapi.InstanceUpdate{}, diagnostics
+	}
+
 	instance := computeapi.InstanceUpdate{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: computeapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
 			Tags:        tags,
 		},
 		Spec: computeapi.InstanceSpec{
-			FlavorId:                  m.FlavorID.ValueString(),
-			ImageId:                   m.ImageID.ValueString(),
+			FlavorId:                  flavorID,
+			ImageId:                   imageID,
 			Networking:                &networking,
-			SshCertificateAuthorityId: m.SSHCertificateAuthorityID.ValueStringPointer(),
+			SshCertificateAuthorityId: sshCertificateAuthorityID,
 			UserData:                  userData,
 		},
 	}
 
 	return instance, nil
+}
+
+func (m *InstanceModel) instanceSpecIDs(
+	diagnostics *diag.Diagnostics,
+) (computeapi.FlavorId, computeapi.ImageId, *computeapi.SshCertificateAuthorityId, bool) {
+	flavorID, ok := nscale.ParseID(m.FlavorID.ValueString(), "Flavor", regionids.ParseFlavorID, diagnostics)
+	if !ok {
+		return computeapi.FlavorId{}, computeapi.ImageId{}, nil, false
+	}
+
+	imageID, ok := nscale.ParseID(m.ImageID.ValueString(), "Image", regionids.ParseImageID, diagnostics)
+	if !ok {
+		return computeapi.FlavorId{}, computeapi.ImageId{}, nil, false
+	}
+
+	var sshCertificateAuthorityID *computeapi.SshCertificateAuthorityId
+	if value := m.SSHCertificateAuthorityID.ValueString(); value != "" {
+		parsedID, parsed := nscale.ParseID(
+			value,
+			"SSH Certificate Authority",
+			regionids.ParseSSHCertificateAuthorityID,
+			diagnostics,
+		)
+		if !parsed {
+			return computeapi.FlavorId{}, computeapi.ImageId{}, nil, false
+		}
+
+		converted := computeapi.SshCertificateAuthorityId(parsedID)
+		sshCertificateAuthorityID = &converted
+	}
+
+	return computeapi.FlavorId(flavorID), computeapi.ImageId(imageID), sshCertificateAuthorityID, true
 }
 
 var InstanceNetworkInterfaceModelAttributeType = types.ObjectType{

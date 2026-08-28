@@ -21,19 +21,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 )
 
-const testUserDataPlaintext = "#cloud-config\nruncmd:\n  - [ echo, hello ]\n"
+const (
+	testUserDataPlaintext = "#cloud-config\nruncmd:\n  - [ echo, hello ]\n"
+	testOrganizationID    = "11111111-1111-1111-1111-111111111111"
+	testProjectID         = "22222222-2222-2222-2222-222222222222"
+	testNetworkID         = "33333333-3333-3333-3333-333333333333"
+	testImageID           = "44444444-4444-4444-4444-444444444444"
+	testFlavorID          = "55555555-5555-5555-5555-555555555555"
+)
 
 func testNetworkInterfaceObject() types.Object {
 	return types.ObjectValueMust(
 		InstanceNetworkInterfaceModelAttributeType.AttrTypes,
 		map[string]attr.Value{
-			"network_id":           types.StringValue("network-1"),
+			"network_id":           types.StringValue(testNetworkID),
 			"enable_public_ip":     types.BoolValue(true),
 			"security_group_ids":   types.ListNull(types.StringType),
 			"allowed_destinations": types.ListNull(types.StringType),
@@ -46,9 +53,9 @@ func testInstanceModel(userData types.String) InstanceModel {
 		Name:             types.StringValue("test-instance"),
 		UserData:         userData,
 		NetworkInterface: testNetworkInterfaceObject(),
-		ImageID:          types.StringValue("image-1"),
-		FlavorID:         types.StringValue("flavor-1"),
-		ProjectID:        types.StringValue("project-1"),
+		ImageID:          types.StringValue(testImageID),
+		FlavorID:         types.StringValue(testFlavorID),
+		ProjectID:        types.StringValue(testProjectID),
 		Tags:             types.MapNull(types.StringType),
 	}
 }
@@ -59,7 +66,7 @@ func TestNscaleInstanceCreateParamsDecodesUserData(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString([]byte(testUserDataPlaintext))
 	model := testInstanceModel(types.StringValue(encoded))
 
-	params, diagnostics := model.NscaleInstanceCreateParams("org-1")
+	params, diagnostics := model.NscaleInstanceCreateParams(testOrganizationID)
 	if diagnostics.HasError() {
 		t.Fatalf("NscaleInstanceCreateParams() diagnostics = %v", diagnostics)
 	}
@@ -76,7 +83,7 @@ func TestNscaleInstanceCreateParamsDecodesUserData(t *testing.T) {
 func TestNscaleInstanceCreateParamsRejectsInvalidUserData(t *testing.T) {
 	model := testInstanceModel(types.StringValue("not!valid!base64"))
 
-	if _, diagnostics := model.NscaleInstanceCreateParams("org-1"); !diagnostics.HasError() {
+	if _, diagnostics := model.NscaleInstanceCreateParams(testOrganizationID); !diagnostics.HasError() {
 		t.Error("NscaleInstanceCreateParams() diagnostics = none, want an error for malformed base64")
 	}
 }
@@ -84,7 +91,7 @@ func TestNscaleInstanceCreateParamsRejectsInvalidUserData(t *testing.T) {
 func TestNscaleInstanceCreateParamsOmitsEmptyUserData(t *testing.T) {
 	model := testInstanceModel(types.StringNull())
 
-	params, diagnostics := model.NscaleInstanceCreateParams("org-1")
+	params, diagnostics := model.NscaleInstanceCreateParams(testOrganizationID)
 	if diagnostics.HasError() {
 		t.Fatalf("NscaleInstanceCreateParams() diagnostics = %v", diagnostics)
 	}
@@ -125,15 +132,15 @@ func TestNscaleInstanceUpdateParamsRejectsInvalidUserData(t *testing.T) {
 func TestNewInstanceModelEncodesUserData(t *testing.T) {
 	userData := []byte(testUserDataPlaintext)
 	source := &computeapi.InstanceRead{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: computeapi.ProjectScopedResourceReadMetadata{
 			Id:           "instance-1",
 			Name:         "test-instance",
 			ProjectId:    "project-1",
 			CreationTime: time.Date(2026, time.April, 28, 11, 3, 12, 0, time.UTC),
 		},
 		Spec: computeapi.InstanceSpec{
-			FlavorId:   "flavor-1",
-			ImageId:    "image-1",
+			FlavorId:   uuid.MustParse(testFlavorID),
+			ImageId:    uuid.MustParse(testImageID),
 			Networking: &computeapi.InstanceNetworking{},
 			UserData:   &userData,
 		},
@@ -153,15 +160,15 @@ func TestNewInstanceModelEncodesUserData(t *testing.T) {
 
 func TestNewInstanceModelNullUserData(t *testing.T) {
 	source := &computeapi.InstanceRead{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: computeapi.ProjectScopedResourceReadMetadata{
 			Id:           "instance-1",
 			Name:         "test-instance",
 			ProjectId:    "project-1",
 			CreationTime: time.Date(2026, time.April, 28, 11, 3, 12, 0, time.UTC),
 		},
 		Spec: computeapi.InstanceSpec{
-			FlavorId:   "flavor-1",
-			ImageId:    "image-1",
+			FlavorId:   uuid.MustParse(testFlavorID),
+			ImageId:    uuid.MustParse(testImageID),
 			Networking: &computeapi.InstanceNetworking{},
 		},
 		Status: computeapi.InstanceStatus{

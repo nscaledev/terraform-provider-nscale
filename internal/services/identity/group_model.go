@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -167,7 +166,7 @@ func (m *GroupModel) NscaleGroupSpec(ctx context.Context) (identityapi.GroupSpec
 }
 
 func (m *GroupModel) NscaleGroupCreateParams(ctx context.Context) (identityapi.GroupWrite, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[identityapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return identityapi.GroupWrite{}, diagnostics
 	}
@@ -179,7 +178,7 @@ func (m *GroupModel) NscaleGroupCreateParams(ctx context.Context) (identityapi.G
 	}
 
 	return identityapi.GroupWrite{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: identityapi.ResourceMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
 			Tags:        tags,

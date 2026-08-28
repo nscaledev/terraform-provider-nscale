@@ -24,7 +24,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -203,7 +202,7 @@ func newPlacementServerNetworkingObject(source *reservationapi.PlacementServerNe
 func (m *PlacementModel) NscalePlacementCreateParams(
 	ctx context.Context,
 ) (reservationapi.PlacementV2Create, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[reservationapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return reservationapi.PlacementV2Create{}, diagnostics
 	}
@@ -220,7 +219,7 @@ func (m *PlacementModel) NscalePlacementCreateParams(
 	}
 
 	return reservationapi.PlacementV2Create{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: reservationapi.ResourceMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
 			Tags:        tags,

@@ -42,8 +42,8 @@ func getProject(
 
 	projectResponse, err := client.Identity.GetApiV1OrganizationsOrganizationIDProjectsProjectID(
 		ctx,
-		organizationID,
-		projectID,
+		identityapi.OrganizationIDParameter(organizationID),
+		identityapi.ProjectIDParameter(projectID),
 	)
 	if err != nil {
 		return nil, err
@@ -59,8 +59,7 @@ func getProject(
 }
 
 // getProjectStatus reads a project and adapts it to the shared watchers'
-// (resource, ResourceStatus, error) shape. Identity reads are
-// organization-scoped, so it uses StatusFromOrgScoped.
+// (resource, ResourceStatus, error) shape.
 func getProjectStatus(
 	ctx context.Context,
 	id string,
@@ -71,5 +70,10 @@ func getProjectStatus(
 		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return project, nscale.StatusFromOrgScoped(&project.Metadata), nil
+	return project, nscale.NewResourceStatus(
+		project.Metadata.Id,
+		project.Metadata.Name,
+		string(project.Metadata.ProvisioningStatus),
+		project.Metadata.Tags,
+	), nil
 }

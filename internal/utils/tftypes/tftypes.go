@@ -25,8 +25,19 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 )
+
+type tag interface {
+	~struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+}
+
+type tagValue struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
 
 // Base64StringValue renders raw bytes returned by the API as the base64 string
 // held in configuration and state.
@@ -84,20 +95,21 @@ func NullableSetValueMust(elementType attr.Type, elements []attr.Value) basetype
 	return basetypes.NewSetValueMust(elementType, elements)
 }
 
-func TagMapValueMust(tags *[]coreapi.Tag) basetypes.MapValue {
+func TagMapValueMust[T tag](tags *[]T) basetypes.MapValue {
 	if tags == nil || len(*tags) == 0 {
 		return basetypes.NewMapNull(types.StringType)
 	}
 
 	elements := make(map[string]attr.Value, len(*tags))
 	for _, tag := range *tags {
-		elements[tag.Name] = types.StringValue(tag.Value)
+		value := tagValue(tag)
+		elements[value.Name] = types.StringValue(value.Value)
 	}
 
 	return basetypes.NewMapValueMust(types.StringType, elements)
 }
 
-func ValueTagListPointer(tagMap basetypes.MapValue) (*[]coreapi.Tag, diag.Diagnostics) {
+func ValueTagListPointer[T tag](tagMap basetypes.MapValue) (*[]T, diag.Diagnostics) {
 	if tagMap.IsNull() || tagMap.IsUnknown() {
 		return nil, nil
 	}
@@ -111,12 +123,12 @@ func ValueTagListPointer(tagMap basetypes.MapValue) (*[]coreapi.Tag, diag.Diagno
 		return nil, nil
 	}
 
-	tags := make([]coreapi.Tag, 0, len(data))
+	tags := make([]T, 0, len(data))
 	for name, value := range data {
-		tags = append(tags, coreapi.Tag{
+		tags = append(tags, T(tagValue{
 			Name:  name,
 			Value: value,
-		})
+		}))
 	}
 
 	return &tags, nil

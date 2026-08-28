@@ -171,8 +171,8 @@ github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyua
 github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/mitchellh/reflectwalk v1.0.2 h1:G2LzWKi524PWgd3mLHV8Y5k7s6XUvT0Gef6zxSIeXaQ=
 github.com/mitchellh/reflectwalk v1.0.2/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
-github.com/nscaledev/nscale-sdk-go v0.0.4 h1:F0cuqqcP05rG4rXT3Kck1UOijdgMKVw02ZUhmT13nXw=
-github.com/nscaledev/nscale-sdk-go v0.0.4/go.mod h1:6b2K2vuos3m0RGFRf8JZFHp3+tgtVK43rfUwN1+BwxI=
+github.com/nscaledev/nscale-sdk-go v0.2.1-0.20260828063058-00c00c78528e h1:eyaUiHQ7tbbbL56OcDlY2a0Kftj/jpswm0oITT+/VHg=
+github.com/nscaledev/nscale-sdk-go v0.2.1-0.20260828063058-00c00c78528e/go.mod h1:Mhnc4zbTDyfX8yz+gHn9gAWKD9l22RP0mlbDiboI0oY=
 github.com/nxadm/tail v1.4.4/go.mod h1:kenIhsEOeOJmVchQTgglprH7qJGnHDVpk1VPCcaMI8A=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/nxadm/tail v1.4.8/go.mod h1:+ncqLTQzXmGhMZNUePPaPqPvBxHAIsmXswZKocGu+AU=

@@ -19,7 +19,6 @@ package network
 import (
 	"context"
 
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
@@ -30,22 +29,27 @@ func getNetwork(
 	ctx context.Context,
 	id string,
 	client *nscale.Client,
-) (*regionapi.NetworkV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
+) (*regionapi.NetworkV2Read, nscale.ResourceStatus, error) {
 	networkID, err := regionids.ParseNetworkID(id)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
-	networkResponse, err := client.Region.GetApiV2NetworksNetworkID(ctx, networkID)
+	networkResponse, err := client.Region.GetApiV2NetworksNetworkID(ctx, regionapi.NetworkIDParameter(networkID))
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 	defer networkResponse.Body.Close()
 
 	network, err := nscale.ReadJSONResponsePointer[regionapi.NetworkV2Read](networkResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return network, &network.Metadata, nil
+	return network, nscale.NewResourceStatus(
+		network.Metadata.Id,
+		network.Metadata.Name,
+		string(network.Metadata.ProvisioningStatus),
+		network.Metadata.Tags,
+	), nil
 }

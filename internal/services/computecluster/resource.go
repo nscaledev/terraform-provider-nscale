@@ -83,7 +83,7 @@ func computeClusterAdapter() nscale.ResourceAdapter[ComputeClusterResourceModel,
 			client *nscale.Client,
 			id string,
 		) (*computeapi.ComputeClusterRead, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getComputeCluster(ctx, client.OrganizationID, id, client))
+			return getComputeCluster(ctx, client.OrganizationID, id, client)
 		},
 		ToModel: func(api *computeapi.ComputeClusterRead, dst *ComputeClusterResourceModel) {
 			dst.ComputeClusterModel = NewComputeClusterModel(api)
@@ -373,9 +373,8 @@ func computeClusterUpdate(
 	}
 
 	// Tag the update so the watcher can confirm the PUT has propagated through
-	// the cache-backed API before reading back a terminal status. The legacy
-	// metadata shape requires the compat shim rather than nscale.WriteOperationTag.
-	operationTagKey := writeOperationTagLegacy(&requestData.Metadata)
+	// the cache-backed API before reading back a terminal status.
+	operationTagKey := nscale.WriteOperationTag(&requestData.Metadata.Tags)
 
 	updateResponse, err := client.LegacyCompute.PutApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(
 		ctx,

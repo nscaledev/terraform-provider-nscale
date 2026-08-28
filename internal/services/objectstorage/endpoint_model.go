@@ -25,7 +25,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -219,7 +218,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointCreateParams(
 	ctx context.Context,
 	organizationID string,
 ) (storageapi.ObjectStorageEndpointCreate, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[storageapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return storageapi.ObjectStorageEndpointCreate{}, diagnostics
 	}
@@ -231,7 +230,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointCreateParams(
 	}
 
 	endpoint := storageapi.ObjectStorageEndpointCreate{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: storageapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
 			Tags:        tags,
@@ -262,7 +261,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointCreateParams(
 func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointUpdateParams(
 	ctx context.Context,
 ) (storageapi.ObjectStorageEndpointUpdate, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[storageapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return storageapi.ObjectStorageEndpointUpdate{}, diagnostics
 	}
@@ -274,7 +273,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointUpdateParams(
 	}
 
 	update := storageapi.ObjectStorageEndpointUpdate{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: storageapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
 			Tags:        tags,

@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
@@ -72,7 +71,7 @@ func NewNetworkModel(source *regionapi.NetworkV2Read) NetworkModel {
 }
 
 func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regionapi.NetworkV2Create, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.NetworkV2Create{}, diagnostics
 	}
@@ -108,7 +107,7 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 	}
 
 	network := regionapi.NetworkV2Create{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
 			Tags:        tags,
@@ -118,7 +117,7 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 			OrganizationId: organizationID,
 			Prefix:         m.CIDRBlock.ValueString(),
 			ProjectId:      m.ProjectID.ValueString(),
-			RegionId:       regionID,
+			RegionId:       regionapi.RegionId(regionID),
 			// Network reservations are not exposed by this resource.
 			Reservations: nil,
 			Routes:       nonEmptyRoutes,
@@ -129,7 +128,7 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 }
 
 func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.NetworkV2Update{}, diagnostics
 	}
@@ -160,7 +159,7 @@ func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, d
 	}
 
 	network := regionapi.NetworkV2Update{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
 			Tags:        tags,

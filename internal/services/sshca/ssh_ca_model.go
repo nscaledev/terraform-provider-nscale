@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 )
 
@@ -49,7 +48,7 @@ func (m *SSHCertificateAuthorityModel) NscaleSSHCACreateParams(
 	organizationID string,
 ) regionapi.SshCertificateAuthorityV2Create {
 	return regionapi.SshCertificateAuthorityV2Create{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
 			Tags:        nil,

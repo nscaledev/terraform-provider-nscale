@@ -287,7 +287,7 @@ func (r *ObjectStorageEndpointResource) Create(
 		ResourceTitle: "Object Storage Endpoint",
 		ResourceName:  "object_storage_endpoint",
 		GetFunc: func(ctx context.Context) (*storageapi.ObjectStorageEndpointRead, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getObjectStorageEndpoint(ctx, endpoint.Metadata.Id, r.client))
+			return getObjectStorageEndpoint(ctx, endpoint.Metadata.Id, r.client)
 		},
 	}
 
@@ -324,7 +324,7 @@ func (r *ObjectStorageEndpointResource) Read(
 		ResourceTitle: "Object Storage Endpoint",
 		ResourceName:  "object_storage_endpoint",
 		GetFunc: func(ctx context.Context, id string) (*storageapi.ObjectStorageEndpointRead, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getObjectStorageEndpoint(ctx, id, r.client))
+			return getObjectStorageEndpoint(ctx, id, r.client)
 		},
 	}
 
@@ -364,7 +364,7 @@ func (r *ObjectStorageEndpointResource) Update(
 	}
 
 	id := data.ID.ValueString()
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	operationTagKey := nscale.WriteOperationTag(&params.Metadata.Tags)
 
 	updateResponse, err := r.client.Storage.PutApiV1ObjectstorageendpointsObjectStorageEndpointID(ctx, id, params)
 	if err != nil {
@@ -391,7 +391,7 @@ func (r *ObjectStorageEndpointResource) Update(
 		ResourceTitle: "Object Storage Endpoint",
 		ResourceName:  "object_storage_endpoint",
 		GetFunc: func(ctx context.Context) (*storageapi.ObjectStorageEndpointRead, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getObjectStorageEndpoint(ctx, id, r.client))
+			return getObjectStorageEndpoint(ctx, id, r.client)
 		},
 	}
 
@@ -451,7 +451,7 @@ func (r *ObjectStorageEndpointResource) Delete(
 		ResourceTitle: "Object Storage Endpoint",
 		ResourceName:  "object_storage_endpoint",
 		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getObjectStorageEndpoint(ctx, id, r.client))
+			return getObjectStorageEndpoint(ctx, id, r.client)
 		},
 	}
 

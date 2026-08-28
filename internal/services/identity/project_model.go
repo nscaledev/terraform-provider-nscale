@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -73,7 +72,7 @@ func (m *ProjectModel) groupIDs(ctx context.Context) ([]string, diag.Diagnostics
 }
 
 func (m *ProjectModel) NscaleProjectCreateParams(ctx context.Context) (identityapi.ProjectWrite, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[identityapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return identityapi.ProjectWrite{}, diagnostics
 	}
@@ -85,7 +84,7 @@ func (m *ProjectModel) NscaleProjectCreateParams(ctx context.Context) (identitya
 	}
 
 	return identityapi.ProjectWrite{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: identityapi.ResourceMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
 			Tags:        tags,

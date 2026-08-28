@@ -172,7 +172,7 @@ func projectCreate(
 
 	createResponse, err := client.Identity.PostApiV1OrganizationsOrganizationIDProjects(
 		ctx,
-		organizationID,
+		identityapi.OrganizationIDParameter(organizationID),
 		params,
 	)
 	if err != nil {
@@ -225,12 +225,12 @@ func projectUpdate(
 
 	// Tag the update so the watcher can confirm the PUT has propagated through
 	// the cache-backed API before reading back a terminal status.
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	operationTagKey := nscale.WriteOperationTag(&params.Metadata.Tags)
 
 	updateResponse, err := client.Identity.PutApiV1OrganizationsOrganizationIDProjectsProjectID(
 		ctx,
-		organizationID,
-		projectID,
+		identityapi.OrganizationIDParameter(organizationID),
+		identityapi.ProjectIDParameter(projectID),
 		params,
 	)
 	if err != nil {
@@ -267,8 +267,8 @@ func projectDelete(ctx context.Context, client *nscale.Client, id string) error 
 
 	deleteResponse, err := client.Identity.DeleteApiV1OrganizationsOrganizationIDProjectsProjectID(
 		ctx,
-		organizationID,
-		projectID,
+		identityapi.OrganizationIDParameter(organizationID),
+		identityapi.ProjectIDParameter(projectID),
 	)
 	if err != nil {
 		return err

@@ -21,7 +21,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -85,14 +84,14 @@ func NewReservationModel(source *reservationapi.ReservationV2Read) ReservationMo
 func (m *ReservationModel) NscaleReservationCreateParams(
 	organizationID string,
 ) (reservationapi.ReservationV2Create, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[reservationapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return reservationapi.ReservationV2Create{}, diagnostics
 	}
 	tags = nscale.RemoveOperationTags(tags)
 
 	return reservationapi.ReservationV2Create{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: reservationapi.ResourceMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
 			Tags:        tags,

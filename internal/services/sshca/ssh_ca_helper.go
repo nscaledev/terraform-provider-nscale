@@ -19,7 +19,6 @@ package sshca
 import (
 	"context"
 
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
@@ -30,22 +29,30 @@ func getSSHCA(
 	ctx context.Context,
 	id string,
 	client *nscale.Client,
-) (*regionapi.SshCertificateAuthorityV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
+) (*regionapi.SshCertificateAuthorityV2Read, nscale.ResourceStatus, error) {
 	sshCAID, err := regionids.ParseSSHCertificateAuthorityID(id)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
-	resp, err := client.Region.GetApiV2SshcertificateauthoritiesSshCertificateAuthorityID(ctx, sshCAID)
+	resp, err := client.Region.GetApiV2SshcertificateauthoritiesSshCertificateAuthorityID(
+		ctx,
+		regionapi.SshCertificateAuthorityIDParameter(sshCAID),
+	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 	defer resp.Body.Close()
 
 	sshCA, err := nscale.ReadJSONResponsePointer[regionapi.SshCertificateAuthorityV2Read](resp)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return sshCA, &sshCA.Metadata, nil
+	return sshCA, nscale.NewResourceStatus(
+		sshCA.Metadata.Id,
+		sshCA.Metadata.Name,
+		string(sshCA.Metadata.ProvisioningStatus),
+		sshCA.Metadata.Tags,
+	), nil
 }

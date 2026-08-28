@@ -24,7 +24,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
@@ -299,7 +298,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 	ctx context.Context,
 	organizationID string,
 ) (regionapi.StorageV2Create, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Create{}, diagnostics
 	}
@@ -322,7 +321,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 	}
 
 	var fileStorage regionapi.StorageV2Create
-	fileStorage.Metadata = coreapi.ResourceWriteMetadata{
+	fileStorage.Metadata = regionapi.ResourceMetadata{
 		Description: m.Description.ValueStringPointer(),
 		Name:        m.Name.ValueString(),
 		Tags:        tags,
@@ -334,7 +333,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 	fileStorage.Spec.SnapshotPolicies = snapshotPolicies
 	fileStorage.Spec.OrganizationId = organizationID
 	fileStorage.Spec.ProjectId = m.ProjectID.ValueString()
-	fileStorage.Spec.RegionId = regionID
+	fileStorage.Spec.RegionId = regionapi.RegionId(regionID)
 	fileStorage.Spec.SizeGiB = m.Capacity.ValueInt64()
 	fileStorage.Spec.StorageClassId = m.StorageClassID.ValueString()
 	fileStorage.Spec.StorageType = regionapi.StorageTypeV2Spec{
@@ -349,7 +348,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 func (m *FileStorageModel) NscaleFileStorageUpdateParams(
 	ctx context.Context,
 ) (regionapi.StorageV2Update, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Update{}, diagnostics
 	}
@@ -367,7 +366,7 @@ func (m *FileStorageModel) NscaleFileStorageUpdateParams(
 	}
 
 	fileStorage := regionapi.StorageV2Update{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
 			Tags:        tags,

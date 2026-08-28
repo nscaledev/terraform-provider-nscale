@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
 )
 
@@ -32,13 +31,13 @@ func TestNewGroupModelFull(t *testing.T) {
 	creationTime := time.Date(2026, time.May, 29, 12, 0, 0, 0, time.UTC)
 
 	source := &identityapi.GroupRead{
-		Metadata: coreapi.OrganizationScopedResourceReadMetadata{
+		Metadata: identityapi.OrganizationScopedResourceReadMetadata{
 			Id:                 "group-1",
 			Name:               "engineers",
 			Description:        new("engineering staff"),
 			OrganizationId:     "org-1",
 			CreationTime:       creationTime,
-			ProvisioningStatus: coreapi.ResourceProvisioningStatusProvisioned,
+			ProvisioningStatus: identityapi.ResourceProvisioningStatusProvisioned,
 		},
 		Spec: identityapi.GroupSpec{
 			RoleIDs:           []string{"role-a"},
@@ -78,12 +77,12 @@ func TestNewGroupModelNilOptionalFields(t *testing.T) {
 	creationTime := time.Date(2026, time.May, 29, 12, 0, 0, 0, time.UTC)
 
 	source := &identityapi.GroupRead{
-		Metadata: coreapi.OrganizationScopedResourceReadMetadata{
+		Metadata: identityapi.OrganizationScopedResourceReadMetadata{
 			Id:                 "group-2",
 			Name:               "minimal",
 			OrganizationId:     "org-1",
 			CreationTime:       creationTime,
-			ProvisioningStatus: coreapi.ResourceProvisioningStatusProvisioned,
+			ProvisioningStatus: identityapi.ResourceProvisioningStatusProvisioned,
 		},
 		Spec: identityapi.GroupSpec{
 			RoleIDs:           []string{"role-a"},

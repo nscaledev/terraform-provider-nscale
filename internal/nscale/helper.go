@@ -28,13 +28,29 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 )
 
 const (
 	TerraformOperationTagPrefix = "terraform.nscale.com/"
 	defaultStateWatcherTimeout  = 30 * time.Minute
+	provisioningStatusError     = "error"
+	provisioningStatusPending   = "pending"
+	provisioningStatusReady     = "provisioned"
+	provisioningStatusCreating  = "provisioning"
+	provisioningStatusUnknown   = "unknown"
 )
+
+type tag interface {
+	~struct {
+		Name  string `json:"name"`
+		Value string `json:"value"`
+	}
+}
+
+type tagValue struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
 
 type StateReaderFunc func(ctx context.Context, target any) diag.Diagnostics
 
@@ -88,7 +104,7 @@ func addProvisioningErrorDiagnostic(
 	found bool,
 	detail string,
 ) bool {
-	if !found || status.ProvisioningStatus != coreapi.ResourceProvisioningStatusError {
+	if !found || status.ProvisioningStatus != provisioningStatusError {
 		return false
 	}
 
@@ -123,20 +139,20 @@ func (w *CreateStateWatcher[T]) Wait(
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
 		Pending: []string{
-			string(coreapi.ResourceProvisioningStatusProvisioning),
-			string(coreapi.ResourceProvisioningStatusPending),
-			string(coreapi.ResourceProvisioningStatusUnknown),
+			provisioningStatusCreating,
+			provisioningStatusPending,
+			provisioningStatusUnknown,
 		},
 		Target: []string{
-			string(coreapi.ResourceProvisioningStatusProvisioned),
-			string(coreapi.ResourceProvisioningStatusError),
+			provisioningStatusReady,
+			provisioningStatusError,
 		},
 		Refresh: func() (any, string, error) {
 			result, status, err := w.GetFunc(ctx)
 			if err != nil {
 				if e, ok := AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 					// FIXME: Temporary workaround for resources that might not yet be visible in the cache-backed client. Should be revisited once API consistency is guaranteed.
-					return nil, string(coreapi.ResourceProvisioningStatusUnknown), nil
+					return nil, provisioningStatusUnknown, nil
 				}
 				return nil, "", err
 			}
@@ -213,29 +229,29 @@ func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resou
 	return result, true
 }
 
-func WriteOperationTag(metadata *coreapi.ResourceWriteMetadata) string {
+func WriteOperationTag[T tag](tags **[]T) string {
 	operationKey := TerraformOperationTagPrefix + uuid.NewString()
 
-	if metadata.Tags == nil {
-		var tags []coreapi.Tag
-		metadata.Tags = &tags
+	if *tags == nil {
+		values := []T{}
+		*tags = &values
 	}
 
-	*metadata.Tags = append(*metadata.Tags, coreapi.Tag{
+	**tags = append(**tags, T(tagValue{
 		Name:  operationKey,
 		Value: time.Now().Format(time.RFC3339),
-	})
+	}))
 
 	return operationKey
 }
 
-func HasOperationTag(tags *[]coreapi.Tag, operationTag string) bool {
+func HasOperationTag[T tag](tags *[]T, operationTag string) bool {
 	if tags == nil {
 		return false
 	}
 
 	for _, tag := range *tags {
-		if tag.Name == operationTag {
+		if tagValue(tag).Name == operationTag {
 			return true
 		}
 	}
@@ -243,7 +259,7 @@ func HasOperationTag(tags *[]coreapi.Tag, operationTag string) bool {
 	return false
 }
 
-func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
+func RemoveOperationTags[T tag](tags *[]T) *[]T {
 	if tags == nil {
 		return nil
 	}
@@ -253,9 +269,9 @@ func RemoveOperationTags(tags *[]coreapi.Tag) *[]coreapi.Tag {
 	// schema forbids users from setting reserved-prefix tags), otherwise an update
 	// that wrote one produces an "inconsistent result after apply" on the tags
 	// attribute. Strip every operation tag regardless of age.
-	var filtered []coreapi.Tag
+	var filtered []T
 	for _, tag := range *tags {
-		if strings.HasPrefix(tag.Name, TerraformOperationTagPrefix) {
+		if strings.HasPrefix(tagValue(tag).Name, TerraformOperationTagPrefix) {
 			continue
 		}
 		filtered = append(filtered, tag)
@@ -305,7 +321,7 @@ func (w *UpdateStateWatcher[T]) Wait(
 			lastStatus = status
 			haveStatus = true
 
-			if status.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+			if status.ProvisioningStatus == provisioningStatusError {
 				return result, UpdateStateProvisioningError, nil
 			}
 
@@ -378,7 +394,7 @@ func (w *DeleteStateWatcher) Wait(
 			if err == nil {
 				lastStatus = status
 				haveStatus = true
-				if status.ProvisioningStatus == coreapi.ResourceProvisioningStatusError {
+				if status.ProvisioningStatus == provisioningStatusError {
 					return struct{}{}, DeleteStateProvisioningError, nil
 				}
 				return struct{}{}, DeleteStateDeleting, nil

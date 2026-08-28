@@ -207,7 +207,7 @@ func groupCreate(
 
 	createResponse, err := client.Identity.PostApiV1OrganizationsOrganizationIDGroups(
 		ctx,
-		organizationID,
+		identityapi.OrganizationIDParameter(organizationID),
 		params,
 	)
 	if err != nil {
@@ -260,12 +260,12 @@ func groupUpdate(
 
 	// Tag the update so the watcher can confirm the PUT has propagated through
 	// the cache-backed API before reading back a terminal status.
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	operationTagKey := nscale.WriteOperationTag(&params.Metadata.Tags)
 
 	updateResponse, err := client.Identity.PutApiV1OrganizationsOrganizationIDGroupsGroupid(
 		ctx,
-		organizationID,
-		groupID,
+		identityapi.OrganizationIDParameter(organizationID),
+		identityapi.GroupidParameter(groupID),
 		params,
 	)
 	if err != nil {
@@ -302,8 +302,8 @@ func groupDelete(ctx context.Context, client *nscale.Client, id string) error {
 
 	deleteResponse, err := client.Identity.DeleteApiV1OrganizationsOrganizationIDGroupsGroupid(
 		ctx,
-		organizationID,
-		groupID,
+		identityapi.OrganizationIDParameter(organizationID),
+		identityapi.GroupidParameter(groupID),
 	)
 	if err != nil {
 		return err

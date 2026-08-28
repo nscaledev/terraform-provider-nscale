@@ -254,7 +254,7 @@ func (r *SecurityGroupResource) Create(
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
 			targetID := securityGroup.Metadata.Id
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, targetID, r.client))
+			return getSecurityGroup(ctx, targetID, r.client)
 		},
 	}
 
@@ -282,7 +282,7 @@ func (r *SecurityGroupResource) Read(
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context, id string) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
+			return getSecurityGroup(ctx, id, r.client)
 		},
 	}
 
@@ -319,11 +319,11 @@ func (r *SecurityGroupResource) Update(
 		return
 	}
 
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	operationTagKey := nscale.WriteOperationTag(&params.Metadata.Tags)
 
 	securityGroupUpdateResponse, err := r.client.Region.PutApiV2SecuritygroupsSecurityGroupID(
 		ctx,
-		securityGroupID,
+		regionapi.SecurityGroupIDParameter(securityGroupID),
 		params,
 	)
 	if err != nil {
@@ -349,7 +349,7 @@ func (r *SecurityGroupResource) Update(
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
+			return getSecurityGroup(ctx, id, r.client)
 		},
 	}
 
@@ -389,7 +389,10 @@ func (r *SecurityGroupResource) Delete(
 	// Retry while the API reports the SG is still in use — typically a parallel
 	// instance update is dropping the reference. See nscale.RetryDelete.
 	err := nscale.RetryDelete(ctx, deleteTimeout, func(ctx context.Context) (error, bool) {
-		deleteResponse, deleteErr := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, securityGroupID)
+		deleteResponse, deleteErr := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(
+			ctx,
+			regionapi.SecurityGroupIDParameter(securityGroupID),
+		)
 		if deleteErr != nil {
 			return deleteErr, false
 		}
@@ -414,7 +417,7 @@ func (r *SecurityGroupResource) Delete(
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
+			return getSecurityGroup(ctx, id, r.client)
 		},
 	}
 

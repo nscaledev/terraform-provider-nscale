@@ -22,10 +22,16 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
+
+type generatedTag struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
 
 const userDataPlaintext = "#cloud-config\nruncmd:\n  - [ echo, hello ]\n"
 
@@ -150,5 +156,29 @@ func TestValueBase64BytesPointerRejectsMalformedInput(t *testing.T) {
 func TestBase64StringValueNil(t *testing.T) {
 	if got := tftypes.Base64StringValue(nil); !got.IsNull() {
 		t.Errorf("Base64StringValue(nil) = %v, want null", got)
+	}
+}
+
+func TestTagMapValueMustAcceptsGeneratedTagShape(t *testing.T) {
+	tags := []generatedTag{{Name: "environment", Value: "test"}}
+
+	got := tftypes.TagMapValueMust(&tags)
+	value, ok := got.Elements()["environment"].(types.String)
+	if !ok || value.ValueString() != "test" {
+		t.Fatalf("TagMapValueMust() = %v, want environment=test", got)
+	}
+}
+
+func TestValueTagListPointerReturnsRequestedTagType(t *testing.T) {
+	tagMap := types.MapValueMust(types.StringType, map[string]attr.Value{
+		"environment": types.StringValue("test"),
+	})
+
+	got, diagnostics := tftypes.ValueTagListPointer[generatedTag](tagMap)
+	if diagnostics.HasError() {
+		t.Fatalf("ValueTagListPointer() diagnostics = %v", diagnostics)
+	}
+	if got == nil || len(*got) != 1 || (*got)[0] != (generatedTag{Name: "environment", Value: "test"}) {
+		t.Fatalf("ValueTagListPointer() = %v, want environment=test", got)
 	}
 }
