@@ -179,6 +179,12 @@
         "nscale_file_storage": {
           "block": {
             "attributes": {
+              "atime_update_interval_seconds": {
+                "computed": true,
+                "description": "The effective interval in seconds after which a read updates an older atime value. Zero disables read-driven atime updates.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
               "capacity": {
                 "computed": true,
                 "description": "The total capacity of the file storage, in gibibytes.",
@@ -214,6 +220,12 @@
                 "description": "The name of the file storage.",
                 "description_kind": "markdown",
                 "type": "string"
+              },
+              "posix_acl": {
+                "computed": true,
+                "description": "Whether extended POSIX ACL support is enabled for the file storage.",
+                "description_kind": "markdown",
+                "type": "bool"
               },
               "project_id": {
                 "computed": true,
@@ -1853,6 +1865,13 @@
         "nscale_file_storage": {
           "block": {
             "attributes": {
+              "atime_update_interval_seconds": {
+                "computed": true,
+                "description": "Set to 0 to disable read-driven atime updates. A positive value updates atime during a read only when the existing atime is older than this number of seconds. Maximum: 86,399,999,999,999 seconds. When unconfigured, Terraform adopts the effective value and preserves it during updates.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "number"
+              },
               "capacity": {
                 "description": "The total capacity requested for the file storage, in gibibytes.",
                 "description_kind": "markdown",
@@ -1889,6 +1908,13 @@
                 "description_kind": "markdown",
                 "required": true,
                 "type": "string"
+              },
+              "posix_acl": {
+                "computed": true,
+                "description": "Whether extended POSIX ACL support is enabled. Enabling POSIX ACLs may reduce metadata performance. Extended POSIX ACLs must be managed over NFSv3. Disabling this option does not remove existing ACLs; they may remain enforced. When unconfigured, Terraform adopts the effective value and preserves it during updates.",
+                "description_kind": "markdown",
+                "optional": true,
+                "type": "bool"
               },
               "project_id": {
                 "computed": true,

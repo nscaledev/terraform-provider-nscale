@@ -184,6 +184,226 @@ func TestNewFileStorageModelMapsDefaultSnapshotProtectionEnabled(t *testing.T) {
 	}
 }
 
+func TestNewFileStorageModelMapsNFSPolicySettings(t *testing.T) {
+	tests := []struct {
+		name      string
+		nfs       *regionapi.NFSV2Spec
+		wantPOSIX types.Bool
+		wantAtime types.Int64
+	}{
+		{
+			name:      "absent NFS maps to null",
+			wantPOSIX: types.BoolNull(),
+			wantAtime: types.Int64Null(),
+		},
+		{
+			name:      "absent settings map to null",
+			nfs:       &regionapi.NFSV2Spec{},
+			wantPOSIX: types.BoolNull(),
+			wantAtime: types.Int64Null(),
+		},
+		{
+			name: "explicit disabled values remain known",
+			nfs: &regionapi.NFSV2Spec{
+				PosixAcl:                   new(false),
+				AtimeUpdateIntervalSeconds: new(int64(0)),
+			},
+			wantPOSIX: types.BoolValue(false),
+			wantAtime: types.Int64Value(0),
+		},
+		{
+			name: "explicit enabled values remain known",
+			nfs: &regionapi.NFSV2Spec{
+				PosixAcl:                   new(true),
+				AtimeUpdateIntervalSeconds: new(int64(600)),
+			},
+			wantPOSIX: types.BoolValue(true),
+			wantAtime: types.Int64Value(600),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var source regionapi.StorageV2Read
+			source.Spec.StorageType.NFS = tt.nfs
+
+			model := NewFileStorageModel(&source)
+
+			if !model.PosixACL.Equal(tt.wantPOSIX) {
+				t.Fatalf("PosixACL = %s, want %s", model.PosixACL, tt.wantPOSIX)
+			}
+			if !model.AtimeUpdateIntervalSeconds.Equal(tt.wantAtime) {
+				t.Fatalf(
+					"AtimeUpdateIntervalSeconds = %s, want %s",
+					model.AtimeUpdateIntervalSeconds,
+					tt.wantAtime,
+				)
+			}
+		})
+	}
+}
+
+func TestNscaleFileStorageCreateParamsNFSPolicySettings(t *testing.T) {
+	tests := []struct {
+		name      string
+		posixACL  types.Bool
+		atime     types.Int64
+		wantPOSIX *bool
+		wantAtime *int64
+	}{
+		{
+			name:     "unconfigured delegates to Region defaults",
+			posixACL: types.BoolNull(),
+			atime:    types.Int64Null(),
+		},
+		{
+			name:      "explicit disabled values are preserved",
+			posixACL:  types.BoolValue(false),
+			atime:     types.Int64Value(0),
+			wantPOSIX: new(false),
+			wantAtime: new(int64(0)),
+		},
+		{
+			name:      "explicit enabled values are preserved",
+			posixACL:  types.BoolValue(true),
+			atime:     types.Int64Value(600),
+			wantPOSIX: new(true),
+			wantAtime: new(int64(600)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := FileStorageModel{
+				Name:                       types.StringValue("fs"),
+				RegionID:                   types.StringValue(testRegionID),
+				Capacity:                   types.Int64Value(20),
+				StorageClassID:             types.StringValue("class"),
+				RootSquash:                 types.BoolValue(true),
+				PosixACL:                   tt.posixACL,
+				AtimeUpdateIntervalSeconds: tt.atime,
+				Network:                    types.ListNull(FileStorageNetworkModelAttributeType),
+			}
+
+			params, diagnostics := model.NscaleFileStorageCreateParams(context.Background(), "org")
+			if diagnostics.HasError() {
+				t.Fatalf("unexpected diagnostics: %v", diagnostics)
+			}
+
+			assertBoolPointer(t, "posixAcl", params.Spec.StorageType.NFS.PosixAcl, tt.wantPOSIX)
+			assertInt64Pointer(
+				t,
+				"atimeUpdateIntervalSeconds",
+				params.Spec.StorageType.NFS.AtimeUpdateIntervalSeconds,
+				tt.wantAtime,
+			)
+		})
+	}
+}
+
+func TestNscaleFileStorageUpdateParamsNFSPolicySettings(t *testing.T) {
+	model := FileStorageModel{
+		Name:                       types.StringValue("fs"),
+		Capacity:                   types.Int64Value(20),
+		RootSquash:                 types.BoolValue(true),
+		PosixACL:                   types.BoolValue(false),
+		AtimeUpdateIntervalSeconds: types.Int64Value(600),
+		Network:                    types.ListNull(FileStorageNetworkModelAttributeType),
+	}
+
+	params, diagnostics := model.NscaleFileStorageUpdateParams(context.Background())
+	if diagnostics.HasError() {
+		t.Fatalf("unexpected diagnostics: %v", diagnostics)
+	}
+
+	assertBoolPointer(t, "posixAcl", params.Spec.StorageType.NFS.PosixAcl, new(false))
+	assertInt64Pointer(
+		t,
+		"atimeUpdateIntervalSeconds",
+		params.Spec.StorageType.NFS.AtimeUpdateIntervalSeconds,
+		new(int64(600)),
+	)
+}
+
+func TestNscaleFileStorageUpdateParamsRejectsUnavailableNFSPolicySettings(t *testing.T) {
+	tests := []struct {
+		name     string
+		posixACL types.Bool
+		atime    types.Int64
+	}{
+		{
+			name:     "null POSIX ACL",
+			posixACL: types.BoolNull(),
+			atime:    types.Int64Value(0),
+		},
+		{
+			name:     "unknown POSIX ACL",
+			posixACL: types.BoolUnknown(),
+			atime:    types.Int64Value(0),
+		},
+		{
+			name:     "null atime",
+			posixACL: types.BoolValue(false),
+			atime:    types.Int64Null(),
+		},
+		{
+			name:     "unknown atime",
+			posixACL: types.BoolValue(false),
+			atime:    types.Int64Unknown(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			model := FileStorageModel{
+				Name:                       types.StringValue("fs"),
+				Capacity:                   types.Int64Value(20),
+				RootSquash:                 types.BoolValue(true),
+				PosixACL:                   tt.posixACL,
+				AtimeUpdateIntervalSeconds: tt.atime,
+				Network:                    types.ListNull(FileStorageNetworkModelAttributeType),
+			}
+
+			_, diagnostics := model.NscaleFileStorageUpdateParams(context.Background())
+			if !diagnostics.HasError() {
+				t.Fatal("HasError() = false, want true for an unavailable effective NFS setting")
+			}
+		})
+	}
+}
+
+func assertBoolPointer(t *testing.T, name string, got, want *bool) {
+	t.Helper()
+
+	if got == nil || want == nil {
+		if got != want {
+			t.Fatalf("%s = %v, want %v", name, got, want)
+		}
+
+		return
+	}
+
+	if *got != *want {
+		t.Fatalf("%s = %t, want %t", name, *got, *want)
+	}
+}
+
+func assertInt64Pointer(t *testing.T, name string, got, want *int64) {
+	t.Helper()
+
+	if got == nil || want == nil {
+		if got != want {
+			t.Fatalf("%s = %v, want %v", name, got, want)
+		}
+
+		return
+	}
+
+	if *got != *want {
+		t.Fatalf("%s = %d, want %d", name, *got, *want)
+	}
+}
+
 // Create must send the API default behavior (omit the field) when Default
 // Snapshot Protection is not explicitly configured, and send the explicit
 // value otherwise. CRUD populates the model field from configuration, where an
@@ -410,11 +630,13 @@ func TestNscaleFileStorageCreateParamsMarshalsSingleCustomPolicy(t *testing.T) {
 func TestNscaleFileStorageUpdateParamsSnapshotPolicyOrderIsDeterministic(t *testing.T) {
 	makeModel := func(policies types.Set) FileStorageModel {
 		return FileStorageModel{
-			Name:             types.StringValue("fs"),
-			Capacity:         types.Int64Value(20),
-			RootSquash:       types.BoolValue(true),
-			Network:          types.ListNull(FileStorageNetworkModelAttributeType),
-			SnapshotPolicies: policies,
+			Name:                       types.StringValue("fs"),
+			Capacity:                   types.Int64Value(20),
+			RootSquash:                 types.BoolValue(true),
+			PosixACL:                   types.BoolValue(false),
+			AtimeUpdateIntervalSeconds: types.Int64Value(0),
+			Network:                    types.ListNull(FileStorageNetworkModelAttributeType),
+			SnapshotPolicies:           policies,
 		}
 	}
 
@@ -476,6 +698,8 @@ func TestNscaleFileStorageUpdateParamsDefaultSnapshotProtectionEnabled(t *testin
 				Name:                             types.StringValue("fs"),
 				Capacity:                         types.Int64Value(20),
 				RootSquash:                       types.BoolValue(true),
+				PosixACL:                         types.BoolValue(false),
+				AtimeUpdateIntervalSeconds:       types.Int64Value(0),
 				Network:                          types.ListNull(FileStorageNetworkModelAttributeType),
 				DefaultSnapshotProtectionEnabled: tt.configured,
 			}
@@ -520,11 +744,13 @@ func TestNscaleFileStorageUpdateParamsSnapshotPolicies(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			model := FileStorageModel{
-				Name:             types.StringValue("fs"),
-				Capacity:         types.Int64Value(20),
-				RootSquash:       types.BoolValue(true),
-				Network:          types.ListNull(FileStorageNetworkModelAttributeType),
-				SnapshotPolicies: tt.policies,
+				Name:                       types.StringValue("fs"),
+				Capacity:                   types.Int64Value(20),
+				RootSquash:                 types.BoolValue(true),
+				PosixACL:                   types.BoolValue(false),
+				AtimeUpdateIntervalSeconds: types.Int64Value(0),
+				Network:                    types.ListNull(FileStorageNetworkModelAttributeType),
+				SnapshotPolicies:           tt.policies,
 			}
 
 			params, diagnostics := model.NscaleFileStorageUpdateParams(context.Background())

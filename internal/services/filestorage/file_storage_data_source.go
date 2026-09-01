@@ -89,6 +89,14 @@ func (s *FileStorageDataSource) Schema(
 				MarkdownDescription: "Indicates whether root squashing is enabled for the file storage.",
 				Computed:            true,
 			},
+			"posix_acl": schema.BoolAttribute{
+				MarkdownDescription: "Whether extended POSIX ACL support is enabled for the file storage.",
+				Computed:            true,
+			},
+			"atime_update_interval_seconds": schema.Int64Attribute{
+				MarkdownDescription: "The effective interval in seconds after which a read updates an older atime value. Zero disables read-driven atime updates.",
+				Computed:            true,
+			},
 			"default_snapshot_protection_enabled": schema.BoolAttribute{
 				MarkdownDescription: "Whether platform-managed Default Snapshot Protection is enabled for the file storage. " +
 					"This is separate from any user-managed snapshot policies.",

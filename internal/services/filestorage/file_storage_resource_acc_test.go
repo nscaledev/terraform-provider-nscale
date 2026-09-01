@@ -40,6 +40,10 @@ func TestAccFileStorageResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("nscale_file_storage.test", "storage_class_id", storageClassID),
 					resource.TestCheckResourceAttr("nscale_file_storage.test", "capacity", "20"),
 					resource.TestCheckResourceAttr("nscale_file_storage.test", "root_squash", "true"),
+					resource.TestCheckResourceAttr("nscale_file_storage.test", "posix_acl", "false"),
+					resource.TestCheckResourceAttr(
+						"nscale_file_storage.test", "atime_update_interval_seconds", "0",
+					),
 					// Omitted: Terraform reads back the resolved platform default.
 					resource.TestCheckResourceAttrSet(
 						"nscale_file_storage.test", "default_snapshot_protection_enabled",
@@ -63,6 +67,80 @@ func TestAccFileStorageResource_basic(t *testing.T) {
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("nscale_file_storage.test", "description", "Updated file storage"),
+				),
+			},
+			{
+				ResourceName:            "nscale_file_storage.test",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"timeouts", "refresh_usage"},
+			},
+		},
+	})
+}
+
+func TestAccFileStorageResource_nfsPolicySettings(t *testing.T) {
+	storageClassID := os.Getenv("NSCALE_TEST_FILE_STORAGE_CLASS_ID")
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccFileStorageResourceConfigNFSPolicy(
+					storageClassID,
+					"",
+					"posix_acl = true\natime_update_interval_seconds = 600",
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("nscale_file_storage.test", "posix_acl", "true"),
+					resource.TestCheckResourceAttr(
+						"nscale_file_storage.test", "atime_update_interval_seconds", "600",
+					),
+				),
+			},
+			{
+				Config:             testAccFileStorageResourceConfigNFSPolicy(storageClassID, "", ""),
+				PlanOnly:           true,
+				ExpectNonEmptyPlan: false,
+			},
+			{
+				Config: testAccFileStorageResourceConfigNFSPolicy(
+					storageClassID,
+					"Updated without configuring NFS policy settings",
+					"",
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("nscale_file_storage.test", "posix_acl", "true"),
+					resource.TestCheckResourceAttr(
+						"nscale_file_storage.test", "atime_update_interval_seconds", "600",
+					),
+				),
+			},
+			{
+				Config: testAccFileStorageResourceConfigNFSPolicy(
+					storageClassID,
+					"Updated without configuring NFS policy settings",
+					"posix_acl = false",
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("nscale_file_storage.test", "posix_acl", "false"),
+					resource.TestCheckResourceAttr(
+						"nscale_file_storage.test", "atime_update_interval_seconds", "600",
+					),
+				),
+			},
+			{
+				Config: testAccFileStorageResourceConfigNFSPolicy(
+					storageClassID,
+					"Updated without configuring NFS policy settings",
+					"atime_update_interval_seconds = 0",
+				),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("nscale_file_storage.test", "posix_acl", "false"),
+					resource.TestCheckResourceAttr(
+						"nscale_file_storage.test", "atime_update_interval_seconds", "0",
+					),
 				),
 			},
 			{
@@ -545,6 +623,30 @@ resource "nscale_file_storage" "test" {
   }
 }
 `, name, storageClassID)
+}
+
+func testAccFileStorageResourceConfigNFSPolicy(storageClassID, description, settings string) string {
+	name := "tf-acc-file-storage-nfs-policy"
+
+	return fmt.Sprintf(`
+resource "nscale_network" "test" {
+  name       = "%[1]s-net"
+  cidr_block = "192.168.242.0/24"
+}
+
+resource "nscale_file_storage" "test" {
+  name             = %[1]q
+  description      = %[3]q
+  storage_class_id = %[2]q
+  capacity         = 20
+  root_squash      = true
+  %[4]s
+
+  network {
+    id = nscale_network.test.id
+  }
+}
+`, name, storageClassID, description, settings)
 }
 
 func testAccFileStorageResourceConfigUpdated(name, storageClassID, description string) string {

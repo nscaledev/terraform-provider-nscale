@@ -32,18 +32,20 @@ import (
 )
 
 type FileStorageModel struct {
-	ID             types.String `tfsdk:"id"`
-	Name           types.String `tfsdk:"name"`
-	Description    types.String `tfsdk:"description"`
-	StorageClassID types.String `tfsdk:"storage_class_id"`
-	Size           types.Int64  `tfsdk:"size"`
-	Capacity       types.Int64  `tfsdk:"capacity"`
-	RootSquash     types.Bool   `tfsdk:"root_squash"`
-	Network        types.List   `tfsdk:"network"`
-	Tags           types.Map    `tfsdk:"tags"`
-	ProjectID      types.String `tfsdk:"project_id"`
-	RegionID       types.String `tfsdk:"region_id"`
-	CreationTime   types.String `tfsdk:"creation_time"`
+	ID                         types.String `tfsdk:"id"`
+	Name                       types.String `tfsdk:"name"`
+	Description                types.String `tfsdk:"description"`
+	StorageClassID             types.String `tfsdk:"storage_class_id"`
+	Size                       types.Int64  `tfsdk:"size"`
+	Capacity                   types.Int64  `tfsdk:"capacity"`
+	RootSquash                 types.Bool   `tfsdk:"root_squash"`
+	PosixACL                   types.Bool   `tfsdk:"posix_acl"`
+	AtimeUpdateIntervalSeconds types.Int64  `tfsdk:"atime_update_interval_seconds"`
+	Network                    types.List   `tfsdk:"network"`
+	Tags                       types.Map    `tfsdk:"tags"`
+	ProjectID                  types.String `tfsdk:"project_id"`
+	RegionID                   types.String `tfsdk:"region_id"`
+	CreationTime               types.String `tfsdk:"creation_time"`
 
 	// DefaultSnapshotProtectionEnabled mirrors the API-resolved platform-managed
 	// Default Snapshot Protection setting. It is separate from any user-managed
@@ -171,8 +173,14 @@ func NewFileStorageModel(source *regionapi.StorageV2Read) FileStorageModel {
 	}
 
 	rootSquash := types.BoolNull()
+	posixACL := types.BoolNull()
+	atimeUpdateIntervalSeconds := types.Int64Null()
 	if source.Spec.StorageType.NFS != nil {
 		rootSquash = types.BoolValue(source.Spec.StorageType.NFS.RootSquash)
+		posixACL = types.BoolPointerValue(source.Spec.StorageType.NFS.PosixAcl)
+		atimeUpdateIntervalSeconds = types.Int64PointerValue(
+			source.Spec.StorageType.NFS.AtimeUpdateIntervalSeconds,
+		)
 	}
 
 	networks := types.ListNull(FileStorageNetworkModelAttributeType)
@@ -183,18 +191,20 @@ func NewFileStorageModel(source *regionapi.StorageV2Read) FileStorageModel {
 	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
 
 	return FileStorageModel{
-		ID:             types.StringValue(source.Metadata.Id),
-		Name:           types.StringValue(source.Metadata.Name),
-		Description:    types.StringPointerValue(source.Metadata.Description),
-		StorageClassID: types.StringValue(source.Status.StorageClassId),
-		Size:           size,
-		Capacity:       types.Int64Value(source.Spec.SizeGiB),
-		RootSquash:     rootSquash,
-		Network:        networks,
-		Tags:           tftypes.TagMapValueMust(tags),
-		ProjectID:      types.StringValue(source.Metadata.ProjectId),
-		RegionID:       types.StringValue(source.Status.RegionId),
-		CreationTime:   types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
+		ID:                         types.StringValue(source.Metadata.Id),
+		Name:                       types.StringValue(source.Metadata.Name),
+		Description:                types.StringPointerValue(source.Metadata.Description),
+		StorageClassID:             types.StringValue(source.Status.StorageClassId),
+		Size:                       size,
+		Capacity:                   types.Int64Value(source.Spec.SizeGiB),
+		RootSquash:                 rootSquash,
+		PosixACL:                   posixACL,
+		AtimeUpdateIntervalSeconds: atimeUpdateIntervalSeconds,
+		Network:                    networks,
+		Tags:                       tftypes.TagMapValueMust(tags),
+		ProjectID:                  types.StringValue(source.Metadata.ProjectId),
+		RegionID:                   types.StringValue(source.Status.RegionId),
+		CreationTime:               types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
 
 		DefaultSnapshotProtectionEnabled: types.BoolPointerValue(source.Spec.DefaultSnapshotProtectionEnabled),
 		SnapshotPolicies:                 NewFileStorageSnapshotPolicies(source.Spec.SnapshotPolicies),
@@ -265,8 +275,11 @@ func (r FileStorageSnapshotRetentionModel) toAPI() regionapi.StorageSnapshotRete
 	}
 }
 
-// bytesToGiBShift converts a byte count to whole gibibytes (1 GiB = 2^30 bytes).
-const bytesToGiBShift = 30
+const (
+	// bytesToGiBShift converts a byte count to whole gibibytes (1 GiB = 2^30 bytes).
+	bytesToGiBShift                     = 30
+	maxAtimeUpdateIntervalSeconds int64 = 86_399_999_999_999
+)
 
 // defaultSnapshotProtectionPointer maps the configured Default Snapshot
 // Protection value to the API request field. A null or unknown value means the
@@ -338,7 +351,9 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 	fileStorage.Spec.StorageClassId = m.StorageClassID.ValueString()
 	fileStorage.Spec.StorageType = regionapi.StorageTypeV2Spec{
 		NFS: &regionapi.NFSV2Spec{
-			RootSquash: m.RootSquash.ValueBool(),
+			RootSquash:                 m.RootSquash.ValueBool(),
+			PosixAcl:                   optionalBoolPointer(m.PosixACL),
+			AtimeUpdateIntervalSeconds: optionalInt64Pointer(m.AtimeUpdateIntervalSeconds),
 		},
 	}
 
@@ -365,6 +380,22 @@ func (m *FileStorageModel) NscaleFileStorageUpdateParams(
 		return regionapi.StorageV2Update{}, diagnostics
 	}
 
+	if m.PosixACL.IsNull() || m.PosixACL.IsUnknown() {
+		diagnostics.AddError(
+			"Unable to Preserve POSIX ACL Setting",
+			"The effective POSIX ACL setting is unavailable, so updating the file storage could reset it. Refresh the resource against a Region API that returns the setting, or configure posix_acl explicitly.",
+		)
+	}
+	if m.AtimeUpdateIntervalSeconds.IsNull() || m.AtimeUpdateIntervalSeconds.IsUnknown() {
+		diagnostics.AddError(
+			"Unable to Preserve Atime Setting",
+			"The effective atime update interval is unavailable, so updating the file storage could reset it. Refresh the resource against a Region API that returns the setting, or configure atime_update_interval_seconds explicitly.",
+		)
+	}
+	if diagnostics.HasError() {
+		return regionapi.StorageV2Update{}, diagnostics
+	}
+
 	fileStorage := regionapi.StorageV2Update{
 		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
@@ -380,13 +411,31 @@ func (m *FileStorageModel) NscaleFileStorageUpdateParams(
 			SizeGiB:                          m.Capacity.ValueInt64(),
 			StorageType: regionapi.StorageTypeV2Spec{
 				NFS: &regionapi.NFSV2Spec{
-					RootSquash: m.RootSquash.ValueBool(),
+					RootSquash:                 m.RootSquash.ValueBool(),
+					PosixAcl:                   m.PosixACL.ValueBoolPointer(),
+					AtimeUpdateIntervalSeconds: m.AtimeUpdateIntervalSeconds.ValueInt64Pointer(),
 				},
 			},
 		},
 	}
 
 	return fileStorage, nil
+}
+
+func optionalBoolPointer(value types.Bool) *bool {
+	if value.IsNull() || value.IsUnknown() {
+		return nil
+	}
+
+	return value.ValueBoolPointer()
+}
+
+func optionalInt64Pointer(value types.Int64) *int64 {
+	if value.IsNull() || value.IsUnknown() {
+		return nil
+	}
+
+	return value.ValueInt64Pointer()
 }
 
 var FileStorageNetworkModelAttributeType = types.ObjectType{

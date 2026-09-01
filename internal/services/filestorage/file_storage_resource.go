@@ -22,12 +22,15 @@ import (
 	"net/http"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -150,6 +153,29 @@ func (r *FileStorageResource) Schema(
 			"root_squash": schema.BoolAttribute{
 				MarkdownDescription: "Whether root squashing is applied to the file storage to restrict root access for clients.",
 				Required:            true,
+			},
+			"posix_acl": schema.BoolAttribute{
+				MarkdownDescription: "Whether extended POSIX ACL support is enabled. Enabling POSIX ACLs may reduce metadata performance. " +
+					"Extended POSIX ACLs must be managed over NFSv3. Disabling this option does not remove existing ACLs; they may remain enforced. " +
+					"When unconfigured, Terraform adopts the effective value and preserves it during updates.",
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"atime_update_interval_seconds": schema.Int64Attribute{
+				MarkdownDescription: "Set to 0 to disable read-driven atime updates. A positive value updates atime during a read " +
+					"only when the existing atime is older than this number of seconds. Maximum: 86,399,999,999,999 seconds. " +
+					"When unconfigured, Terraform adopts the effective value and preserves it during updates.",
+				Optional: true,
+				Computed: true,
+				Validators: []validator.Int64{
+					int64validator.Between(0, maxAtimeUpdateIntervalSeconds),
+				},
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"default_snapshot_protection_enabled": schema.BoolAttribute{
 				MarkdownDescription: "Whether platform-managed Default Snapshot Protection is enabled for the file storage. " +

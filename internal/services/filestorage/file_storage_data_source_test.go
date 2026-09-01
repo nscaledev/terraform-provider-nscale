@@ -43,6 +43,10 @@ func TestAccFileStorageDataSource_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("data.nscale_file_storage.test", "storage_class_id", storageClassID),
 					resource.TestCheckResourceAttr("data.nscale_file_storage.test", "capacity", "20"),
 					resource.TestCheckResourceAttr("data.nscale_file_storage.test", "root_squash", "true"),
+					resource.TestCheckResourceAttr("data.nscale_file_storage.test", "posix_acl", "false"),
+					resource.TestCheckResourceAttr(
+						"data.nscale_file_storage.test", "atime_update_interval_seconds", "0",
+					),
 					resource.TestCheckResourceAttrSet(
 						"data.nscale_file_storage.test", "default_snapshot_protection_enabled",
 					),
@@ -73,6 +77,10 @@ func TestAccFileStorageDataSource_customSnapshotPolicy(t *testing.T) {
 					"tf-acc-file-storage-ds-policy", storageClassID,
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.nscale_file_storage.test", "posix_acl", "true"),
+					resource.TestCheckResourceAttr(
+						"data.nscale_file_storage.test", "atime_update_interval_seconds", "600",
+					),
 					resource.TestCheckResourceAttr("data.nscale_file_storage.test", "snapshot_policies.#", "1"),
 					resource.TestCheckTypeSetElemNestedAttrs(
 						"data.nscale_file_storage.test", "snapshot_policies.*", map[string]string{
@@ -100,6 +108,8 @@ resource "nscale_file_storage" "test" {
   storage_class_id = %[2]q
   capacity         = 20
   root_squash      = true
+  posix_acl        = true
+  atime_update_interval_seconds = 600
 
   snapshot_policies = [
     {
