@@ -49,4 +49,21 @@ testacc-env:
 	@test -f .env || { echo ".env not found — copy a teammate's or pull from your secret store"; exit 1; }
 	@set -a; . ./.env; set +a; $(MAKE) testacc
 
-.PHONY: fmt lint test schema-check schema-update testacc testacc-env build install generate
+# testacc-profile runs the suite against one gitignored terraform.<profile>.tfvars.
+#
+# Profiles exist because no single region can satisfy every test: `staging` uses
+# no-glo1, the only region with both storage classes, and `staging-reservation`
+# uses stgstack, the only one with usable reservation capacity. A profile omits
+# the fixtures its region cannot provide, so those tests skip rather than fail.
+#
+#   make testacc-profile PROFILE=staging
+#   make testacc-profile PROFILE=staging-reservation
+#   make testacc-profile PROFILE=staging PKG=./internal/services/reservation/
+testacc-profile:
+	@test -n "$(PROFILE)" || { echo "PROFILE is required, e.g. make testacc-profile PROFILE=staging"; exit 1; }
+	@test -f terraform.$(PROFILE).tfvars || { echo "terraform.$(PROFILE).tfvars not found — pull it from 1Password"; exit 1; }
+	@eval "$$(./scripts/tfvars-to-env.sh terraform.$(PROFILE).tfvars)"; \
+		test -n "$$NSCALE_SERVICE_TOKEN" || { echo "service_token is empty in terraform.$(PROFILE).tfvars"; exit 1; }; \
+		go test -v -cover -p 1 -timeout 120m $(or $(PKG),./...)
+
+.PHONY: fmt lint test schema-check schema-update testacc testacc-env testacc-profile build install generate
