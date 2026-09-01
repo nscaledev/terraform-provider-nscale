@@ -96,8 +96,12 @@ None.
 
 - **Insufficient capacity (`507`)** on create: "No contiguous set of reservation
   units of the requested size is available in the region." Surface the API error
-  verbatim. Capacity is discoverable via the `reservation-units` list endpoint
-  (a future `nscale_reservation_unit` data source — out of scope this PR).
+  verbatim. Capacity is discoverable via the `nscale_reservation_unit` data
+  source, which reads the **organization-scoped**
+  `GET /api/v2/organizations/{organizationID}/reservation-units`. Do not use the
+  global `/api/v2/reservation-units`: it aggregates across every allocation, so
+  it overstates capacity in regions the org holds and lists regions it holds
+  nothing in.
 - `accelerator` / `unit` are public capacity shapes (e.g. `GB300` / `NVL72`); valid
   combinations are region-specific and enforced server-side (400 otherwise).
 - `count >= 1`.

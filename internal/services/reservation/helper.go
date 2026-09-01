@@ -17,10 +17,44 @@ limitations under the License.
 package reservation
 
 import (
+	"context"
+
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
+
+// listOrganizationReservationUnits reads the reservation units offered to the
+// configured organization, narrowed server-side to one (region, accelerator,
+// unit).
+//
+// Deliberately the organization-scoped endpoint, not the global
+// `/api/v2/reservation-units`: capacity is calculated within the organization's
+// active allocation scope, so the global endpoint both overstates capacity in
+// regions the organization holds and lists regions it holds nothing in.
+func listOrganizationReservationUnits(
+	ctx context.Context,
+	client *nscale.Client,
+	regionID, accelerator, unit string,
+) (reservationapi.ReservationUnitsV2, error) {
+	params := &reservationapi.ListOrganizationReservationUnitsParams{
+		RegionID:    &reservationapi.RegionIDQueryParameter{regionID},
+		Accelerator: &reservationapi.AcceleratorQueryParameter{accelerator},
+		Unit:        &reservationapi.ReservationUnitQueryParameter{unit},
+	}
+
+	unitsResponse, err := client.Reservation.ListOrganizationReservationUnits(
+		ctx,
+		client.OrganizationID,
+		params,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer unitsResponse.Body.Close()
+
+	return nscale.ReadJSONResponseValue[reservationapi.ReservationUnitsV2](unitsResponse)
+}
 
 // statusOf projects a read's metadata onto the ResourceStatus the shared
 // watchers consume.

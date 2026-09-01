@@ -256,6 +256,7 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		identity.NewProjectDataSource,
 		identity.NewGroupDataSource,
 		reservation.NewReservationDataSource,
+		reservation.NewReservationUnitDataSource,
 		reservation.NewPlacementDataSource,
 	}
 }
