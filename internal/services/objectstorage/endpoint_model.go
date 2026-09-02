@@ -25,7 +25,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -231,10 +230,10 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointCreateParams(
 	}
 
 	endpoint := storageapi.ObjectStorageEndpointCreate{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: storageapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[storageapi.Tag](tags),
 		},
 		Spec: struct {
 			IdentityPolicies             *storageapi.ObjectStorageIdentityPolicyList `json:"identityPolicies,omitempty"`
@@ -274,10 +273,10 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointUpdateParams(
 	}
 
 	update := storageapi.ObjectStorageEndpointUpdate{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: storageapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[storageapi.Tag](tags),
 		},
 		Spec: &storageapi.ObjectStorageEndpointUpdateSpec{IdentityPolicies: nil},
 	}

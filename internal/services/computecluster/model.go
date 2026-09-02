@@ -29,6 +29,7 @@ import (
 	computeapi "github.com/unikorn-cloud/compute/pkg/openapi"
 	coreapi "github.com/unikorn-cloud/core/pkg/openapi"
 
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
 
@@ -55,7 +56,7 @@ func NewComputeClusterModel(source *computeapi.ComputeClusterRead) ComputeCluste
 		sshPrivateKey = types.StringPointerValue(source.Status.SshPrivateKey)
 	}
 
-	tags := readTagsToCommon(source.Metadata.Tags)
+	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
 
 	return ComputeClusterModel{
 		ID:                 types.StringValue(source.Metadata.Id),
@@ -76,7 +77,7 @@ func (m *ComputeClusterModel) NscaleComputeCluster() (computeapi.ComputeClusterW
 		return computeapi.ComputeClusterWrite{}, diagnostics
 	}
 
-	legacyTags := writeTagsToLegacy(tags)
+	legacyTags := nscale.TagsToAPI[coreapi.Tag](nscale.RemoveOperationTags(tags))
 
 	var sourceWorkloadPools []WorkloadPoolModel
 	if diagnostics = m.WorkloadPools.ElementsAs(context.TODO(), &sourceWorkloadPools, false); diagnostics.HasError() {

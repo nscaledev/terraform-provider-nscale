@@ -19,9 +19,8 @@ package filestorage
 import (
 	"context"
 
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+	"github.com/google/uuid"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -30,22 +29,27 @@ func getFileStorage(
 	ctx context.Context,
 	id string,
 	client *nscale.Client,
-) (*regionapi.StorageV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	fileStorageID, err := regionids.ParseFileStorageID(id)
+) (*regionapi.StorageV2Read, nscale.ResourceStatus, error) {
+	fileStorageID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
 	fileStorageResponse, err := client.Region.GetApiV2FilestorageFilestorageID(ctx, fileStorageID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 	defer fileStorageResponse.Body.Close()
 
 	fileStorage, err := nscale.ReadJSONResponsePointer[regionapi.StorageV2Read](fileStorageResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return fileStorage, &fileStorage.Metadata, nil
+	return fileStorage, nscale.NewResourceStatus(
+		fileStorage.Metadata.Id,
+		fileStorage.Metadata.Name,
+		fileStorage.Metadata.ProvisioningStatus,
+		fileStorage.Metadata.Tags,
+	), nil
 }

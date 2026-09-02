@@ -24,9 +24,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
@@ -316,16 +314,16 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 		return regionapi.StorageV2Create{}, diagnostics
 	}
 
-	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", regionids.ParseRegionID, &diagnostics)
+	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", &diagnostics)
 	if !ok {
 		return regionapi.StorageV2Create{}, diagnostics
 	}
 
 	var fileStorage regionapi.StorageV2Create
-	fileStorage.Metadata = coreapi.ResourceWriteMetadata{
+	fileStorage.Metadata = regionapi.ResourceMetadata{
 		Description: m.Description.ValueStringPointer(),
 		Name:        m.Name.ValueString(),
-		Tags:        tags,
+		Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 	}
 	fileStorage.Spec.Attachments = &regionapi.StorageAttachmentV2Spec{NetworkIds: networkIDs}
 	fileStorage.Spec.DefaultSnapshotProtectionEnabled = defaultSnapshotProtectionPointer(
@@ -367,10 +365,10 @@ func (m *FileStorageModel) NscaleFileStorageUpdateParams(
 	}
 
 	fileStorage := regionapi.StorageV2Update{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 		},
 		Spec: regionapi.StorageV2Spec{
 			Attachments: &regionapi.StorageAttachmentV2Spec{

@@ -157,11 +157,19 @@ func (s *InstanceFlavorDataSource) Read(
 		return
 	}
 
-	regionID := data.RegionID.ValueString()
+	organizationID, ok := nscale.ParseID(s.client.OrganizationID, "Organization", &response.Diagnostics)
+	if !ok {
+		return
+	}
+
+	regionID, ok := nscale.ParseID(data.RegionID.ValueString(), "Region", &response.Diagnostics)
+	if !ok {
+		return
+	}
 
 	flavorListResponse, err := s.client.Compute.GetApiV1OrganizationsOrganizationIDRegionsRegionIDFlavors(
 		ctx,
-		s.client.OrganizationID,
+		organizationID,
 		regionID,
 	)
 	if err != nil {
@@ -187,7 +195,7 @@ func (s *InstanceFlavorDataSource) Read(
 
 	for _, region := range flavors {
 		if region.Metadata.Id == id {
-			data = NewInstanceFlavorModel(&region, regionID)
+			data = NewInstanceFlavorModel(&region, data.RegionID.ValueString())
 			response.Diagnostics.Append(response.State.Set(ctx, data)...)
 			return
 		}

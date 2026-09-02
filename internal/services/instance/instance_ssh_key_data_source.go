@@ -103,7 +103,10 @@ func (s *InstanceSSHKeyDataSource) Read(
 		return
 	}
 
-	instanceID := data.InstanceID.ValueString()
+	instanceID, parsed := nscale.ParseID(data.InstanceID.ValueString(), "Instance", &response.Diagnostics)
+	if !parsed {
+		return
+	}
 
 	sshKeyResponse, err := s.client.Compute.GetApiV2InstancesInstanceIDSshkey(ctx, instanceID)
 	if err != nil {
@@ -138,6 +141,6 @@ func (s *InstanceSSHKeyDataSource) Read(
 		return
 	}
 
-	data = NewInstanceSSHKeyModel(instanceID, sshKey)
+	data = NewInstanceSSHKeyModel(data.InstanceID.ValueString(), sshKey)
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }

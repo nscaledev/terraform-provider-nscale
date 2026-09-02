@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 )
 
@@ -83,7 +82,7 @@ func NewObjectStorageAccessKeyModelFromCreate(
 // place in the request.
 func (m *ObjectStorageAccessKeyModel) NscaleObjectStorageAccessKeyCreateParams() storageapi.ObjectStorageAccessKeyCreate {
 	return storageapi.ObjectStorageAccessKeyCreate{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: storageapi.ResourceMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
 			Tags:        nil,

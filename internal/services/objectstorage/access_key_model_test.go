@@ -22,14 +22,13 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 )
 
 func TestNewObjectStorageAccessKeyModel(t *testing.T) {
 	created := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	source := &storageapi.ObjectStorageAccessKeyRead{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: storageapi.ProjectScopedResourceReadMetadata{
 			Id:           "ak-123",
 			Name:         "writer",
 			Description:  new("ingest credential"),
@@ -77,7 +76,7 @@ func TestNewObjectStorageAccessKeyModel(t *testing.T) {
 
 func TestNewObjectStorageAccessKeyModel_NilOptionalFields(t *testing.T) {
 	source := &storageapi.ObjectStorageAccessKeyRead{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: storageapi.ProjectScopedResourceReadMetadata{
 			Id:           "ak-bare",
 			Name:         "writer",
 			ProjectId:    "proj-1",
@@ -102,7 +101,7 @@ func TestNewObjectStorageAccessKeyModel_NilOptionalFields(t *testing.T) {
 
 func TestNewObjectStorageAccessKeyModelFromCreate_PopulatesSecret(t *testing.T) {
 	source := &storageapi.ObjectStorageAccessKeyCreateResponseBody{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: storageapi.ProjectScopedResourceReadMetadata{
 			Id:           "ak-1",
 			Name:         "writer",
 			ProjectId:    "proj-1",

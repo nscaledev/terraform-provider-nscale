@@ -19,8 +19,8 @@ package identity
 import (
 	"context"
 
+	"github.com/google/uuid"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
-	identityids "github.com/unikorn-cloud/identity/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -30,12 +30,12 @@ func getProject(
 	id string,
 	client *nscale.Client,
 ) (*identityapi.ProjectRead, error) {
-	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
+	organizationID, err := uuid.Parse(client.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
 
-	projectID, err := identityids.ParseProjectID(id)
+	projectID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,8 @@ func getProject(
 
 // getProjectStatus reads a project and adapts it to the shared watchers'
 // (resource, ResourceStatus, error) shape. Identity reads are
-// organization-scoped, so it uses StatusFromOrgScoped.
+// organization-scoped, which the projection absorbs: ResourceStatus carries no
+// project, so both scopes' metadata map onto it identically.
 func getProjectStatus(
 	ctx context.Context,
 	id string,
@@ -71,5 +72,10 @@ func getProjectStatus(
 		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return project, nscale.StatusFromOrgScoped(&project.Metadata), nil
+	return project, nscale.NewResourceStatus(
+		project.Metadata.Id,
+		project.Metadata.Name,
+		project.Metadata.ProvisioningStatus,
+		project.Metadata.Tags,
+	), nil
 }

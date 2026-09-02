@@ -20,11 +20,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -67,9 +67,9 @@ func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
 		PublicIP:                  types.StringPointerValue(source.Status.PublicIP),
 		PrivateIP:                 types.StringPointerValue(source.Status.PrivateIP),
 		PowerState:                powerState,
-		ImageID:                   types.StringValue(source.Spec.ImageId),
-		FlavorID:                  types.StringValue(source.Spec.FlavorId),
-		SSHCertificateAuthorityID: types.StringPointerValue(source.Spec.SshCertificateAuthorityId),
+		ImageID:                   tftypes.UUIDStringValue(source.Spec.ImageId),
+		FlavorID:                  tftypes.UUIDStringValue(source.Spec.FlavorId),
+		SSHCertificateAuthorityID: tftypes.UUIDStringPointerValue(source.Spec.SshCertificateAuthorityId),
 		Tags:                      tftypes.TagMapValueMust(tags),
 		ProjectID:                 types.StringValue(source.Metadata.ProjectId),
 		RegionID:                  types.StringValue(source.Status.RegionId),
@@ -106,25 +106,65 @@ func (m *InstanceModel) NscaleInstanceCreateParams(
 		return computeapi.InstanceCreate{}, diagnostics
 	}
 
+	ids, diagnostics := m.nscaleInstanceSpecIDs()
+
+	networkID, _ := nscale.ParseID(sourceNetworkInterface.NetworkID.ValueString(), "Network", &diagnostics)
+	organizationUUID, _ := nscale.ParseID(organizationID, "Organization", &diagnostics)
+	projectID, _ := nscale.ParseID(m.ProjectID.ValueString(), "Project", &diagnostics)
+
+	if diagnostics.HasError() {
+		return computeapi.InstanceCreate{}, diagnostics
+	}
+
 	instance := computeapi.InstanceCreate{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: computeapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[computeapi.Tag](tags),
 		},
 		Spec: computeapi.InstanceCreateSpec{
-			FlavorId:                  m.FlavorID.ValueString(),
-			ImageId:                   m.ImageID.ValueString(),
-			NetworkId:                 sourceNetworkInterface.NetworkID.ValueString(),
+			FlavorId:                  ids.flavorID,
+			ImageId:                   ids.imageID,
+			NetworkId:                 networkID,
 			Networking:                &networking,
-			OrganizationId:            organizationID,
-			ProjectId:                 m.ProjectID.ValueString(),
-			SshCertificateAuthorityId: m.SSHCertificateAuthorityID.ValueStringPointer(),
+			OrganizationId:            organizationUUID,
+			ProjectId:                 projectID,
+			SshCertificateAuthorityId: ids.sshCertificateAuthorityID,
 			UserData:                  userData,
 		},
 	}
 
 	return instance, nil
+}
+
+// instanceSpecIDs holds the identifiers both the create and update specs carry,
+// once parsed.
+//
+// The compute API types every identifier as a UUID, so a malformed one is now
+// caught here as a diagnostic naming the resource it belongs to rather than
+// travelling to the API as an opaque string. Every field is parsed before
+// returning, so one apply reports all the bad identifiers rather than only the
+// first — hence the discarded ok values, with the accumulated diagnostics
+// checked by the caller.
+type instanceSpecIDs struct {
+	flavorID                  uuid.UUID
+	imageID                   uuid.UUID
+	sshCertificateAuthorityID *uuid.UUID
+}
+
+func (m *InstanceModel) nscaleInstanceSpecIDs() (instanceSpecIDs, diag.Diagnostics) {
+	var ids instanceSpecIDs
+	var diagnostics diag.Diagnostics
+
+	ids.flavorID, _ = nscale.ParseID(m.FlavorID.ValueString(), "Flavor", &diagnostics)
+	ids.imageID, _ = nscale.ParseID(m.ImageID.ValueString(), "Image", &diagnostics)
+	ids.sshCertificateAuthorityID, _ = nscale.ParseOptionalID(
+		m.SSHCertificateAuthorityID.ValueString(),
+		"SSH Certificate Authority",
+		&diagnostics,
+	)
+
+	return ids, diagnostics
 }
 
 func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate, diag.Diagnostics) {
@@ -154,17 +194,22 @@ func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate,
 		return computeapi.InstanceUpdate{}, diagnostics
 	}
 
+	ids, diagnostics := m.nscaleInstanceSpecIDs()
+	if diagnostics.HasError() {
+		return computeapi.InstanceUpdate{}, diagnostics
+	}
+
 	instance := computeapi.InstanceUpdate{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: computeapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[computeapi.Tag](tags),
 		},
 		Spec: computeapi.InstanceSpec{
-			FlavorId:                  m.FlavorID.ValueString(),
-			ImageId:                   m.ImageID.ValueString(),
+			FlavorId:                  ids.flavorID,
+			ImageId:                   ids.imageID,
 			Networking:                &networking,
-			SshCertificateAuthorityId: m.SSHCertificateAuthorityID.ValueStringPointer(),
+			SshCertificateAuthorityId: ids.sshCertificateAuthorityID,
 			UserData:                  userData,
 		},
 	}

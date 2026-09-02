@@ -55,5 +55,5 @@ func getReservationStatus(
 		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return reservation, nscale.StatusFromProjectScoped(&reservation.Metadata), nil
+	return reservation, statusOf(&reservation.Metadata), nil
 }

@@ -19,7 +19,8 @@ package instance
 import (
 	"context"
 
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+	"github.com/google/uuid"
+
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -29,17 +30,27 @@ func getInstance(
 	ctx context.Context,
 	id string,
 	client *nscale.Client,
-) (*computeapi.InstanceRead, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	instanceResponse, err := client.Compute.GetApiV2InstancesInstanceID(ctx, id)
+) (*computeapi.InstanceRead, nscale.ResourceStatus, error) {
+	instanceID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
+	}
+
+	instanceResponse, err := client.Compute.GetApiV2InstancesInstanceID(ctx, instanceID)
+	if err != nil {
+		return nil, nscale.ResourceStatus{}, err
 	}
 	defer instanceResponse.Body.Close()
 
 	instance, err := nscale.ReadJSONResponsePointer[computeapi.InstanceRead](instanceResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return instance, &instance.Metadata, nil
+	return instance, nscale.NewResourceStatus(
+		instance.Metadata.Id,
+		instance.Metadata.Name,
+		instance.Metadata.ProvisioningStatus,
+		instance.Metadata.Tags,
+	), nil
 }

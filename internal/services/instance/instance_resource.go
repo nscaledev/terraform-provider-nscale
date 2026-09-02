@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
@@ -76,7 +77,7 @@ func instanceAdapter() nscale.ResourceAdapter[InstanceResourceModel, computeapi.
 			client *nscale.Client,
 			id string,
 		) (*computeapi.InstanceRead, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getInstance(ctx, id, client))
+			return getInstance(ctx, id, client)
 		},
 		ToModel: func(api *computeapi.InstanceRead, dst *InstanceResourceModel) {
 			dst.InstanceModel = NewInstanceModel(api)
@@ -283,9 +284,15 @@ func instanceUpdate(
 
 	// Tag the update so the watcher can confirm the PUT has propagated through
 	// the cache-backed API before reading back a terminal status.
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
-	updateResponse, err := client.Compute.PutApiV2InstancesInstanceID(ctx, id, params)
+	instanceID, ok := nscale.ParseID(id, "Instance", &diagnostics)
+	if !ok {
+		return "", diagnostics
+	}
+
+	updateResponse, err := client.Compute.PutApiV2InstancesInstanceID(ctx, instanceID, params)
 	if err != nil {
 		diagnostics.AddError(
 			"Failed to Update Instance",
@@ -308,7 +315,12 @@ func instanceUpdate(
 }
 
 func instanceDelete(ctx context.Context, client *nscale.Client, id string) error {
-	deleteResponse, err := client.Compute.DeleteApiV2InstancesInstanceID(ctx, id)
+	instanceID, err := uuid.Parse(id)
+	if err != nil {
+		return err
+	}
+
+	deleteResponse, err := client.Compute.DeleteApiV2InstancesInstanceID(ctx, instanceID)
 	if err != nil {
 		return err
 	}

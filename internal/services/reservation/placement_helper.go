@@ -55,5 +55,5 @@ func getPlacementStatus(
 		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return placement, nscale.StatusFromProjectScoped(&placement.Metadata), nil
+	return placement, statusOf(&placement.Metadata), nil
 }

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -30,7 +31,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
-	identityids "github.com/unikorn-cloud/identity/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -160,12 +160,7 @@ func projectCreate(
 		return nil, diagnostics
 	}
 
-	organizationID, ok := nscale.ParseID(
-		client.OrganizationID,
-		"Organization",
-		identityids.ParseOrganizationID,
-		&diagnostics,
-	)
+	organizationID, ok := nscale.ParseID(client.OrganizationID, "Organization", &diagnostics)
 	if !ok {
 		return nil, diagnostics
 	}
@@ -208,24 +203,20 @@ func projectUpdate(
 		return "", diagnostics
 	}
 
-	organizationID, ok := nscale.ParseID(
-		client.OrganizationID,
-		"Organization",
-		identityids.ParseOrganizationID,
-		&diagnostics,
-	)
+	organizationID, ok := nscale.ParseID(client.OrganizationID, "Organization", &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}
 
-	projectID, ok := nscale.ParseID(id, "Project", identityids.ParseProjectID, &diagnostics)
+	projectID, ok := nscale.ParseID(id, "Project", &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}
 
 	// Tag the update so the watcher can confirm the PUT has propagated through
 	// the cache-backed API before reading back a terminal status.
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
 	updateResponse, err := client.Identity.PutApiV1OrganizationsOrganizationIDProjectsProjectID(
 		ctx,
@@ -255,12 +246,12 @@ func projectUpdate(
 }
 
 func projectDelete(ctx context.Context, client *nscale.Client, id string) error {
-	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
+	organizationID, err := uuid.Parse(client.OrganizationID)
 	if err != nil {
 		return err
 	}
 
-	projectID, err := identityids.ParseProjectID(id)
+	projectID, err := uuid.Parse(id)
 	if err != nil {
 		return err
 	}

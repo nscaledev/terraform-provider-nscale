@@ -23,8 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	identityids "github.com/unikorn-cloud/identity/pkg/ids"
+	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -113,17 +112,16 @@ func (s *RegionDataSource) Read(
 		return
 	}
 
-	organizationID, ok := nscale.ParseID(
-		s.client.OrganizationID,
-		"Organization",
-		identityids.ParseOrganizationID,
-		&response.Diagnostics,
-	)
+	organizationID, ok := nscale.ParseID(s.client.OrganizationID, "Organization", &response.Diagnostics)
 	if !ok {
 		return
 	}
 
-	regionListResponse, err := s.client.Region.GetApiV1OrganizationsOrganizationIDRegions(ctx, organizationID)
+	// The region service dropped its org-scoped v1 API in nscale-sdk-go v0.2.0;
+	// the region list is served by compute, which the flavor data source already
+	// reads from. Note this also moves the request to the compute service's base
+	// URL rather than the region service's.
+	regionListResponse, err := s.client.Compute.GetApiV1OrganizationsOrganizationIDRegions(ctx, organizationID)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Read Region",
@@ -132,7 +130,7 @@ func (s *RegionDataSource) Read(
 		return
 	}
 
-	regions, err := nscale.ReadJSONResponseValue[[]regionapi.RegionRead](regionListResponse)
+	regions, err := nscale.ReadJSONResponseValue[[]computeapi.RegionRead](regionListResponse)
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(

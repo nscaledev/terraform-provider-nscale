@@ -34,7 +34,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -393,7 +392,7 @@ func (r *FileStorageResource) Create(
 		ResourceName:  "file storage",
 		GetFunc: func(ctx context.Context) (*regionapi.StorageV2Read, nscale.ResourceStatus, error) {
 			targetID := fileStorage.Metadata.Id
-			return nscale.AdaptProjectScoped(getFileStorage(ctx, targetID, r.client))
+			return getFileStorage(ctx, targetID, r.client)
 		},
 	}
 
@@ -418,7 +417,7 @@ func (r *FileStorageResource) Read(ctx context.Context, request resource.ReadReq
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
 		GetFunc: func(ctx context.Context, id string) (*regionapi.StorageV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getFileStorage(ctx, id, r.client))
+			return getFileStorage(ctx, id, r.client)
 		},
 	}
 
@@ -471,12 +470,13 @@ func (r *FileStorageResource) Update(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, ok := nscale.ParseID(id, "File Storage", regionids.ParseFileStorageID, &response.Diagnostics)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", &response.Diagnostics)
 	if !ok {
 		return
 	}
 
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
 	fileStorageUpdateResponse, err := r.client.Region.PutApiV2FilestorageFilestorageID(ctx, fileStorageID, params)
 	if err != nil {
@@ -503,7 +503,7 @@ func (r *FileStorageResource) Update(
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
 		GetFunc: func(ctx context.Context) (*regionapi.StorageV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getFileStorage(ctx, id, r.client))
+			return getFileStorage(ctx, id, r.client)
 		},
 	}
 
@@ -530,7 +530,7 @@ func (r *FileStorageResource) Delete(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, ok := nscale.ParseID(id, "File Storage", regionids.ParseFileStorageID, &response.Diagnostics)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", &response.Diagnostics)
 	if !ok {
 		return
 	}
@@ -560,7 +560,7 @@ func (r *FileStorageResource) Delete(
 		ResourceTitle: "File Storage",
 		ResourceName:  "file storage",
 		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getFileStorage(ctx, id, r.client))
+			return getFileStorage(ctx, id, r.client)
 		},
 	}
 

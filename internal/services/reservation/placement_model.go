@@ -24,7 +24,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -220,10 +219,10 @@ func (m *PlacementModel) NscalePlacementCreateParams(
 	}
 
 	return reservationapi.PlacementV2Create{
-		Metadata: coreapi.ResourceWriteMetadata{
+		Metadata: reservationapi.ResourceMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[reservationapi.Tag](tags),
 		},
 		Spec: reservationapi.PlacementV2CreateSpec{
 			ReservationId: m.ReservationID.ValueString(),

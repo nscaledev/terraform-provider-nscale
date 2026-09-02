@@ -33,7 +33,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -254,7 +253,7 @@ func (r *SecurityGroupResource) Create(
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
 			targetID := securityGroup.Metadata.Id
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, targetID, r.client))
+			return getSecurityGroup(ctx, targetID, r.client)
 		},
 	}
 
@@ -282,7 +281,7 @@ func (r *SecurityGroupResource) Read(
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context, id string) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
+			return getSecurityGroup(ctx, id, r.client)
 		},
 	}
 
@@ -314,12 +313,13 @@ func (r *SecurityGroupResource) Update(
 
 	id := data.ID.ValueString()
 
-	securityGroupID, ok := nscale.ParseID(id, "Security Group", regionids.ParseSecurityGroupID, &response.Diagnostics)
+	securityGroupID, ok := nscale.ParseID(id, "Security Group", &response.Diagnostics)
 	if !ok {
 		return
 	}
 
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
 	securityGroupUpdateResponse, err := r.client.Region.PutApiV2SecuritygroupsSecurityGroupID(
 		ctx,
@@ -349,7 +349,7 @@ func (r *SecurityGroupResource) Update(
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
+			return getSecurityGroup(ctx, id, r.client)
 		},
 	}
 
@@ -375,7 +375,7 @@ func (r *SecurityGroupResource) Delete(
 
 	id := data.ID.ValueString()
 
-	securityGroupID, ok := nscale.ParseID(id, "Security Group", regionids.ParseSecurityGroupID, &response.Diagnostics)
+	securityGroupID, ok := nscale.ParseID(id, "Security Group", &response.Diagnostics)
 	if !ok {
 		return
 	}
@@ -414,7 +414,7 @@ func (r *SecurityGroupResource) Delete(
 		ResourceTitle: "Security Group",
 		ResourceName:  "security group",
 		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getSecurityGroup(ctx, id, r.client))
+			return getSecurityGroup(ctx, id, r.client)
 		},
 	}
 

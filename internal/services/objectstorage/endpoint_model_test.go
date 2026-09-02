@@ -24,7 +24,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -46,13 +45,13 @@ func TestNewObjectStorageEndpointModel(t *testing.T) {
 		},
 	}
 	policies := storageapi.ObjectStorageIdentityPolicyList{policy}
-	tags := coreapi.TagList{
+	tags := storageapi.TagList{
 		{Name: "team", Value: "ingest"},
 		// Operation tags must be stripped on the way into state.
 		{Name: nscale.TerraformOperationTagPrefix + "abc", Value: "in-flight"},
 	}
 	source := &storageapi.ObjectStorageEndpointRead{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: storageapi.ProjectScopedResourceReadMetadata{
 			Id:           "ep-1",
 			Name:         "ml-artifacts",
 			Description:  new("ingest endpoint"),
@@ -133,7 +132,7 @@ func TestNewObjectStorageEndpointModel(t *testing.T) {
 
 func TestNewObjectStorageEndpointModel_NilOptionals(t *testing.T) {
 	source := &storageapi.ObjectStorageEndpointRead{
-		Metadata: coreapi.ProjectScopedResourceReadMetadata{
+		Metadata: storageapi.ProjectScopedResourceReadMetadata{
 			Id:           "ep-bare",
 			Name:         "bare",
 			ProjectId:    "proj-1",

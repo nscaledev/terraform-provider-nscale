@@ -245,7 +245,7 @@ func (r *ObjectStorageAccessKeyResource) Create(
 		ResourceTitle: "Object Storage Access Key",
 		ResourceName:  "object_storage_access_key",
 		GetFunc: func(ctx context.Context) (*storageapi.ObjectStorageAccessKeyRead, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getObjectStorageAccessKey(ctx, endpointID, created.Metadata.Id, r.client))
+			return getObjectStorageAccessKey(ctx, endpointID, created.Metadata.Id, r.client)
 		},
 	}
 
@@ -287,7 +287,7 @@ func (r *ObjectStorageAccessKeyResource) Read(
 		ResourceName:  "object_storage_access_key",
 		GetFunc: func(ctx context.Context, id string) (*storageapi.ObjectStorageAccessKeyRead, nscale.ResourceStatus, error) {
 			endpointID := preservedEndpointID.ValueString()
-			return nscale.AdaptProjectScoped(getObjectStorageAccessKey(ctx, endpointID, id, r.client))
+			return getObjectStorageAccessKey(ctx, endpointID, id, r.client)
 		},
 	}
 
@@ -364,7 +364,7 @@ func (r *ObjectStorageAccessKeyResource) Delete(
 		ResourceTitle: "Object Storage Access Key",
 		ResourceName:  "object_storage_access_key",
 		GetFunc: func(ctx context.Context) (any, nscale.ResourceStatus, error) {
-			return nscale.AdaptProjectScoped(getObjectStorageAccessKey(ctx, endpointID, id, r.client))
+			return getObjectStorageAccessKey(ctx, endpointID, id, r.client)
 		},
 	}
 

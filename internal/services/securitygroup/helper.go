@@ -19,9 +19,8 @@ package securitygroup
 import (
 	"context"
 
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
+	"github.com/google/uuid"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -30,21 +29,26 @@ func getSecurityGroup(
 	ctx context.Context,
 	id string,
 	client *nscale.Client,
-) (*regionapi.SecurityGroupV2Read, *coreapi.ProjectScopedResourceReadMetadata, error) {
-	securityGroupID, err := regionids.ParseSecurityGroupID(id)
+) (*regionapi.SecurityGroupV2Read, nscale.ResourceStatus, error) {
+	securityGroupID, err := uuid.Parse(id)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
 	securityGroupResponse, err := client.Region.GetApiV2SecuritygroupsSecurityGroupID(ctx, securityGroupID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
 	securityGroup, err := nscale.ReadJSONResponsePointer[regionapi.SecurityGroupV2Read](securityGroupResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return securityGroup, &securityGroup.Metadata, nil
+	return securityGroup, nscale.NewResourceStatus(
+		securityGroup.Metadata.Id,
+		securityGroup.Metadata.Name,
+		securityGroup.Metadata.ProvisioningStatus,
+		securityGroup.Metadata.Tags,
+	), nil
 }

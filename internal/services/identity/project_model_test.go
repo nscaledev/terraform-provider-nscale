@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	coreapi "github.com/nscaledev/nscale-sdk-go/common"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
 )
 
@@ -38,14 +37,14 @@ func TestNewProjectModel(t *testing.T) {
 		{
 			name: "full",
 			source: &identityapi.ProjectRead{
-				Metadata: coreapi.OrganizationScopedResourceReadMetadata{
+				Metadata: identityapi.OrganizationScopedResourceReadMetadata{
 					Id:                 "project-1",
 					Name:               "demo-project",
 					Description:        new("a description"),
 					OrganizationId:     "org-1",
 					CreationTime:       creationTime,
-					ProvisioningStatus: coreapi.ResourceProvisioningStatusProvisioned,
-					Tags: &[]coreapi.Tag{
+					ProvisioningStatus: identityapi.ResourceProvisioningStatusProvisioned,
+					Tags: &[]identityapi.Tag{
 						{Name: "team", Value: "platform"},
 					},
 				},
@@ -60,12 +59,12 @@ func TestNewProjectModel(t *testing.T) {
 		{
 			name: "nil description and tags and empty groups",
 			source: &identityapi.ProjectRead{
-				Metadata: coreapi.OrganizationScopedResourceReadMetadata{
+				Metadata: identityapi.OrganizationScopedResourceReadMetadata{
 					Id:                 "project-2",
 					Name:               "bare-project",
 					OrganizationId:     "org-1",
 					CreationTime:       creationTime,
-					ProvisioningStatus: coreapi.ResourceProvisioningStatusProvisioned,
+					ProvisioningStatus: identityapi.ResourceProvisioningStatusProvisioned,
 				},
 				Spec: identityapi.ProjectSpec{
 					GroupIDs: []string{},

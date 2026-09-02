@@ -10,6 +10,28 @@ Categories used: `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 
 ## [Unreleased]
 
+### BREAKING CHANGES
+
+- The `nscale_region` data source now reads the region list from the compute
+  service instead of the region service, because nscale-sdk-go v0.2.0 drops the
+  region service's org-scoped v1 API. `region_service_api_endpoint` and
+  `compute_service_api_endpoint` are separate provider attributes with separate
+  defaults, so **if you override `region_service_api_endpoint` in your provider
+  block you must now also set `compute_service_api_endpoint`** — otherwise this
+  data source resolves against the default compute host rather than the one you
+  configured. Configurations that set neither, or both, are unaffected
+  (DX-1716, [#74](https://github.com/nscaledev/terraform-provider-nscale/pull/74)).
+
+### ENHANCEMENTS
+
+- A malformed identifier on a compute resource (`flavor_id`, `image_id`,
+  `network_id`, `project_id`, `ssh_certificate_authority_id`) is now rejected
+  during plan with a diagnostic naming the resource it belongs to, rather than
+  being sent to the API as an opaque string. Every identifier the platform
+  issues is a UUID, so this should only reject configurations the API would have
+  refused anyway
+  (DX-1716, [#74](https://github.com/nscaledev/terraform-provider-nscale/pull/74)).
+
 ## [1.4.0] - 2026-08-10
 
 ### FEATURES
