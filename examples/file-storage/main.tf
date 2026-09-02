@@ -33,6 +33,16 @@ resource "nscale_file_storage" "example" {
   capacity         = 20
   root_squash      = true
 
+  # Enabling POSIX ACLs may reduce metadata performance.
+  # Extended POSIX ACLs must be managed over NFSv3. Disabling this option does
+  # not remove existing ACLs; they may remain enforced.
+  posix_acl = false
+
+  # Set to 0 to disable read-driven atime updates. A positive value updates
+  # atime during a read only when the existing atime is older than this number
+  # of seconds. Maximum: 86,399,999,999,999 seconds.
+  atime_update_interval_seconds = 0
+
   # This keeps a daily snapshot taken at 02:00 UTC and retains the seven most recent.
   # Policies are identified by name; ordering is not significant.
   snapshot_policies = [

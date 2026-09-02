@@ -14,6 +14,8 @@ platform-managed Default Snapshot Protection setting, and `snapshot_policies` re
 policy set (the hidden platform-managed default object is never included). See the
 [`nscale_file_storage` resource](../r/file_storage.html.markdown) for how these two controls differ.
 
+The data source also exposes the effective `posix_acl` and `atime_update_interval_seconds` NFS settings.
+
 ## Example Usage
 
 ```hcl
@@ -31,12 +33,14 @@ data "nscale_file_storage" "example" {
 
 ### Read-Only
 
+- `atime_update_interval_seconds` (Number) The effective interval in seconds after which a read updates an older atime value. Zero disables read-driven atime updates.
 - `capacity` (Number) The total capacity of the file storage, in gibibytes.
 - `creation_time` (String) The timestamp when the file storage was created.
 - `default_snapshot_protection_enabled` (Boolean) Whether platform-managed Default Snapshot Protection is enabled for the file storage. This is separate from any user-managed snapshot policies.
 - `description` (String) The description of the file storage.
 - `name` (String) The name of the file storage.
 - `network` (Block List) The network to which the file storage is attached. (see [below for nested schema](#nestedblock--network))
+- `posix_acl` (Boolean) Whether extended POSIX ACL support is enabled for the file storage.
 - `project_id` (String) The identifier of the project where the file storage is provisioned.
 - `region_id` (String) The identifier of the region where the file storage is provisioned.
 - `root_squash` (Boolean) Indicates whether root squashing is enabled for the file storage.
