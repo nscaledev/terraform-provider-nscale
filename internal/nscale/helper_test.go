@@ -2,7 +2,6 @@ package nscale
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -17,17 +16,17 @@ type waitTestResource struct {
 }
 
 func TestParseIDReturnsParsedID(t *testing.T) {
+	const raw = "f51ac0e0-d2e4-4648-99cf-c18a19c4934a"
+
 	var diagnostics diag.Diagnostics
 
-	got, ok := ParseID("raw", "Project", func(raw string) (string, error) {
-		return "parsed-" + raw, nil
-	}, &diagnostics)
+	got, ok := ParseID(raw, "Project", &diagnostics)
 	if !ok {
 		t.Fatalf("ParseID() returned ok=false with diagnostics: %#v", diagnostics)
 	}
 
-	if got != "parsed-raw" {
-		t.Fatalf("ParseID() returned %q, want %q", got, "parsed-raw")
+	if got.String() != raw {
+		t.Fatalf("ParseID() returned %q, want %q", got, raw)
 	}
 
 	if len(diagnostics) != 0 {
@@ -38,9 +37,7 @@ func TestParseIDReturnsParsedID(t *testing.T) {
 func TestParseIDAddsDiagnostic(t *testing.T) {
 	var diagnostics diag.Diagnostics
 
-	_, ok := ParseID("not-id", "File Storage", func(string) (string, error) {
-		return "", errors.New("not a uuid")
-	}, &diagnostics)
+	_, ok := ParseID("not-id", "File Storage", &diagnostics)
 	if ok {
 		t.Fatal("ParseID() returned ok=true, want ok=false")
 	}
@@ -54,9 +51,53 @@ func TestParseIDAddsDiagnostic(t *testing.T) {
 		t.Fatalf("ParseID() summary = %q, want %q", errs[0].Summary(), "Invalid File Storage ID")
 	}
 
-	const wantDetail = `Could not parse file storage ID "not-id": not a uuid`
-	if errs[0].Detail() != wantDetail {
-		t.Fatalf("ParseID() detail = %q, want %q", errs[0].Detail(), wantDetail)
+	// The label is lowercased in the detail so it reads as prose, and the raw
+	// value is quoted back so the operator can spot which identifier is wrong.
+	const wantPrefix = `Could not parse file storage ID "not-id": `
+	if !strings.HasPrefix(errs[0].Detail(), wantPrefix) {
+		t.Fatalf("ParseID() detail = %q, want prefix %q", errs[0].Detail(), wantPrefix)
+	}
+}
+
+// TestParseOptionalIDSkipsUnsetValue covers the case an optional attribute
+// relies on: a null or unknown attribute reaches ParseOptionalID as the empty
+// string and must be omitted from the request rather than reported as malformed.
+func TestParseOptionalIDSkipsUnsetValue(t *testing.T) {
+	var diagnostics diag.Diagnostics
+
+	got, ok := ParseOptionalID("", "SSH Certificate Authority", &diagnostics)
+	if !ok {
+		t.Fatalf("ParseOptionalID() returned ok=false with diagnostics: %#v", diagnostics)
+	}
+
+	if got != nil {
+		t.Fatalf("ParseOptionalID() returned %v, want nil", got)
+	}
+
+	if len(diagnostics) != 0 {
+		t.Fatalf("ParseOptionalID() returned unexpected diagnostics: %#v", diagnostics)
+	}
+}
+
+func TestParseOptionalIDAddsDiagnostic(t *testing.T) {
+	var diagnostics diag.Diagnostics
+
+	got, ok := ParseOptionalID("not-id", "SSH Certificate Authority", &diagnostics)
+	if ok {
+		t.Fatal("ParseOptionalID() returned ok=true, want ok=false")
+	}
+
+	if got != nil {
+		t.Fatalf("ParseOptionalID() returned %v, want nil", got)
+	}
+
+	errs := diagnostics.Errors()
+	if len(errs) != 1 {
+		t.Fatalf("ParseOptionalID() returned %d error diagnostics, want 1: %#v", len(errs), diagnostics)
+	}
+
+	if errs[0].Summary() != "Invalid SSH Certificate Authority ID" {
+		t.Fatalf("ParseOptionalID() summary = %q, want %q", errs[0].Summary(), "Invalid SSH Certificate Authority ID")
 	}
 }
 

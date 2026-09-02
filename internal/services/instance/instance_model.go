@@ -108,17 +108,9 @@ func (m *InstanceModel) NscaleInstanceCreateParams(
 
 	ids, diagnostics := m.nscaleInstanceSpecIDs()
 
-	networkID, networkDiagnostics := tftypes.ValueUUID(sourceNetworkInterface.NetworkID, "network_id")
-	diagnostics.Append(networkDiagnostics...)
-
-	organizationUUID, organizationDiagnostics := tftypes.ValueUUID(
-		types.StringValue(organizationID),
-		"organization_id",
-	)
-	diagnostics.Append(organizationDiagnostics...)
-
-	projectID, projectDiagnostics := tftypes.ValueUUID(m.ProjectID, "project_id")
-	diagnostics.Append(projectDiagnostics...)
+	networkID, _ := nscale.ParseID(sourceNetworkInterface.NetworkID.ValueString(), "Network", &diagnostics)
+	organizationUUID, _ := nscale.ParseID(organizationID, "Organization", &diagnostics)
+	projectID, _ := nscale.ParseID(m.ProjectID.ValueString(), "Project", &diagnostics)
 
 	if diagnostics.HasError() {
 		return computeapi.InstanceCreate{}, diagnostics
@@ -149,10 +141,11 @@ func (m *InstanceModel) NscaleInstanceCreateParams(
 // once parsed.
 //
 // The compute API types every identifier as a UUID, so a malformed one is now
-// caught here as a diagnostic naming the offending attribute rather than
+// caught here as a diagnostic naming the resource it belongs to rather than
 // travelling to the API as an opaque string. Every field is parsed before
 // returning, so one apply reports all the bad identifiers rather than only the
-// first.
+// first — hence the discarded ok values, with the accumulated diagnostics
+// checked by the caller.
 type instanceSpecIDs struct {
 	flavorID                  uuid.UUID
 	imageID                   uuid.UUID
@@ -163,20 +156,13 @@ func (m *InstanceModel) nscaleInstanceSpecIDs() (instanceSpecIDs, diag.Diagnosti
 	var ids instanceSpecIDs
 	var diagnostics diag.Diagnostics
 
-	flavorID, flavorDiagnostics := tftypes.ValueUUID(m.FlavorID, "flavor_id")
-	diagnostics.Append(flavorDiagnostics...)
-	ids.flavorID = flavorID
-
-	imageID, imageDiagnostics := tftypes.ValueUUID(m.ImageID, "image_id")
-	diagnostics.Append(imageDiagnostics...)
-	ids.imageID = imageID
-
-	sshCertificateAuthorityID, sshDiagnostics := tftypes.ValueUUIDPointer(
-		m.SSHCertificateAuthorityID,
-		"ssh_certificate_authority_id",
+	ids.flavorID, _ = nscale.ParseID(m.FlavorID.ValueString(), "Flavor", &diagnostics)
+	ids.imageID, _ = nscale.ParseID(m.ImageID.ValueString(), "Image", &diagnostics)
+	ids.sshCertificateAuthorityID, _ = nscale.ParseOptionalID(
+		m.SSHCertificateAuthorityID.ValueString(),
+		"SSH Certificate Authority",
+		&diagnostics,
 	)
-	diagnostics.Append(sshDiagnostics...)
-	ids.sshCertificateAuthorityID = sshCertificateAuthorityID
 
 	return ids, diagnostics
 }

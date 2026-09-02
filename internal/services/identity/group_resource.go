@@ -195,12 +195,7 @@ func groupCreate(
 		return nil, diagnostics
 	}
 
-	organizationID, ok := nscale.ParseID(
-		client.OrganizationID,
-		"Organization",
-		uuid.Parse,
-		&diagnostics,
-	)
+	organizationID, ok := nscale.ParseID(client.OrganizationID, "Organization", &diagnostics)
 	if !ok {
 		return nil, diagnostics
 	}
@@ -243,17 +238,12 @@ func groupUpdate(
 		return "", diagnostics
 	}
 
-	organizationID, ok := nscale.ParseID(
-		client.OrganizationID,
-		"Organization",
-		uuid.Parse,
-		&diagnostics,
-	)
+	organizationID, ok := nscale.ParseID(client.OrganizationID, "Organization", &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}
 
-	groupID, ok := nscale.ParseID(id, "Group", uuid.Parse, &diagnostics)
+	groupID, ok := nscale.ParseID(id, "Group", &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}

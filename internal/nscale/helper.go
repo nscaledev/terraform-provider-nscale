@@ -53,18 +53,41 @@ func ReadTerraformState[T any](ctx context.Context, fn StateReaderFunc, mutates 
 	return data, nil
 }
 
-// ParseID parses a typed SDK ID and appends a consistent Terraform diagnostic on failure.
-func ParseID[T any](raw, label string, parse func(string) (T, error), diagnostics *diag.Diagnostics) (T, bool) {
-	id, err := parse(raw)
+// ParseID parses a resource identifier and appends a consistent Terraform
+// diagnostic on failure. label is the resource's human name in title case
+// ("Network", "File Storage"), so the diagnostic reads "Invalid Network ID".
+//
+// The canonical specs type every identifier as a UUID, so this is the provider's
+// single conversion point from the strings Terraform carries: a malformed
+// identifier is reported against the resource that owns it rather than sent to
+// the API as an opaque string.
+func ParseID(raw, label string, diagnostics *diag.Diagnostics) (uuid.UUID, bool) {
+	id, err := uuid.Parse(raw)
 	if err != nil {
 		diagnostics.AddError(
 			fmt.Sprintf("Invalid %s ID", label),
 			fmt.Sprintf("Could not parse %s ID %q: %s", strings.ToLower(label), raw, err),
 		)
-		return id, false
+		return uuid.UUID{}, false
 	}
 
 	return id, true
+}
+
+// ParseOptionalID is ParseID for an optional identifier: an unset value yields a
+// nil pointer with no diagnostic, so the field is simply omitted from the
+// request. A null or unknown attribute reaches here as the empty string.
+func ParseOptionalID(raw, label string, diagnostics *diag.Diagnostics) (*uuid.UUID, bool) {
+	if raw == "" {
+		return nil, true
+	}
+
+	id, ok := ParseID(raw, label, diagnostics)
+	if !ok {
+		return nil, false
+	}
+
+	return &id, true
 }
 
 func assertState[T any](state any, diagnostics *diag.Diagnostics) (*T, bool) {

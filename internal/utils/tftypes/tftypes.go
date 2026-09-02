@@ -76,7 +76,7 @@ func ValueBase64BytesPointer(value basetypes.StringValue, attributeName string) 
 //
 // The canonical specs type resource identifiers as UUIDs, while Terraform
 // carries every identifier as a string, so reads convert on the way in and
-// ValueUUID converts on the way out.
+// nscale.ParseID converts on the way out.
 func UUIDStringValue(id uuid.UUID) basetypes.StringValue {
 	return types.StringValue(id.String())
 }
@@ -89,39 +89,6 @@ func UUIDStringPointerValue(id *uuid.UUID) basetypes.StringValue {
 	}
 
 	return types.StringValue(id.String())
-}
-
-// ValueUUID parses a string attribute into the UUID the SDK expects, reporting a
-// malformed identifier as a Terraform diagnostic against the attribute rather
-// than letting the API reject it later.
-func ValueUUID(value basetypes.StringValue, attributeName string) (uuid.UUID, diag.Diagnostics) {
-	id, err := uuid.Parse(value.ValueString())
-	if err != nil {
-		var diagnostics diag.Diagnostics
-		diagnostics.AddError(
-			fmt.Sprintf("Invalid %s", attributeName),
-			fmt.Sprintf("Expected %s to be a UUID, got %q: %s", attributeName, value.ValueString(), err),
-		)
-
-		return uuid.UUID{}, diagnostics
-	}
-
-	return id, nil
-}
-
-// ValueUUIDPointer is ValueUUID for an optional attribute: a null or unset value
-// yields a nil pointer with no diagnostic, so the field is simply omitted.
-func ValueUUIDPointer(value basetypes.StringValue, attributeName string) (*uuid.UUID, diag.Diagnostics) {
-	if value.IsNull() || value.IsUnknown() || value.ValueString() == "" {
-		return nil, nil
-	}
-
-	id, diagnostics := ValueUUID(value, attributeName)
-	if diagnostics.HasError() {
-		return nil, diagnostics
-	}
-
-	return &id, nil
 }
 
 func NullableListValueMust(elementType attr.Type, elements []attr.Value) basetypes.ListValue {

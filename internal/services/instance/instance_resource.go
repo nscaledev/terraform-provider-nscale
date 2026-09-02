@@ -287,7 +287,7 @@ func instanceUpdate(
 	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
 	params.Metadata.Tags = taggedList
 
-	instanceID, ok := nscale.ParseID(id, "Instance", uuid.Parse, &diagnostics)
+	instanceID, ok := nscale.ParseID(id, "Instance", &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}

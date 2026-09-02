@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -471,7 +470,7 @@ func (r *FileStorageResource) Update(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, ok := nscale.ParseID(id, "File Storage", uuid.Parse, &response.Diagnostics)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", &response.Diagnostics)
 	if !ok {
 		return
 	}
@@ -531,7 +530,7 @@ func (r *FileStorageResource) Delete(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, ok := nscale.ParseID(id, "File Storage", uuid.Parse, &response.Diagnostics)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", &response.Diagnostics)
 	if !ok {
 		return
 	}

@@ -250,7 +250,7 @@ func networkUpdate(
 		return "", diagnostics
 	}
 
-	networkID, ok := nscale.ParseID(id, "Network", uuid.Parse, &diagnostics)
+	networkID, ok := nscale.ParseID(id, "Network", &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}

@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -158,16 +157,12 @@ func (s *InstanceFlavorDataSource) Read(
 		return
 	}
 
-	organizationID, ok := nscale.ParseID(
-		s.client.OrganizationID, "Organization", uuid.Parse, &response.Diagnostics,
-	)
+	organizationID, ok := nscale.ParseID(s.client.OrganizationID, "Organization", &response.Diagnostics)
 	if !ok {
 		return
 	}
 
-	regionID, ok := nscale.ParseID(
-		data.RegionID.ValueString(), "Region", uuid.Parse, &response.Diagnostics,
-	)
+	regionID, ok := nscale.ParseID(data.RegionID.ValueString(), "Region", &response.Diagnostics)
 	if !ok {
 		return
 	}

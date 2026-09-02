@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
@@ -314,7 +313,7 @@ func (r *SecurityGroupResource) Update(
 
 	id := data.ID.ValueString()
 
-	securityGroupID, ok := nscale.ParseID(id, "Security Group", uuid.Parse, &response.Diagnostics)
+	securityGroupID, ok := nscale.ParseID(id, "Security Group", &response.Diagnostics)
 	if !ok {
 		return
 	}
@@ -376,7 +375,7 @@ func (r *SecurityGroupResource) Delete(
 
 	id := data.ID.ValueString()
 
-	securityGroupID, ok := nscale.ParseID(id, "Security Group", uuid.Parse, &response.Diagnostics)
+	securityGroupID, ok := nscale.ParseID(id, "Security Group", &response.Diagnostics)
 	if !ok {
 		return
 	}

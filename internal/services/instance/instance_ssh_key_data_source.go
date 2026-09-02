@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -104,9 +103,7 @@ func (s *InstanceSSHKeyDataSource) Read(
 		return
 	}
 
-	instanceID, parsed := nscale.ParseID(
-		data.InstanceID.ValueString(), "Instance", uuid.Parse, &response.Diagnostics,
-	)
+	instanceID, parsed := nscale.ParseID(data.InstanceID.ValueString(), "Instance", &response.Diagnostics)
 	if !parsed {
 		return
 	}

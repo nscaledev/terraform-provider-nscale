@@ -71,7 +71,11 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 	*_reservation_accelerator) emit NSCALE_TEST_RESERVATION_ACCELERATOR "$val" "$key" ;;
 	*_reservation_unit) emit NSCALE_TEST_RESERVATION_UNIT "$val" "$key" ;;
 	*)
-		echo "$0: warning: no mapping for '$key' — ignored" >&2
+		# Fail rather than warn: a renamed or misspelled key would otherwise
+		# emit no export at all, and the test that needed it would skip silently
+		# somewhere inside a 120-minute run. Add a case above or drop the key.
+		echo "$0: no mapping for '$key' — add a suffix rule to this script or remove the key" >&2
+		exit 65
 		;;
 	esac
 done <"$file"

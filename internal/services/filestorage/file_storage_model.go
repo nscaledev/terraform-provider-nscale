@@ -21,7 +21,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -315,7 +314,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 		return regionapi.StorageV2Create{}, diagnostics
 	}
 
-	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", uuid.Parse, &diagnostics)
+	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", &diagnostics)
 	if !ok {
 		return regionapi.StorageV2Create{}, diagnostics
 	}

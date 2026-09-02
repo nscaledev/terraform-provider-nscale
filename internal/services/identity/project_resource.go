@@ -160,12 +160,7 @@ func projectCreate(
 		return nil, diagnostics
 	}
 
-	organizationID, ok := nscale.ParseID(
-		client.OrganizationID,
-		"Organization",
-		uuid.Parse,
-		&diagnostics,
-	)
+	organizationID, ok := nscale.ParseID(client.OrganizationID, "Organization", &diagnostics)
 	if !ok {
 		return nil, diagnostics
 	}
@@ -208,17 +203,12 @@ func projectUpdate(
 		return "", diagnostics
 	}
 
-	organizationID, ok := nscale.ParseID(
-		client.OrganizationID,
-		"Organization",
-		uuid.Parse,
-		&diagnostics,
-	)
+	organizationID, ok := nscale.ParseID(client.OrganizationID, "Organization", &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}
 
-	projectID, ok := nscale.ParseID(id, "Project", uuid.Parse, &diagnostics)
+	projectID, ok := nscale.ParseID(id, "Project", &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}

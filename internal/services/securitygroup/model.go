@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -122,7 +121,7 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 		rules = append(rules, source.NscaleSecurityGroupRule())
 	}
 
-	networkID, ok := nscale.ParseID(m.NetworkID.ValueString(), "Network", uuid.Parse, &diagnostics)
+	networkID, ok := nscale.ParseID(m.NetworkID.ValueString(), "Network", &diagnostics)
 	if !ok {
 		return regionapi.SecurityGroupV2Create{}, diagnostics
 	}

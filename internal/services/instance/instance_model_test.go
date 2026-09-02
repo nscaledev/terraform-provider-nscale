@@ -129,10 +129,12 @@ func TestNscaleInstanceUpdateParamsDecodesUserData(t *testing.T) {
 	}
 }
 
-// The compute API types identifiers as UUIDs, so a malformed one is reported
-// against the attribute that carries it instead of being sent to the API as an
-// opaque string. All of them are checked in one pass, so a config with several
-// bad identifiers reports them together rather than one per apply.
+// The compute API types identifiers as UUIDs, so a malformed one is reported as
+// a diagnostic instead of being sent to the API as an opaque string. The summary
+// names the resource the identifier refers to, matching nscale.ParseID's
+// convention across every other service. All of them are checked in one pass, so
+// a config with several bad identifiers reports them together rather than one
+// per apply.
 func TestNscaleInstanceCreateParamsRejectsNonUUIDIdentifiers(t *testing.T) {
 	model := testInstanceModel(types.StringNull())
 	model.FlavorID = types.StringValue("flavor-1")
@@ -148,7 +150,7 @@ func TestNscaleInstanceCreateParamsRejectsNonUUIDIdentifiers(t *testing.T) {
 		summaries = append(summaries, diagnostic.Summary())
 	}
 
-	for _, want := range []string{"Invalid flavor_id", "Invalid image_id"} {
+	for _, want := range []string{"Invalid Flavor ID", "Invalid Image ID"} {
 		if !slices.Contains(summaries, want) {
 			t.Errorf("diagnostics %v missing %q", summaries, want)
 		}
