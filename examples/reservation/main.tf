@@ -29,16 +29,55 @@ variable "image_id" {
   description = "The identifier of an existing image to boot each pinned server with."
 }
 
+variable "unit_count" {
+  type        = number
+  description = "The number of contiguous reservation units to reserve."
+  default     = 1
+}
+
+# The reservation unit describes the capacity shape offered to this organization
+# in this region: how many hosts one unit spans, what each host provides, and
+# how much is currently free. Reading it means the placement below never has to
+# hardcode a host count.
+data "nscale_reservation_unit" "training" {
+  accelerator = var.accelerator
+  unit        = var.unit
+}
+
 # Reserve one or more contiguous accelerator reservation units in a region.
 resource "nscale_reservation" "training" {
   name        = "gb300-nvl72"
   description = "Reserved accelerator units for training."
   accelerator = var.accelerator
   unit        = var.unit
-  unit_count  = 1
+  unit_count  = var.unit_count
 
   tags = {
     workload = "training"
+  }
+}
+
+# Warn during plan rather than discovering a 507 during apply. Capacity is shared
+# across the organization, so this narrows the window rather than closing it — an
+# apply can still lose a race for the last block.
+#
+# A check rather than a lifecycle precondition, because
+# largest_contiguous_unit_count is live availability, not a fixed shape: once this
+# reservation claims its block the figure drops by what it took. A precondition
+# would then fail every subsequent plan — including the unit_count resize it was
+# written to guard, since that forces replacement and is checked against capacity
+# that still excludes the units about to be released. A check warns instead of
+# blocking, which is what "advisory" should cost.
+check "reservation_capacity" {
+  assert {
+    condition = var.unit_count <= data.nscale_reservation_unit.training.largest_contiguous_unit_count
+    error_message = format(
+      "Requested %d contiguous %s %s units but the largest contiguous block currently available is %d.",
+      var.unit_count,
+      var.accelerator,
+      var.unit,
+      data.nscale_reservation_unit.training.largest_contiguous_unit_count,
+    )
   }
 }
 
@@ -69,7 +108,14 @@ resource "nscale_placement" "workers" {
   name           = "training-workers"
   reservation_id = nscale_reservation.training.id
   network_id     = nscale_network.training.id
-  host_count     = 1
+
+  # Every host the reservation claimed. hosts_per_unit is the unit's fixed
+  # topology (an NVL72 unit is 18 hosts), so this stays correct if unit_count
+  # changes or the platform revises the unit shape.
+  host_count = (
+    nscale_reservation.training.claimed_unit_count *
+    data.nscale_reservation_unit.training.hosts_per_unit
+  )
 
   constraints = {
     policy             = "spread"
@@ -94,4 +140,12 @@ output "reservation_machine_flavor_id" {
 output "placement_ready_host_count" {
   description = "The number of hosts whose Region server resources are ready."
   value       = nscale_placement.workers.ready_host_count
+}
+
+output "reservation_unit" {
+  description = "The shape of one reservation unit, and the capacity available at the last refresh."
+  value = {
+    hosts_per_unit                = data.nscale_reservation_unit.training.hosts_per_unit
+    largest_contiguous_unit_count = data.nscale_reservation_unit.training.largest_contiguous_unit_count
+  }
 }
