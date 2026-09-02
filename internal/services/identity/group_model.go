@@ -166,7 +166,7 @@ func (m *GroupModel) NscaleGroupSpec(ctx context.Context) (identityapi.GroupSpec
 }
 
 func (m *GroupModel) NscaleGroupCreateParams(ctx context.Context) (identityapi.GroupWrite, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[identityapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return identityapi.GroupWrite{}, diagnostics
 	}
@@ -181,7 +181,7 @@ func (m *GroupModel) NscaleGroupCreateParams(ctx context.Context) (identityapi.G
 		Metadata: identityapi.ResourceMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[identityapi.Tag](tags),
 		},
 		Spec: spec,
 	}, nil

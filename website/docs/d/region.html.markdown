@@ -9,6 +9,12 @@ description: |-
 
 Retrieves information about an existing region by its unique identifier.
 
+~> **Note** This data source reads the region list from the **compute** service,
+not the region service. If you set API endpoints granularly in your provider
+block, it is `compute_service_api_endpoint` — not
+`region_service_api_endpoint` — that determines which host this data source
+queries.
+
 ## Example Usage
 
 ```hcl

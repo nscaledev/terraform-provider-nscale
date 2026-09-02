@@ -19,7 +19,7 @@ package instance
 import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 )
 
 type InstanceFlavorModel struct {
@@ -33,7 +33,7 @@ type InstanceFlavorModel struct {
 	RegionID    types.String `tfsdk:"region_id"`
 }
 
-func NewInstanceFlavorModel(source *computeapi.Flavor, regionID string) InstanceFlavorModel {
+func NewInstanceFlavorModel(source *regionapi.Flavor, regionID string) InstanceFlavorModel {
 	gpu := types.ObjectNull(InstanceFlavorGPUModelAttributeType.AttrTypes)
 	if source.Spec.Gpu != nil {
 		gpu = NewInstanceFlavorGPUModel(source.Spec.Gpu)
@@ -69,7 +69,7 @@ type InstanceFlavorGPUModel struct {
 	MemorySize    types.Int64  `tfsdk:"memory_size"`
 }
 
-func NewInstanceFlavorGPUModel(source *computeapi.GpuSpec) types.Object {
+func NewInstanceFlavorGPUModel(source *regionapi.GpuSpec) types.Object {
 	return types.ObjectValueMust(
 		InstanceFlavorGPUModelAttributeType.AttrTypes,
 		map[string]attr.Value{

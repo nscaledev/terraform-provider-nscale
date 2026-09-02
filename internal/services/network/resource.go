@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
@@ -15,7 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -250,20 +250,17 @@ func networkUpdate(
 		return "", diagnostics
 	}
 
-	networkID, ok := nscale.ParseID(id, "Network", regionids.ParseNetworkID, &diagnostics)
+	networkID, ok := nscale.ParseID(id, "Network", &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}
 
 	// Tag the update so the watcher can confirm the PUT has propagated through
 	// the cache-backed API before reading back a terminal status.
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata.Tags)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
-	updateResponse, err := client.Region.PutApiV2NetworksNetworkID(
-		ctx,
-		regionapi.NetworkIDParameter(networkID),
-		params,
-	)
+	updateResponse, err := client.Region.PutApiV2NetworksNetworkID(ctx, networkID, params)
 	if err != nil {
 		diagnostics.AddError(
 			"Failed to Update Network",
@@ -286,12 +283,12 @@ func networkUpdate(
 }
 
 func networkDelete(ctx context.Context, client *nscale.Client, id string) error {
-	networkID, err := regionids.ParseNetworkID(id)
+	networkID, err := uuid.Parse(id)
 	if err != nil {
 		return err
 	}
 
-	deleteResponse, err := client.Region.DeleteApiV2NetworksNetworkID(ctx, regionapi.NetworkIDParameter(networkID))
+	deleteResponse, err := client.Region.DeleteApiV2NetworksNetworkID(ctx, networkID)
 	if err != nil {
 		return err
 	}

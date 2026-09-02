@@ -364,7 +364,8 @@ func (r *ObjectStorageEndpointResource) Update(
 	}
 
 	id := data.ID.ValueString()
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata.Tags)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
 	updateResponse, err := r.client.Storage.PutApiV1ObjectstorageendpointsObjectStorageEndpointID(ctx, id, params)
 	if err != nil {

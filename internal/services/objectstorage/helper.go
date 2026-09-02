@@ -43,7 +43,7 @@ func getObjectStorageEndpoint(
 	return endpoint, nscale.NewResourceStatus(
 		endpoint.Metadata.Id,
 		endpoint.Metadata.Name,
-		string(endpoint.Metadata.ProvisioningStatus),
+		endpoint.Metadata.ProvisioningStatus,
 		endpoint.Metadata.Tags,
 	), nil
 }
@@ -71,7 +71,7 @@ func getObjectStorageAccessKey(
 	return accessKey, nscale.NewResourceStatus(
 		accessKey.Metadata.Id,
 		accessKey.Metadata.Name,
-		string(accessKey.Metadata.ProvisioningStatus),
+		accessKey.Metadata.ProvisioningStatus,
 		accessKey.Metadata.Tags,
 	), nil
 }

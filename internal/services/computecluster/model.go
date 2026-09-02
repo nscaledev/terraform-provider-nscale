@@ -72,12 +72,12 @@ func NewComputeClusterModel(source *computeapi.ComputeClusterRead) ComputeCluste
 }
 
 func (m *ComputeClusterModel) NscaleComputeCluster() (computeapi.ComputeClusterWrite, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[coreapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return computeapi.ComputeClusterWrite{}, diagnostics
 	}
 
-	tags = nscale.RemoveOperationTags(tags)
+	legacyTags := nscale.TagsToAPI[coreapi.Tag](nscale.RemoveOperationTags(tags))
 
 	var sourceWorkloadPools []WorkloadPoolModel
 	if diagnostics = m.WorkloadPools.ElementsAs(context.TODO(), &sourceWorkloadPools, false); diagnostics.HasError() {
@@ -97,7 +97,7 @@ func (m *ComputeClusterModel) NscaleComputeCluster() (computeapi.ComputeClusterW
 		Metadata: coreapi.ResourceWriteMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        legacyTags,
 		},
 		Spec: computeapi.ComputeClusterSpec{
 			RegionId:      m.RegionID.ValueString(),

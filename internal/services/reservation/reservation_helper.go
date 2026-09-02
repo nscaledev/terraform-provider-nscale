@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-//nolint:dupl // Placement and reservation use separate generated API types and endpoints.
 package reservation
 
 import (
@@ -56,10 +55,5 @@ func getReservationStatus(
 		return nil, nscale.ResourceStatus{}, err
 	}
 
-	return reservation, nscale.NewResourceStatus(
-		reservation.Metadata.Id,
-		reservation.Metadata.Name,
-		string(reservation.Metadata.ProvisioningStatus),
-		reservation.Metadata.Tags,
-	), nil
+	return reservation, statusOf(&reservation.Metadata), nil
 }

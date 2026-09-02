@@ -218,7 +218,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointCreateParams(
 	ctx context.Context,
 	organizationID string,
 ) (storageapi.ObjectStorageEndpointCreate, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[storageapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return storageapi.ObjectStorageEndpointCreate{}, diagnostics
 	}
@@ -233,7 +233,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointCreateParams(
 		Metadata: storageapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[storageapi.Tag](tags),
 		},
 		Spec: struct {
 			IdentityPolicies             *storageapi.ObjectStorageIdentityPolicyList `json:"identityPolicies,omitempty"`
@@ -261,7 +261,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointCreateParams(
 func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointUpdateParams(
 	ctx context.Context,
 ) (storageapi.ObjectStorageEndpointUpdate, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[storageapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return storageapi.ObjectStorageEndpointUpdate{}, diagnostics
 	}
@@ -276,7 +276,7 @@ func (m *ObjectStorageEndpointModel) NscaleObjectStorageEndpointUpdateParams(
 		Metadata: storageapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[storageapi.Tag](tags),
 		},
 		Spec: &storageapi.ObjectStorageEndpointUpdateSpec{IdentityPolicies: nil},
 	}

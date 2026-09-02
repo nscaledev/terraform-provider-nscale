@@ -24,7 +24,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
@@ -71,7 +70,7 @@ func NewNetworkModel(source *regionapi.NetworkV2Read) NetworkModel {
 }
 
 func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regionapi.NetworkV2Create, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.NetworkV2Create{}, diagnostics
 	}
@@ -101,7 +100,7 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 		nonEmptyRoutes = &routes
 	}
 
-	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", regionids.ParseRegionID, &diagnostics)
+	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", &diagnostics)
 	if !ok {
 		return regionapi.NetworkV2Create{}, diagnostics
 	}
@@ -110,14 +109,14 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 		},
 		Spec: regionapi.NetworkV2CreateSpec{
 			DnsNameservers: dnsNameservers,
 			OrganizationId: organizationID,
 			Prefix:         m.CIDRBlock.ValueString(),
 			ProjectId:      m.ProjectID.ValueString(),
-			RegionId:       regionapi.RegionId(regionID),
+			RegionId:       regionID,
 			// Network reservations are not exposed by this resource.
 			Reservations: nil,
 			Routes:       nonEmptyRoutes,
@@ -128,7 +127,7 @@ func (m *NetworkModel) NscaleNetworkCreateParams(organizationID string) (regiona
 }
 
 func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.NetworkV2Update{}, diagnostics
 	}
@@ -162,7 +161,7 @@ func (m *NetworkModel) NscaleNetworkUpdateParams() (regionapi.NetworkV2Update, d
 		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 		},
 		Spec: regionapi.NetworkV2Spec{
 			DnsNameservers: dnsNameservers,

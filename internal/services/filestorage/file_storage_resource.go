@@ -37,7 +37,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -497,18 +496,15 @@ func (r *FileStorageResource) Update(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, ok := nscale.ParseID(id, "File Storage", regionids.ParseFileStorageID, &response.Diagnostics)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", &response.Diagnostics)
 	if !ok {
 		return
 	}
 
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata.Tags)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
-	fileStorageUpdateResponse, err := r.client.Region.PutApiV2FilestorageFilestorageID(
-		ctx,
-		regionapi.FilestorageIDParameter(fileStorageID),
-		params,
-	)
+	fileStorageUpdateResponse, err := r.client.Region.PutApiV2FilestorageFilestorageID(ctx, fileStorageID, params)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Update File Storage",
@@ -560,15 +556,12 @@ func (r *FileStorageResource) Delete(
 
 	id := data.ID.ValueString()
 
-	fileStorageID, ok := nscale.ParseID(id, "File Storage", regionids.ParseFileStorageID, &response.Diagnostics)
+	fileStorageID, ok := nscale.ParseID(id, "File Storage", &response.Diagnostics)
 	if !ok {
 		return
 	}
 
-	fileStorageDeleteResponse, err := r.client.Region.DeleteApiV2FilestorageFilestorageID(
-		ctx,
-		regionapi.FilestorageIDParameter(fileStorageID),
-	)
+	fileStorageDeleteResponse, err := r.client.Region.DeleteApiV2FilestorageFilestorageID(ctx, fileStorageID)
 	if err != nil {
 		response.Diagnostics.AddError(
 			"Failed to Delete File Storage",

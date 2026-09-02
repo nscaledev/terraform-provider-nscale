@@ -282,20 +282,17 @@ func instanceUpdate(
 		return "", diagnostics
 	}
 
-	instanceID, ok := nscale.ParseID(id, "Instance", uuid.Parse, &diagnostics)
+	// Tag the update so the watcher can confirm the PUT has propagated through
+	// the cache-backed API before reading back a terminal status.
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
+
+	instanceID, ok := nscale.ParseID(id, "Instance", &diagnostics)
 	if !ok {
 		return "", diagnostics
 	}
 
-	// Tag the update so the watcher can confirm the PUT has propagated through
-	// the cache-backed API before reading back a terminal status.
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata.Tags)
-
-	updateResponse, err := client.Compute.PutApiV2InstancesInstanceID(
-		ctx,
-		instanceID,
-		params,
-	)
+	updateResponse, err := client.Compute.PutApiV2InstancesInstanceID(ctx, instanceID, params)
 	if err != nil {
 		diagnostics.AddError(
 			"Failed to Update Instance",
@@ -323,10 +320,7 @@ func instanceDelete(ctx context.Context, client *nscale.Client, id string) error
 		return err
 	}
 
-	deleteResponse, err := client.Compute.DeleteApiV2InstancesInstanceID(
-		ctx,
-		instanceID,
-	)
+	deleteResponse, err := client.Compute.DeleteApiV2InstancesInstanceID(ctx, instanceID)
 	if err != nil {
 		return err
 	}

@@ -374,7 +374,8 @@ func computeClusterUpdate(
 
 	// Tag the update so the watcher can confirm the PUT has propagated through
 	// the cache-backed API before reading back a terminal status.
-	operationTagKey := nscale.WriteOperationTag(&requestData.Metadata.Tags)
+	taggedList, operationTagKey := nscale.AppendOperationTag(requestData.Metadata.Tags)
+	requestData.Metadata.Tags = taggedList
 
 	updateResponse, err := client.LegacyCompute.PutApiV1OrganizationsOrganizationIDProjectsProjectIDClustersClusterID(
 		ctx,

@@ -33,7 +33,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -314,16 +313,17 @@ func (r *SecurityGroupResource) Update(
 
 	id := data.ID.ValueString()
 
-	securityGroupID, ok := nscale.ParseID(id, "Security Group", regionids.ParseSecurityGroupID, &response.Diagnostics)
+	securityGroupID, ok := nscale.ParseID(id, "Security Group", &response.Diagnostics)
 	if !ok {
 		return
 	}
 
-	operationTagKey := nscale.WriteOperationTag(&params.Metadata.Tags)
+	taggedList, operationTagKey := nscale.AppendOperationTag(params.Metadata.Tags)
+	params.Metadata.Tags = taggedList
 
 	securityGroupUpdateResponse, err := r.client.Region.PutApiV2SecuritygroupsSecurityGroupID(
 		ctx,
-		regionapi.SecurityGroupIDParameter(securityGroupID),
+		securityGroupID,
 		params,
 	)
 	if err != nil {
@@ -375,7 +375,7 @@ func (r *SecurityGroupResource) Delete(
 
 	id := data.ID.ValueString()
 
-	securityGroupID, ok := nscale.ParseID(id, "Security Group", regionids.ParseSecurityGroupID, &response.Diagnostics)
+	securityGroupID, ok := nscale.ParseID(id, "Security Group", &response.Diagnostics)
 	if !ok {
 		return
 	}
@@ -389,10 +389,7 @@ func (r *SecurityGroupResource) Delete(
 	// Retry while the API reports the SG is still in use — typically a parallel
 	// instance update is dropping the reference. See nscale.RetryDelete.
 	err := nscale.RetryDelete(ctx, deleteTimeout, func(ctx context.Context) (error, bool) {
-		deleteResponse, deleteErr := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(
-			ctx,
-			regionapi.SecurityGroupIDParameter(securityGroupID),
-		)
+		deleteResponse, deleteErr := r.client.Region.DeleteApiV2SecuritygroupsSecurityGroupID(ctx, securityGroupID)
 		if deleteErr != nil {
 			return deleteErr, false
 		}

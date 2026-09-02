@@ -24,7 +24,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
@@ -105,7 +104,7 @@ func NewSecurityGroupRuleModel(source regionapi.SecurityGroupRuleV2) attr.Value 
 }
 
 func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.SecurityGroupV2Create, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.SecurityGroupV2Create{}, diagnostics
 	}
@@ -122,7 +121,7 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 		rules = append(rules, source.NscaleSecurityGroupRule())
 	}
 
-	networkID, ok := nscale.ParseID(m.NetworkID.ValueString(), "Network", regionids.ParseNetworkID, &diagnostics)
+	networkID, ok := nscale.ParseID(m.NetworkID.ValueString(), "Network", &diagnostics)
 	if !ok {
 		return regionapi.SecurityGroupV2Create{}, diagnostics
 	}
@@ -131,10 +130,10 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 		},
 		Spec: regionapi.SecurityGroupV2CreateSpec{
-			NetworkId: regionapi.NetworkId(networkID),
+			NetworkId: networkID,
 			Rules:     rules,
 		},
 	}
@@ -143,7 +142,7 @@ func (m *SecurityGroupModel) NscaleSecurityGroupCreateParams() (regionapi.Securi
 }
 
 func (m *SecurityGroupModel) NscaleSecurityGroupUpdateParams() (regionapi.SecurityGroupV2Update, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.SecurityGroupV2Update{}, diagnostics
 	}
@@ -164,7 +163,7 @@ func (m *SecurityGroupModel) NscaleSecurityGroupUpdateParams() (regionapi.Securi
 		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 		},
 		Spec: regionapi.SecurityGroupV2Spec{
 			Rules: rules,

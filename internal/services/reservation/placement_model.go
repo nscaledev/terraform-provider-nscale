@@ -202,7 +202,7 @@ func newPlacementServerNetworkingObject(source *reservationapi.PlacementServerNe
 func (m *PlacementModel) NscalePlacementCreateParams(
 	ctx context.Context,
 ) (reservationapi.PlacementV2Create, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[reservationapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return reservationapi.PlacementV2Create{}, diagnostics
 	}
@@ -222,7 +222,7 @@ func (m *PlacementModel) NscalePlacementCreateParams(
 		Metadata: reservationapi.ResourceMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[reservationapi.Tag](tags),
 		},
 		Spec: reservationapi.PlacementV2CreateSpec{
 			ReservationId: m.ReservationID.ValueString(),

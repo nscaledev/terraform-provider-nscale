@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
@@ -35,10 +36,7 @@ func getInstance(
 		return nil, nscale.ResourceStatus{}, err
 	}
 
-	instanceResponse, err := client.Compute.GetApiV2InstancesInstanceID(
-		ctx,
-		instanceID,
-	)
+	instanceResponse, err := client.Compute.GetApiV2InstancesInstanceID(ctx, instanceID)
 	if err != nil {
 		return nil, nscale.ResourceStatus{}, err
 	}
@@ -52,7 +50,7 @@ func getInstance(
 	return instance, nscale.NewResourceStatus(
 		instance.Metadata.Id,
 		instance.Metadata.Name,
-		string(instance.Metadata.ProvisioningStatus),
+		instance.Metadata.ProvisioningStatus,
 		instance.Metadata.Tags,
 	), nil
 }

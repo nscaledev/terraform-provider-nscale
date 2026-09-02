@@ -25,7 +25,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
@@ -311,7 +310,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 	ctx context.Context,
 	organizationID string,
 ) (regionapi.StorageV2Create, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Create{}, diagnostics
 	}
@@ -328,7 +327,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 		return regionapi.StorageV2Create{}, diagnostics
 	}
 
-	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", regionids.ParseRegionID, &diagnostics)
+	regionID, ok := nscale.ParseID(m.RegionID.ValueString(), "Region", &diagnostics)
 	if !ok {
 		return regionapi.StorageV2Create{}, diagnostics
 	}
@@ -337,7 +336,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 	fileStorage.Metadata = regionapi.ResourceMetadata{
 		Description: m.Description.ValueStringPointer(),
 		Name:        m.Name.ValueString(),
-		Tags:        tags,
+		Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 	}
 	fileStorage.Spec.Attachments = &regionapi.StorageAttachmentV2Spec{NetworkIds: networkIDs}
 	fileStorage.Spec.DefaultSnapshotProtectionEnabled = defaultSnapshotProtectionPointer(
@@ -346,7 +345,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 	fileStorage.Spec.SnapshotPolicies = snapshotPolicies
 	fileStorage.Spec.OrganizationId = organizationID
 	fileStorage.Spec.ProjectId = m.ProjectID.ValueString()
-	fileStorage.Spec.RegionId = regionapi.RegionId(regionID)
+	fileStorage.Spec.RegionId = regionID
 	fileStorage.Spec.SizeGiB = m.Capacity.ValueInt64()
 	fileStorage.Spec.StorageClassId = m.StorageClassID.ValueString()
 	fileStorage.Spec.StorageType = regionapi.StorageTypeV2Spec{
@@ -363,7 +362,7 @@ func (m *FileStorageModel) NscaleFileStorageCreateParams(
 func (m *FileStorageModel) NscaleFileStorageUpdateParams(
 	ctx context.Context,
 ) (regionapi.StorageV2Update, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[regionapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return regionapi.StorageV2Update{}, diagnostics
 	}
@@ -400,7 +399,7 @@ func (m *FileStorageModel) NscaleFileStorageUpdateParams(
 		Metadata: regionapi.ResourceMetadata{
 			Description: m.Description.ValueStringPointer(),
 			Name:        m.Name.ValueString(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[regionapi.Tag](tags),
 		},
 		Spec: regionapi.StorageV2Spec{
 			Attachments: &regionapi.StorageAttachmentV2Spec{

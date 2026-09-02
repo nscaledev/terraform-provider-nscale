@@ -21,23 +21,14 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tags"
 )
-
-type tag interface {
-	~struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
-	}
-}
-
-type tagValue struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
 
 // Base64StringValue renders raw bytes returned by the API as the base64 string
 // held in configuration and state.
@@ -81,6 +72,25 @@ func ValueBase64BytesPointer(value basetypes.StringValue, attributeName string) 
 	return &decoded, nil
 }
 
+// UUIDStringValue renders a UUID-typed API field as the string held in state.
+//
+// The canonical specs type resource identifiers as UUIDs, while Terraform
+// carries every identifier as a string, so reads convert on the way in and
+// nscale.ParseID converts on the way out.
+func UUIDStringValue(id uuid.UUID) basetypes.StringValue {
+	return types.StringValue(id.String())
+}
+
+// UUIDStringPointerValue is UUIDStringValue for an optional field, mapping an
+// absent identifier to null rather than to the zero UUID.
+func UUIDStringPointerValue(id *uuid.UUID) basetypes.StringValue {
+	if id == nil {
+		return types.StringNull()
+	}
+
+	return types.StringValue(id.String())
+}
+
 func NullableListValueMust(elementType attr.Type, elements []attr.Value) basetypes.ListValue {
 	if len(elements) == 0 {
 		return basetypes.NewListNull(elementType)
@@ -95,21 +105,26 @@ func NullableSetValueMust(elementType attr.Type, elements []attr.Value) basetype
 	return basetypes.NewSetValueMust(elementType, elements)
 }
 
-func TagMapValueMust[T tag](tags *[]T) basetypes.MapValue {
-	if tags == nil || len(*tags) == 0 {
+// TagMapValueMust renders tags as the map attribute held in state. It is generic
+// over the tag type so it accepts a response's tags straight from any service
+// package as well as the provider's own tags.List.
+func TagMapValueMust[T tags.SDKTag](tagList *[]T) basetypes.MapValue {
+	if tagList == nil || len(*tagList) == 0 {
 		return basetypes.NewMapNull(types.StringType)
 	}
 
-	elements := make(map[string]attr.Value, len(*tags))
-	for _, tag := range *tags {
-		value := tagValue(tag)
-		elements[value.Name] = types.StringValue(value.Value)
+	elements := make(map[string]attr.Value, len(*tagList))
+	for _, tag := range *tags.FromAPI(tagList) {
+		elements[tag.Name] = types.StringValue(tag.Value)
 	}
 
 	return basetypes.NewMapValueMust(types.StringType, elements)
 }
 
-func ValueTagListPointer[T tag](tagMap basetypes.MapValue) (*[]T, diag.Diagnostics) {
+// ValueTagListPointer reads a map attribute into the provider's own tag list.
+// Callers building a request body convert to their service's tag type at the
+// point of use, with nscale.TagsToAPI.
+func ValueTagListPointer(tagMap basetypes.MapValue) (*tags.List, diag.Diagnostics) {
 	if tagMap.IsNull() || tagMap.IsUnknown() {
 		return nil, nil
 	}
@@ -123,13 +138,13 @@ func ValueTagListPointer[T tag](tagMap basetypes.MapValue) (*[]T, diag.Diagnosti
 		return nil, nil
 	}
 
-	tags := make([]T, 0, len(data))
+	tagList := make(tags.List, 0, len(data))
 	for name, value := range data {
-		tags = append(tags, T(tagValue{
+		tagList = append(tagList, tags.Tag{
 			Name:  name,
 			Value: value,
-		}))
+		})
 	}
 
-	return &tags, nil
+	return &tagList, nil
 }

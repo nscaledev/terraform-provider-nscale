@@ -19,8 +19,8 @@ package filestorage
 import (
 	"context"
 
+	"github.com/google/uuid"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -30,15 +30,12 @@ func getFileStorage(
 	id string,
 	client *nscale.Client,
 ) (*regionapi.StorageV2Read, nscale.ResourceStatus, error) {
-	fileStorageID, err := regionids.ParseFileStorageID(id)
+	fileStorageID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, nscale.ResourceStatus{}, err
 	}
 
-	fileStorageResponse, err := client.Region.GetApiV2FilestorageFilestorageID(
-		ctx,
-		regionapi.FilestorageIDParameter(fileStorageID),
-	)
+	fileStorageResponse, err := client.Region.GetApiV2FilestorageFilestorageID(ctx, fileStorageID)
 	if err != nil {
 		return nil, nscale.ResourceStatus{}, err
 	}
@@ -52,7 +49,7 @@ func getFileStorage(
 	return fileStorage, nscale.NewResourceStatus(
 		fileStorage.Metadata.Id,
 		fileStorage.Metadata.Name,
-		string(fileStorage.Metadata.ProvisioningStatus),
+		fileStorage.Metadata.ProvisioningStatus,
 		fileStorage.Metadata.Tags,
 	), nil
 }

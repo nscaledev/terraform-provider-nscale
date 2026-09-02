@@ -23,9 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
-	identityids "github.com/unikorn-cloud/identity/pkg/ids"
-	regionids "github.com/unikorn-cloud/region/pkg/ids"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -159,30 +157,20 @@ func (s *InstanceFlavorDataSource) Read(
 		return
 	}
 
-	organizationID, ok := nscale.ParseID(
-		s.client.OrganizationID,
-		"Organization",
-		identityids.ParseOrganizationID,
-		&response.Diagnostics,
-	)
+	organizationID, ok := nscale.ParseID(s.client.OrganizationID, "Organization", &response.Diagnostics)
 	if !ok {
 		return
 	}
 
-	regionID, ok := nscale.ParseID(
-		data.RegionID.ValueString(),
-		"Region",
-		regionids.ParseRegionID,
-		&response.Diagnostics,
-	)
+	regionID, ok := nscale.ParseID(data.RegionID.ValueString(), "Region", &response.Diagnostics)
 	if !ok {
 		return
 	}
 
 	flavorListResponse, err := s.client.Compute.GetApiV1OrganizationsOrganizationIDRegionsRegionIDFlavors(
 		ctx,
-		computeapi.OrganizationIDParameter(organizationID),
-		computeapi.RegionIDParameter(regionID),
+		organizationID,
+		regionID,
 	)
 	if err != nil {
 		response.Diagnostics.AddError(
@@ -193,7 +181,7 @@ func (s *InstanceFlavorDataSource) Read(
 	}
 	defer flavorListResponse.Body.Close()
 
-	flavors, err := nscale.ReadJSONResponseValue[[]computeapi.Flavor](flavorListResponse)
+	flavors, err := nscale.ReadJSONResponseValue[[]regionapi.Flavor](flavorListResponse)
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(

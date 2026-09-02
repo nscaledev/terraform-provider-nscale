@@ -39,8 +39,10 @@ schema-update:
 
 # -p 1 serializes packages: acceptance tests share one project, and the API can
 # fail to provision resources (e.g. networks) created concurrently across them.
+#
+# PKG narrows the run to one package, e.g. PKG=./internal/services/reservation/.
 testacc:
-	TF_ACC=1 go test -v -cover -p 1 -timeout 120m ./...
+	TF_ACC=1 go test -v -cover -p 1 -timeout 120m $(or $(PKG),./...)
 
 # testacc-env is the developer-facing wrapper: source NSCALE_* and TF_ACC env
 # vars from a local .env (gitignored) and then run testacc. Use this rather
@@ -49,4 +51,45 @@ testacc-env:
 	@test -f .env || { echo ".env not found — copy a teammate's or pull from your secret store"; exit 1; }
 	@set -a; . ./.env; set +a; $(MAKE) testacc
 
-.PHONY: fmt lint test schema-check schema-update testacc testacc-env build install generate
+# testacc-profile runs the suite against one gitignored terraform.<profile>.tfvars.
+#
+# Profiles exist because no single region can satisfy every test: `staging` uses
+# no-glo1, the only region with both storage classes, and `staging-reservation`
+# uses stgstack, the only one with usable reservation capacity. A profile omits
+# the fixtures its region cannot provide, so those tests skip rather than fail.
+#
+#   make testacc-profile PROFILE=staging
+#   make testacc-profile PROFILE=staging-reservation
+#   make testacc-profile PROFILE=staging PKG=./internal/services/reservation/
+
+# Every package's testAccPreCheck requires these four before the provider will
+# construct a client, so a profile missing one skips the whole suite rather than
+# failing. They are checked up front instead of surfacing as a wall of SKIPs at
+# the end of a -timeout 120m run.
+#
+# The remaining NSCALE_TEST_* fixtures are deliberately absent from some
+# profiles — that is what makes their tests skip — so they cannot be checked
+# here. What catches a typo or a rename in one of those is tfvars-to-env.sh,
+# which exits non-zero on a key it has no mapping for.
+#
+# The script's status is captured into `exports` before being eval'd, not eval'd
+# directly: `eval "$(cmd)"` reports the status of the *evaluated* text, so a
+# script that exits non-zero after printing some exports would look like a
+# success. An assignment does carry its command substitution's status, so the
+# `|| exit 1` below is what actually stops the run.
+testacc_required_env = NSCALE_SERVICE_TOKEN NSCALE_ORGANIZATION_ID NSCALE_REGION_ID NSCALE_PROJECT_ID
+
+testacc-profile:
+	@test -n "$(PROFILE)" || { echo "PROFILE is required, e.g. make testacc-profile PROFILE=staging"; exit 1; }
+	@test -f terraform.$(PROFILE).tfvars || { echo "terraform.$(PROFILE).tfvars not found — pull it from 1Password"; exit 1; }
+	@exports="$$(./scripts/tfvars-to-env.sh terraform.$(PROFILE).tfvars)" || exit 1; \
+		eval "$$exports"; \
+		missing=""; \
+		for v in $(testacc_required_env); do \
+			eval "value=\$$$$v"; \
+			test -n "$$value" || missing="$$missing $$v"; \
+		done; \
+		test -z "$$missing" || { echo "terraform.$(PROFILE).tfvars does not set:$$missing"; exit 1; }; \
+		$(MAKE) testacc
+
+.PHONY: fmt lint test schema-check schema-update testacc testacc-env testacc-profile build install generate

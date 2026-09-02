@@ -28,29 +28,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tags"
 )
 
 const (
 	TerraformOperationTagPrefix = "terraform.nscale.com/"
 	defaultStateWatcherTimeout  = 30 * time.Minute
-	provisioningStatusError     = "error"
-	provisioningStatusPending   = "pending"
-	provisioningStatusReady     = "provisioned"
-	provisioningStatusCreating  = "provisioning"
-	provisioningStatusUnknown   = "unknown"
 )
-
-type tag interface {
-	~struct {
-		Name  string `json:"name"`
-		Value string `json:"value"`
-	}
-}
-
-type tagValue struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
 
 type StateReaderFunc func(ctx context.Context, target any) diag.Diagnostics
 
@@ -68,18 +53,41 @@ func ReadTerraformState[T any](ctx context.Context, fn StateReaderFunc, mutates 
 	return data, nil
 }
 
-// ParseID parses a typed SDK ID and appends a consistent Terraform diagnostic on failure.
-func ParseID[T any](raw, label string, parse func(string) (T, error), diagnostics *diag.Diagnostics) (T, bool) {
-	id, err := parse(raw)
+// ParseID parses a resource identifier and appends a consistent Terraform
+// diagnostic on failure. label is the resource's human name in title case
+// ("Network", "File Storage"), so the diagnostic reads "Invalid Network ID".
+//
+// The canonical specs type every identifier as a UUID, so this is the provider's
+// single conversion point from the strings Terraform carries: a malformed
+// identifier is reported against the resource that owns it rather than sent to
+// the API as an opaque string.
+func ParseID(raw, label string, diagnostics *diag.Diagnostics) (uuid.UUID, bool) {
+	id, err := uuid.Parse(raw)
 	if err != nil {
 		diagnostics.AddError(
 			fmt.Sprintf("Invalid %s ID", label),
 			fmt.Sprintf("Could not parse %s ID %q: %s", strings.ToLower(label), raw, err),
 		)
-		return id, false
+		return uuid.UUID{}, false
 	}
 
 	return id, true
+}
+
+// ParseOptionalID is ParseID for an optional identifier: an unset value yields a
+// nil pointer with no diagnostic, so the field is simply omitted from the
+// request. A null or unknown attribute reaches here as the empty string.
+func ParseOptionalID(raw, label string, diagnostics *diag.Diagnostics) (*uuid.UUID, bool) {
+	if raw == "" {
+		return nil, true
+	}
+
+	id, ok := ParseID(raw, label, diagnostics)
+	if !ok {
+		return nil, false
+	}
+
+	return &id, true
 }
 
 func assertState[T any](state any, diagnostics *diag.Diagnostics) (*T, bool) {
@@ -104,7 +112,7 @@ func addProvisioningErrorDiagnostic(
 	found bool,
 	detail string,
 ) bool {
-	if !found || status.ProvisioningStatus != provisioningStatusError {
+	if !found || status.ProvisioningStatus != ProvisioningStatusError {
 		return false
 	}
 
@@ -139,20 +147,20 @@ func (w *CreateStateWatcher[T]) Wait(
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
 		Pending: []string{
-			provisioningStatusCreating,
-			provisioningStatusPending,
-			provisioningStatusUnknown,
+			string(ProvisioningStatusProvisioning),
+			string(ProvisioningStatusPending),
+			string(ProvisioningStatusUnknown),
 		},
 		Target: []string{
-			provisioningStatusReady,
-			provisioningStatusError,
+			string(ProvisioningStatusProvisioned),
+			string(ProvisioningStatusError),
 		},
 		Refresh: func() (any, string, error) {
 			result, status, err := w.GetFunc(ctx)
 			if err != nil {
 				if e, ok := AsAPIError(err); ok && e.StatusCode == http.StatusNotFound {
 					// FIXME: Temporary workaround for resources that might not yet be visible in the cache-backed client. Should be revisited once API consistency is guaranteed.
-					return nil, provisioningStatusUnknown, nil
+					return nil, string(ProvisioningStatusUnknown), nil
 				}
 				return nil, "", err
 			}
@@ -229,29 +237,37 @@ func (r *ResourceReader[T]) Read(ctx context.Context, id string, response *resou
 	return result, true
 }
 
-func WriteOperationTag[T tag](tags **[]T) string {
+// AppendOperationTag returns tagList with a freshly minted operation tag
+// appended, along with that tag's key for the update watcher to poll for.
+//
+// It takes and returns the tags alone rather than the enclosing write metadata:
+// every service declares its own metadata struct, and a generic function cannot
+// reach a field on one. Callers assign the result back:
+//
+//	params.Metadata.Tags, operationTagKey = nscale.AppendOperationTag(params.Metadata.Tags)
+func AppendOperationTag[T tags.SDKTag](tagList *[]T) (*[]T, string) {
 	operationKey := TerraformOperationTagPrefix + uuid.NewString()
 
-	if *tags == nil {
-		values := []T{}
-		*tags = &values
+	appended := TagList{}
+	if existing := tags.FromAPI(tagList); existing != nil {
+		appended = append(appended, *existing...)
 	}
 
-	**tags = append(**tags, T(tagValue{
+	appended = append(appended, Tag{
 		Name:  operationKey,
 		Value: time.Now().Format(time.RFC3339),
-	}))
+	})
 
-	return operationKey
+	return TagsToAPI[T](&appended), operationKey
 }
 
-func HasOperationTag[T tag](tags *[]T, operationTag string) bool {
-	if tags == nil {
+func HasOperationTag(tagList *TagList, operationTag string) bool {
+	if tagList == nil {
 		return false
 	}
 
-	for _, tag := range *tags {
-		if tagValue(tag).Name == operationTag {
+	for _, tag := range *tagList {
+		if tag.Name == operationTag {
 			return true
 		}
 	}
@@ -259,8 +275,9 @@ func HasOperationTag[T tag](tags *[]T, operationTag string) bool {
 	return false
 }
 
-func RemoveOperationTags[T tag](tags *[]T) *[]T {
-	if tags == nil {
+func RemoveOperationTags[T tags.SDKTag](tagList *[]T) *TagList {
+	converted := tags.FromAPI(tagList)
+	if converted == nil {
 		return nil
 	}
 
@@ -269,9 +286,9 @@ func RemoveOperationTags[T tag](tags *[]T) *[]T {
 	// schema forbids users from setting reserved-prefix tags), otherwise an update
 	// that wrote one produces an "inconsistent result after apply" on the tags
 	// attribute. Strip every operation tag regardless of age.
-	var filtered []T
-	for _, tag := range *tags {
-		if strings.HasPrefix(tagValue(tag).Name, TerraformOperationTagPrefix) {
+	var filtered TagList
+	for _, tag := range *converted {
+		if strings.HasPrefix(tag.Name, TerraformOperationTagPrefix) {
 			continue
 		}
 		filtered = append(filtered, tag)
@@ -321,7 +338,7 @@ func (w *UpdateStateWatcher[T]) Wait(
 			lastStatus = status
 			haveStatus = true
 
-			if status.ProvisioningStatus == provisioningStatusError {
+			if status.ProvisioningStatus == ProvisioningStatusError {
 				return result, UpdateStateProvisioningError, nil
 			}
 
@@ -394,7 +411,7 @@ func (w *DeleteStateWatcher) Wait(
 			if err == nil {
 				lastStatus = status
 				haveStatus = true
-				if status.ProvisioningStatus == provisioningStatusError {
+				if status.ProvisioningStatus == ProvisioningStatusError {
 					return struct{}{}, DeleteStateProvisioningError, nil
 				}
 				return struct{}{}, DeleteStateDeleting, nil

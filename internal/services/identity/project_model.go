@@ -72,7 +72,7 @@ func (m *ProjectModel) groupIDs(ctx context.Context) ([]string, diag.Diagnostics
 }
 
 func (m *ProjectModel) NscaleProjectCreateParams(ctx context.Context) (identityapi.ProjectWrite, diag.Diagnostics) {
-	tags, diagnostics := tftypes.ValueTagListPointer[identityapi.Tag](m.Tags)
+	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return identityapi.ProjectWrite{}, diagnostics
 	}
@@ -87,7 +87,7 @@ func (m *ProjectModel) NscaleProjectCreateParams(ctx context.Context) (identitya
 		Metadata: identityapi.ResourceMetadata{
 			Name:        m.Name.ValueString(),
 			Description: m.Description.ValueStringPointer(),
-			Tags:        tags,
+			Tags:        nscale.TagsToAPI[identityapi.Tag](tags),
 		},
 		Spec: identityapi.ProjectSpec{
 			GroupIDs: groupIDs,

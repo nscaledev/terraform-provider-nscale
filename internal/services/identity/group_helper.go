@@ -19,8 +19,8 @@ package identity
 import (
 	"context"
 
+	"github.com/google/uuid"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
-	identityids "github.com/unikorn-cloud/identity/pkg/ids"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -30,20 +30,20 @@ func getGroup(
 	id string,
 	client *nscale.Client,
 ) (*identityapi.GroupRead, error) {
-	organizationID, err := identityids.ParseOrganizationID(client.OrganizationID)
+	organizationID, err := uuid.Parse(client.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
 
-	groupID, err := identityids.ParseGroupID(id)
+	groupID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
 	}
 
 	groupResponse, err := client.Identity.GetApiV1OrganizationsOrganizationIDGroupsGroupid(
 		ctx,
-		identityapi.OrganizationIDParameter(organizationID),
-		identityapi.GroupidParameter(groupID),
+		organizationID,
+		groupID,
 	)
 	if err != nil {
 		return nil, err
@@ -59,7 +59,9 @@ func getGroup(
 }
 
 // getGroupStatus reads a group and adapts it to the shared watchers'
-// (resource, ResourceStatus, error) shape.
+// (resource, ResourceStatus, error) shape. Identity reads are
+// organization-scoped, which the projection absorbs: ResourceStatus carries no
+// project, so both scopes' metadata map onto it identically.
 func getGroupStatus(
 	ctx context.Context,
 	id string,
@@ -73,7 +75,7 @@ func getGroupStatus(
 	return group, nscale.NewResourceStatus(
 		group.Metadata.Id,
 		group.Metadata.Name,
-		string(group.Metadata.ProvisioningStatus),
+		group.Metadata.ProvisioningStatus,
 		group.Metadata.Tags,
 	), nil
 }

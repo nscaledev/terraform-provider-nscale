@@ -51,7 +51,7 @@ func getComputeCluster(
 			return &computeCluster, nscale.NewResourceStatus(
 				computeCluster.Metadata.Id,
 				computeCluster.Metadata.Name,
-				string(computeCluster.Metadata.ProvisioningStatus),
+				computeCluster.Metadata.ProvisioningStatus,
 				computeCluster.Metadata.Tags,
 			), nil
 		}

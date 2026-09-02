@@ -18,7 +18,7 @@ package instance
 
 import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
+	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 )
 
 type InstanceSSHKeyModel struct {
@@ -26,7 +26,7 @@ type InstanceSSHKeyModel struct {
 	PrivateKey types.String `tfsdk:"private_key"`
 }
 
-func NewInstanceSSHKeyModel(instanceID string, source *computeapi.SshKey) InstanceSSHKeyModel {
+func NewInstanceSSHKeyModel(instanceID string, source *regionapi.SshKey) InstanceSSHKeyModel {
 	return InstanceSSHKeyModel{
 		InstanceID: types.StringValue(instanceID),
 		PrivateKey: types.StringValue(source.PrivateKey),
