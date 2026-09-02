@@ -55,21 +55,29 @@ resource "nscale_reservation" "training" {
   tags = {
     workload = "training"
   }
+}
 
-  # Fail during plan with a clear message rather than during apply with a 507.
-  # Capacity is shared across the organization, so this narrows the window
-  # rather than closing it — an apply can still lose a race for the last block.
-  lifecycle {
-    precondition {
-      condition = var.unit_count <= data.nscale_reservation_unit.training.largest_contiguous_unit_count
-      error_message = format(
-        "Requested %d contiguous %s %s units but the largest contiguous block currently available is %d.",
-        var.unit_count,
-        var.accelerator,
-        var.unit,
-        data.nscale_reservation_unit.training.largest_contiguous_unit_count,
-      )
-    }
+# Warn during plan rather than discovering a 507 during apply. Capacity is shared
+# across the organization, so this narrows the window rather than closing it — an
+# apply can still lose a race for the last block.
+#
+# A check rather than a lifecycle precondition, because
+# largest_contiguous_unit_count is live availability, not a fixed shape: once this
+# reservation claims its block the figure drops by what it took. A precondition
+# would then fail every subsequent plan — including the unit_count resize it was
+# written to guard, since that forces replacement and is checked against capacity
+# that still excludes the units about to be released. A check warns instead of
+# blocking, which is what "advisory" should cost.
+check "reservation_capacity" {
+  assert {
+    condition = var.unit_count <= data.nscale_reservation_unit.training.largest_contiguous_unit_count
+    error_message = format(
+      "Requested %d contiguous %s %s units but the largest contiguous block currently available is %d.",
+      var.unit_count,
+      var.accelerator,
+      var.unit,
+      data.nscale_reservation_unit.training.largest_contiguous_unit_count,
+    )
   }
 }
 
