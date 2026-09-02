@@ -71,12 +71,19 @@ testacc-env:
 # profiles — that is what makes their tests skip — so they cannot be checked
 # here. What catches a typo or a rename in one of those is tfvars-to-env.sh,
 # which exits non-zero on a key it has no mapping for.
+#
+# The script's status is captured into `exports` before being eval'd, not eval'd
+# directly: `eval "$(cmd)"` reports the status of the *evaluated* text, so a
+# script that exits non-zero after printing some exports would look like a
+# success. An assignment does carry its command substitution's status, so the
+# `|| exit 1` below is what actually stops the run.
 testacc_required_env = NSCALE_SERVICE_TOKEN NSCALE_ORGANIZATION_ID NSCALE_REGION_ID NSCALE_PROJECT_ID
 
 testacc-profile:
 	@test -n "$(PROFILE)" || { echo "PROFILE is required, e.g. make testacc-profile PROFILE=staging"; exit 1; }
 	@test -f terraform.$(PROFILE).tfvars || { echo "terraform.$(PROFILE).tfvars not found — pull it from 1Password"; exit 1; }
-	@eval "$$(./scripts/tfvars-to-env.sh terraform.$(PROFILE).tfvars)"; \
+	@exports="$$(./scripts/tfvars-to-env.sh terraform.$(PROFILE).tfvars)" || exit 1; \
+		eval "$$exports"; \
 		missing=""; \
 		for v in $(testacc_required_env); do \
 			eval "value=\$$$$v"; \
