@@ -234,3 +234,28 @@ func TestNewInstanceModelNullUserData(t *testing.T) {
 		t.Errorf("UserData = %v, want null", model.UserData)
 	}
 }
+
+func TestNewInstanceModelNullNetworking(t *testing.T) {
+	source := &computeapi.InstanceRead{
+		Spec: computeapi.InstanceSpec{
+			FlavorId: testFlavorID,
+			ImageId:  testImageID,
+		},
+		Status: computeapi.InstanceStatus{
+			NetworkId: "network-1",
+		},
+	}
+
+	model := NewInstanceModel(source)
+	attributes := model.NetworkInterface.Attributes()
+
+	if got := attributes["network_id"]; !got.Equal(types.StringValue("network-1")) {
+		t.Errorf("network_id = %v, want network-1", got)
+	}
+
+	for _, name := range []string{"enable_public_ip", "security_group_ids", "allowed_destinations"} {
+		if !attributes[name].IsNull() {
+			t.Errorf("%s = %v, want null", name, attributes[name])
+		}
+	}
+}

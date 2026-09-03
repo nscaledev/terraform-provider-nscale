@@ -19,6 +19,7 @@ package filestorage_test
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -82,75 +83,126 @@ func TestAccFileStorageResource_basic(t *testing.T) {
 func TestAccFileStorageResource_nfsPolicySettings(t *testing.T) {
 	storageClassID := os.Getenv("NSCALE_TEST_FILE_STORAGE_CLASS_ID")
 
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccFileStorageResourceConfigNFSPolicy(
-					storageClassID,
-					"",
-					"posix_acl = true\natime_update_interval_seconds = 600",
-				),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("nscale_file_storage.test", "posix_acl", "true"),
-					resource.TestCheckResourceAttr(
-						"nscale_file_storage.test", "atime_update_interval_seconds", "600",
-					),
-				),
-			},
-			{
-				Config:             testAccFileStorageResourceConfigNFSPolicy(storageClassID, "", ""),
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: false,
-			},
-			{
-				Config: testAccFileStorageResourceConfigNFSPolicy(
-					storageClassID,
-					"Updated without configuring NFS policy settings",
-					"",
-				),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("nscale_file_storage.test", "posix_acl", "true"),
-					resource.TestCheckResourceAttr(
-						"nscale_file_storage.test", "atime_update_interval_seconds", "600",
-					),
-				),
-			},
-			{
-				Config: testAccFileStorageResourceConfigNFSPolicy(
-					storageClassID,
-					"Updated without configuring NFS policy settings",
-					"posix_acl = false",
-				),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("nscale_file_storage.test", "posix_acl", "false"),
-					resource.TestCheckResourceAttr(
-						"nscale_file_storage.test", "atime_update_interval_seconds", "600",
-					),
-				),
-			},
-			{
-				Config: testAccFileStorageResourceConfigNFSPolicy(
-					storageClassID,
-					"Updated without configuring NFS policy settings",
-					"atime_update_interval_seconds = 0",
-				),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("nscale_file_storage.test", "posix_acl", "false"),
-					resource.TestCheckResourceAttr(
-						"nscale_file_storage.test", "atime_update_interval_seconds", "0",
-					),
-				),
-			},
-			{
-				ResourceName:            "nscale_file_storage.test",
-				ImportState:             true,
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"timeouts", "refresh_usage"},
-			},
+	tests := []struct {
+		name                  string
+		resourceName          string
+		networkCIDR           string
+		initialSettings       string
+		updatedDescription    string
+		updatedSettings       string
+		checkUnconfiguredNoOp bool
+		initialPosixACL       bool
+		initialAtimeInterval  int64
+		expectedPosixACL      bool
+		expectedAtimeInterval int64
+	}{
+		{
+			name:                  "preserves unconfigured settings",
+			resourceName:          "tf-acc-file-storage-nfs-policy-preserve",
+			networkCIDR:           "192.168.242.0/24",
+			initialSettings:       "posix_acl = true\natime_update_interval_seconds = 600",
+			updatedDescription:    "Updated without configuring NFS policy settings",
+			checkUnconfiguredNoOp: true,
+			initialPosixACL:       true,
+			initialAtimeInterval:  600,
+			expectedPosixACL:      true,
+			expectedAtimeInterval: 600,
 		},
-	})
+		{
+			name:                  "updates POSIX ACL",
+			resourceName:          "tf-acc-file-storage-nfs-policy-posix",
+			networkCIDR:           "192.168.241.0/24",
+			initialSettings:       "posix_acl = true\natime_update_interval_seconds = 600",
+			updatedSettings:       "posix_acl = false",
+			initialPosixACL:       true,
+			initialAtimeInterval:  600,
+			expectedPosixACL:      false,
+			expectedAtimeInterval: 600,
+		},
+		{
+			name:                  "updates atime interval",
+			resourceName:          "tf-acc-file-storage-nfs-policy-atime",
+			networkCIDR:           "192.168.240.0/24",
+			initialSettings:       "posix_acl = false\natime_update_interval_seconds = 600",
+			updatedSettings:       "atime_update_interval_seconds = 0",
+			initialPosixACL:       false,
+			initialAtimeInterval:  600,
+			expectedPosixACL:      false,
+			expectedAtimeInterval: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			steps := []resource.TestStep{
+				{
+					Config: testAccFileStorageResourceConfigNFSPolicy(
+						tt.resourceName,
+						tt.networkCIDR,
+						storageClassID,
+						"",
+						tt.initialSettings,
+					),
+					Check: resource.ComposeAggregateTestCheckFunc(
+						resource.TestCheckResourceAttr(
+							"nscale_file_storage.test", "posix_acl", strconv.FormatBool(tt.initialPosixACL),
+						),
+						resource.TestCheckResourceAttr(
+							"nscale_file_storage.test", "atime_update_interval_seconds",
+							strconv.FormatInt(tt.initialAtimeInterval, 10),
+						),
+					),
+				},
+			}
+
+			if tt.checkUnconfiguredNoOp {
+				steps = append(steps, resource.TestStep{
+					Config: testAccFileStorageResourceConfigNFSPolicy(
+						tt.resourceName,
+						tt.networkCIDR,
+						storageClassID,
+						"",
+						"",
+					),
+					PlanOnly:           true,
+					ExpectNonEmptyPlan: false,
+				})
+			}
+
+			steps = append(steps,
+				resource.TestStep{
+					Config: testAccFileStorageResourceConfigNFSPolicy(
+						tt.resourceName,
+						tt.networkCIDR,
+						storageClassID,
+						tt.updatedDescription,
+						tt.updatedSettings,
+					),
+					Check: resource.ComposeAggregateTestCheckFunc(
+						resource.TestCheckResourceAttr(
+							"nscale_file_storage.test", "posix_acl", strconv.FormatBool(tt.expectedPosixACL),
+						),
+						resource.TestCheckResourceAttr(
+							"nscale_file_storage.test", "atime_update_interval_seconds",
+							strconv.FormatInt(tt.expectedAtimeInterval, 10),
+						),
+					),
+				},
+				resource.TestStep{
+					ResourceName:            "nscale_file_storage.test",
+					ImportState:             true,
+					ImportStateVerify:       true,
+					ImportStateVerifyIgnore: []string{"timeouts", "refresh_usage"},
+				},
+			)
+
+			resource.Test(t, resource.TestCase{
+				PreCheck:                 func() { testAccPreCheck(t) },
+				ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+				Steps:                    steps,
+			})
+		})
+	}
 }
 
 // TestAccFileStorageResource_defaultSnapshotProtection covers explicitly
@@ -625,28 +677,28 @@ resource "nscale_file_storage" "test" {
 `, name, storageClassID)
 }
 
-func testAccFileStorageResourceConfigNFSPolicy(storageClassID, description, settings string) string {
-	name := "tf-acc-file-storage-nfs-policy"
-
+func testAccFileStorageResourceConfigNFSPolicy(
+	name, networkCIDR, storageClassID, description, settings string,
+) string {
 	return fmt.Sprintf(`
 resource "nscale_network" "test" {
   name       = "%[1]s-net"
-  cidr_block = "192.168.242.0/24"
+  cidr_block = %[2]q
 }
 
 resource "nscale_file_storage" "test" {
   name             = %[1]q
-  description      = %[3]q
-  storage_class_id = %[2]q
+  description      = %[4]q
+  storage_class_id = %[3]q
   capacity         = 20
   root_squash      = true
-  %[4]s
+  %[5]s
 
   network {
     id = nscale_network.test.id
   }
 }
-`, name, storageClassID, description, settings)
+`, name, networkCIDR, storageClassID, description, settings)
 }
 
 func testAccFileStorageResourceConfigUpdated(name, storageClassID, description string) string {
