@@ -17,6 +17,7 @@ limitations under the License.
 package reservation_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -28,6 +29,74 @@ import (
 
 var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
 	"nscale": providerserver.NewProtocol6WithError(provider.New()),
+}
+
+func TestMain(m *testing.M) {
+	if err := applyReservationTestEnvironment(); err != nil {
+		fmt.Fprintf(os.Stderr, "configure reservation acceptance tests: %v\n", err)
+		os.Exit(1)
+	}
+
+	os.Exit(m.Run())
+}
+
+// applyReservationTestEnvironment keeps reservation-specific infrastructure
+// from changing the region and image used by the other acceptance packages.
+func applyReservationTestEnvironment() error {
+	for _, override := range []struct {
+		source string
+		target string
+	}{
+		{source: "NSCALE_TEST_RESERVATION_REGION_ID", target: "NSCALE_REGION_ID"},
+		{source: "NSCALE_TEST_RESERVATION_IMAGE_ID", target: "NSCALE_TEST_IMAGE_ID"},
+	} {
+		value := os.Getenv(override.source)
+		if value == "" {
+			continue
+		}
+
+		if err := os.Setenv(override.target, value); err != nil {
+			return fmt.Errorf("set %s from %s: %w", override.target, override.source, err)
+		}
+	}
+
+	return nil
+}
+
+func TestApplyReservationTestEnvironment(t *testing.T) {
+	t.Setenv("NSCALE_REGION_ID", "general-region")
+	t.Setenv("NSCALE_TEST_IMAGE_ID", "general-image")
+	t.Setenv("NSCALE_TEST_RESERVATION_REGION_ID", "reservation-region")
+	t.Setenv("NSCALE_TEST_RESERVATION_IMAGE_ID", "reservation-image")
+
+	if err := applyReservationTestEnvironment(); err != nil {
+		t.Fatalf("apply reservation test environment: %v", err)
+	}
+
+	if got := os.Getenv("NSCALE_REGION_ID"); got != "reservation-region" {
+		t.Errorf("NSCALE_REGION_ID = %q, want reservation-region", got)
+	}
+	if got := os.Getenv("NSCALE_TEST_IMAGE_ID"); got != "reservation-image" {
+		t.Errorf("NSCALE_TEST_IMAGE_ID = %q, want reservation-image", got)
+	}
+}
+
+func TestApplyReservationTestEnvironmentWithoutOverrides(t *testing.T) {
+	t.Setenv("NSCALE_REGION_ID", "general-region")
+	t.Setenv("NSCALE_TEST_IMAGE_ID", "general-image")
+	t.Setenv("NSCALE_TEST_RESERVATION_REGION_ID", "")
+	t.Setenv("NSCALE_TEST_RESERVATION_IMAGE_ID", "")
+
+	if err := applyReservationTestEnvironment(); err != nil {
+		t.Fatalf("apply reservation test environment: %v", err)
+	}
+
+	if got := os.Getenv("NSCALE_REGION_ID"); got != "general-region" {
+		t.Errorf("NSCALE_REGION_ID = %q, want general-region", got)
+	}
+	if got := os.Getenv("NSCALE_TEST_IMAGE_ID"); got != "general-image" {
+		t.Errorf("NSCALE_TEST_IMAGE_ID = %q, want general-image", got)
+	}
 }
 
 // testAccPreCheck skips acceptance tests unless the base credentials are set.

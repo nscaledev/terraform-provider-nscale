@@ -45,18 +45,47 @@ jobs:
           terraform_wrapper: false
       - run: go mod download
 
-      # Fail fast with a clear message if the repo hasn't been configured with
-      # credentials, rather than letting every test fail with a confusing auth
-      # error. See the env block below for the full list of required secrets.
-      - name: Check credentials are configured
+      # Fail fast rather than letting missing configuration surface as skipped
+      # tests after the full acceptance suite has run.
+      - name: Check acceptance test configuration
         env:
           NSCALE_SERVICE_TOKEN: ${{ secrets.NSCALE_SERVICE_TOKEN }}
+          NSCALE_ORGANIZATION_ID: ${{ secrets.NSCALE_ORGANIZATION_ID }}
+          NSCALE_PROJECT_ID: ${{ secrets.NSCALE_PROJECT_ID }}
+          NSCALE_REGION_ID: ${{ secrets.NSCALE_REGION_ID }}
+          NSCALE_TEST_IMAGE_ID: ${{ secrets.NSCALE_TEST_IMAGE_ID }}
+          NSCALE_RESERVATION_SERVICE_API_ENDPOINT: ${{ vars.NSCALE_RESERVATION_SERVICE_API_ENDPOINT }}
+          NSCALE_TEST_RESERVATION_ACCELERATOR: ${{ vars.NSCALE_TEST_RESERVATION_ACCELERATOR }}
+          NSCALE_TEST_RESERVATION_IMAGE_ID: ${{ vars.NSCALE_TEST_RESERVATION_IMAGE_ID }}
+          NSCALE_TEST_RESERVATION_UNIT: ${{ vars.NSCALE_TEST_RESERVATION_UNIT }}
+          NSCALE_TEST_RESERVATION_REGION_ID: ${{ vars.NSCALE_TEST_RESERVATION_REGION_ID }}
         run: |
-          if [ -z "$NSCALE_SERVICE_TOKEN" ]; then
-            echo "::error::NSCALE_SERVICE_TOKEN is not set. Configure the acceptance-test secrets in repo Settings → Secrets and variables → Actions. See .github/workflows/acceptance-tests.yml for the full list."
+          missing=""
+          for variable in \
+            NSCALE_SERVICE_TOKEN \
+            NSCALE_ORGANIZATION_ID \
+            NSCALE_PROJECT_ID \
+            NSCALE_REGION_ID \
+            NSCALE_TEST_IMAGE_ID \
+            NSCALE_RESERVATION_SERVICE_API_ENDPOINT \
+            NSCALE_TEST_RESERVATION_ACCELERATOR \
+            NSCALE_TEST_RESERVATION_IMAGE_ID \
+            NSCALE_TEST_RESERVATION_UNIT \
+            NSCALE_TEST_RESERVATION_REGION_ID
+          do
+            if [ -z "${!variable}" ]; then
+              missing="$missing $variable"
+            fi
+          done
+
+          if [ -n "$missing" ]; then
+            echo "::error::Missing acceptance-test configuration:$missing. Configure it in repo Settings > Secrets and variables > Actions."
             exit 1
           fi
 
+      # Go runs each package in its own test process. The reservation package's
+      # TestMain applies its region and image overrides without affecting the
+      # other acceptance packages in this invocation.
       - name: Run acceptance tests
         env:
           NSCALE_SERVICE_TOKEN: ${{ secrets.NSCALE_SERVICE_TOKEN }}
@@ -67,10 +96,15 @@ jobs:
           NSCALE_COMPUTE_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_COMPUTE_SERVICE_API_ENDPOINT }}
           NSCALE_STORAGE_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_STORAGE_SERVICE_API_ENDPOINT }}
           NSCALE_IDENTITY_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_IDENTITY_SERVICE_API_ENDPOINT }}
+          NSCALE_RESERVATION_SERVICE_API_ENDPOINT: ${{ vars.NSCALE_RESERVATION_SERVICE_API_ENDPOINT }}
           NSCALE_TEST_IMAGE_ID: ${{ secrets.NSCALE_TEST_IMAGE_ID }}
           NSCALE_TEST_FLAVOR_ID: ${{ secrets.NSCALE_TEST_FLAVOR_ID }}
           NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID: ${{ secrets.NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID }}
           NSCALE_TEST_FILE_STORAGE_CLASS_ID: ${{ secrets.NSCALE_TEST_FILE_STORAGE_CLASS_ID }}
+          NSCALE_TEST_RESERVATION_ACCELERATOR: ${{ vars.NSCALE_TEST_RESERVATION_ACCELERATOR }}
+          NSCALE_TEST_RESERVATION_IMAGE_ID: ${{ vars.NSCALE_TEST_RESERVATION_IMAGE_ID }}
+          NSCALE_TEST_RESERVATION_REGION_ID: ${{ vars.NSCALE_TEST_RESERVATION_REGION_ID }}
+          NSCALE_TEST_RESERVATION_UNIT: ${{ vars.NSCALE_TEST_RESERVATION_UNIT }}
           NSCALE_TEST_SSH_CA_PUBLIC_KEY: ${{ secrets.NSCALE_TEST_SSH_CA_PUBLIC_KEY }}
           NSCALE_TEST_ROLE_ID: ${{ secrets.NSCALE_TEST_ROLE_ID }}
           TF_VAR_role_id: ${{ secrets.TF_VAR_ROLE_ID }}

@@ -185,6 +185,7 @@ NSCALE_PROJECT_ID=<uuid>
 # Override service URLs only if not the default *.unikorn.nscale.com hosts:
 NSCALE_REGION_SERVICE_API_ENDPOINT=...
 NSCALE_COMPUTE_SERVICE_API_ENDPOINT=...
+NSCALE_RESERVATION_SERVICE_API_ENDPOINT=...
 NSCALE_STORAGE_SERVICE_API_ENDPOINT=...
 ```
 
@@ -194,9 +195,17 @@ Per service, additional `NSCALE_TEST_*` vars:
 |---|---|
 | `instance` | `NSCALE_TEST_IMAGE_ID`, `NSCALE_TEST_FLAVOR_ID` |
 | `objectstorage` | `NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID` |
+| `reservation` | `NSCALE_TEST_RESERVATION_ACCELERATOR`, `NSCALE_TEST_RESERVATION_UNIT`; placement tests also need `NSCALE_TEST_IMAGE_ID` |
 
 Each `acc_test.go` lists the exact vars its `testAccPreCheck` requires. Missing
 vars produce `t.Skipf` — they do not fail.
+
+The acceptance workflow passes both the general and reservation-specific
+configuration into one `make testacc` invocation. Because Go runs each package
+in its own process, the reservation package's `TestMain` maps the repository
+Actions variables `NSCALE_TEST_RESERVATION_REGION_ID` and
+`NSCALE_TEST_RESERVATION_IMAGE_ID` to `NSCALE_REGION_ID` and
+`NSCALE_TEST_IMAGE_ID` without changing the values used by other packages.
 
 ---
 
