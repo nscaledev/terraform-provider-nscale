@@ -58,10 +58,12 @@ func TestAccReservationResource_basic(t *testing.T) {
 			},
 			// 3. Import.
 			{
-				ResourceName:            "nscale_reservation.test",
-				ImportState:             true,
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"timeouts"}, // timeouts is provider-side, not returned by the API.
+				ResourceName:      "nscale_reservation.test",
+				ImportState:       true,
+				ImportStateVerify: true,
+				// timeouts is provider-side; topology_observed_at changes whenever
+				// the reservation controller validates the claimed topology.
+				ImportStateVerifyIgnore: []string{"timeouts", "topology_observed_at"},
 			},
 		},
 	})
