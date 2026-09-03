@@ -234,21 +234,25 @@ type InstanceNetworkInterfaceModel struct {
 }
 
 func NewInstanceNetworkInterfaceModel(spec computeapi.InstanceSpec, status computeapi.InstanceStatus) types.Object {
-	enablePublicIP := types.BoolPointerValue(spec.Networking.PublicIP)
-
+	enablePublicIP := types.BoolNull()
 	var securityGroupIDs []attr.Value
-	if securityGroups := spec.Networking.SecurityGroups; securityGroups != nil {
-		securityGroupIDs = make([]attr.Value, 0, len(*securityGroups))
-		for _, securityGroupID := range *securityGroups {
-			securityGroupIDs = append(securityGroupIDs, types.StringValue(securityGroupID))
-		}
-	}
-
 	var allowedDestinations []attr.Value
-	if allowedSourceAddresses := spec.Networking.AllowedSourceAddresses; allowedSourceAddresses != nil {
-		allowedDestinations = make([]attr.Value, 0, len(*allowedSourceAddresses))
-		for _, allowedSourceAddress := range *allowedSourceAddresses {
-			allowedDestinations = append(allowedDestinations, types.StringValue(allowedSourceAddress))
+
+	if networking := spec.Networking; networking != nil {
+		enablePublicIP = types.BoolPointerValue(networking.PublicIP)
+
+		if securityGroups := networking.SecurityGroups; securityGroups != nil {
+			securityGroupIDs = make([]attr.Value, 0, len(*securityGroups))
+			for _, securityGroupID := range *securityGroups {
+				securityGroupIDs = append(securityGroupIDs, types.StringValue(securityGroupID))
+			}
+		}
+
+		if allowedSourceAddresses := networking.AllowedSourceAddresses; allowedSourceAddresses != nil {
+			allowedDestinations = make([]attr.Value, 0, len(*allowedSourceAddresses))
+			for _, allowedSourceAddress := range *allowedSourceAddresses {
+				allowedDestinations = append(allowedDestinations, types.StringValue(allowedSourceAddress))
+			}
 		}
 	}
 
