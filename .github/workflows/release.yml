@@ -1,12 +1,35 @@
 # Terraform Provider release workflow.
 name: Release
 
-# This GitHub action creates a release when a tag that matches the pattern
-# "v*" (e.g. v0.1.0) is created.
+# Releases are driven by release-please.yml, which creates the tag and the
+# GitHub Release and then calls this workflow to build the binaries and attach
+# them.
+#
+# There is deliberately no `push: tags` trigger. Two reasons, either of which
+# is sufficient:
+#
+#   - release-please cuts its tag with the default GITHUB_TOKEN, and tags
+#     created by GITHUB_TOKEN do not trigger workflows. A tag trigger here
+#     would silently never fire.
+#   - If the token is ever swapped for a GitHub App token (see the comment in
+#     release-please.yml), tags *would* fire it — in addition to the explicit
+#     call below, running GoReleaser twice for the same tag.
+#
+# workflow_dispatch is the manual escape hatch: re-running a release whose tag
+# already exists, or building a tag pushed by hand.
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_call:
+    inputs:
+      tag:
+        description: "Tag to release, e.g. v1.5.0. The tag must already exist."
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release, e.g. v1.5.0. The tag must already exist."
+        required: true
+        type: string
 
 # Releases need permissions to read and write the repository contents.
 # GitHub considers creating releases and uploading assets as writing contents.
@@ -19,6 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
+          ref: ${{ inputs.tag }}
           # Allow goreleaser to access older tag information.
           fetch-depth: 0
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0

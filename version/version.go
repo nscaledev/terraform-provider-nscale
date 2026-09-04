@@ -16,4 +16,13 @@ limitations under the License.
 
 package version
 
-var ProviderVersion = "dev"
+// ProviderVersion is reported to Terraform via the provider's Metadata
+// response and sent in the API user agent.
+//
+// release-please rewrites the literal below on every release PR, so it tracks
+// the released version rather than being injected at link time — GoReleaser's
+// ldflags target `main.version`, which this provider's main package does not
+// define. Keep the `x-release-please-version` annotation on the same line: it
+// is the anchor release-please matches, and the `extra-files` entry in
+// release-please-config.json is what brings this file into scope.
+var ProviderVersion = "1.4.0" // x-release-please-version
