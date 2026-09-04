@@ -185,6 +185,8 @@ NSCALE_PROJECT_ID=<uuid>
 # Override service URLs only if not the default *.unikorn.nscale.com hosts:
 NSCALE_REGION_SERVICE_API_ENDPOINT=...
 NSCALE_COMPUTE_SERVICE_API_ENDPOINT=...
+NSCALE_IDENTITY_SERVICE_API_ENDPOINT=...
+NSCALE_RESERVATION_SERVICE_API_ENDPOINT=...
 NSCALE_STORAGE_SERVICE_API_ENDPOINT=...
 ```
 
@@ -192,11 +194,29 @@ Per service, additional `NSCALE_TEST_*` vars:
 
 | Service | Variable |
 |---|---|
+| `filestorage` | `NSCALE_TEST_FILE_STORAGE_CLASS_ID` |
+| `identity` | `NSCALE_TEST_ROLE_ID` |
 | `instance` | `NSCALE_TEST_IMAGE_ID`, `NSCALE_TEST_FLAVOR_ID` |
 | `objectstorage` | `NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID` |
+| `reservation` | `NSCALE_TEST_RESERVATION_ACCELERATOR`, `NSCALE_TEST_RESERVATION_UNIT`; placement tests also need `NSCALE_TEST_IMAGE_ID` |
 
 Each `acc_test.go` lists the exact vars its `testAccPreCheck` requires. Missing
 vars produce `t.Skipf` — they do not fail.
+
+The acceptance workflow runs one matrix job per service package. Pushes to
+`main` select every package with acceptance tests. Manual runs expose an
+`All modules` checkbox (enabled by default) plus individual module checkboxes;
+uncheck `All modules` to run a subset. Matrix jobs are serialized because they
+share one staging project, and each invokes:
+
+```
+make testacc PKG=./internal/services/<module>/
+```
+
+`computecluster` is not selectable because it has no acceptance tests. The
+reservation package's `TestMain` maps the repository Actions variables
+`NSCALE_TEST_RESERVATION_REGION_ID` and `NSCALE_TEST_RESERVATION_IMAGE_ID` to
+`NSCALE_REGION_ID` and `NSCALE_TEST_IMAGE_ID` within its matrix job.
 
 ---
 

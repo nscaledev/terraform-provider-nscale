@@ -3,7 +3,7 @@
 # These tests provision real, billable resources in a shared staging project,
 # so this workflow runs ONLY on trusted events:
 #   * push to main    — every merge is validated against staging
-#   * workflow_dispatch — on-demand run from the Actions tab
+#   * workflow_dispatch — select one or more modules from the Actions tab
 #
 # There is deliberately NO pull_request / pull_request_target trigger. Fork PRs
 # never receive secrets, and we never execute fork code with credentials in
@@ -16,23 +16,109 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      all:
+        description: Run all modules (overrides individual selections)
+        required: false
+        default: true
+        type: boolean
+      filestorage:
+        description: File storage
+        required: false
+        default: false
+        type: boolean
+      identity:
+        description: Identity
+        required: false
+        default: false
+        type: boolean
+      instance:
+        description: Instances and flavors
+        required: false
+        default: false
+        type: boolean
+      network:
+        description: Networks
+        required: false
+        default: false
+        type: boolean
+      objectstorage:
+        description: Object storage
+        required: false
+        default: false
+        type: boolean
+      region:
+        description: Regions
+        required: false
+        default: false
+        type: boolean
+      reservation:
+        description: Reservations and placements
+        required: false
+        default: false
+        type: boolean
+      securitygroup:
+        description: Security groups
+        required: false
+        default: false
+        type: boolean
+      sshca:
+        description: SSH certificate authorities
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
-# Acceptance tests share a single staging project and run serialized (-p 1).
-# Serialize workflow runs too so a merge landing mid-run can't clobber another
-# run's resources. Don't cancel in flight — let a run finish and tear its
-# resources down cleanly rather than leaking half-provisioned infra.
+# Acceptance tests share a single staging project, so both workflow runs and
+# module matrix jobs are serialized. Don't cancel in flight — let a run finish
+# and tear its resources down cleanly rather than leaking half-provisioned infra.
 concurrency:
   group: acceptance-tests
   cancel-in-progress: false
 
 jobs:
-  testacc:
-    name: Acceptance tests (staging)
+  select-modules:
+    name: Select modules
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    outputs:
+      modules: ${{ steps.select.outputs.modules }}
+    steps:
+      - name: Select modules
+        id: select
+        env:
+          ALL_MODULES: '["filestorage","identity","instance","network","objectstorage","region","reservation","securitygroup","sshca"]'
+          INPUTS_JSON: ${{ toJSON(inputs) }}
+          RUN_ALL: ${{ inputs.all }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "push" || "$RUN_ALL" == "true" ]]; then
+            modules="$ALL_MODULES"
+          else
+            modules="$(jq -cn \
+              --argjson modules "$ALL_MODULES" \
+              --argjson inputs "$INPUTS_JSON" \
+              '$modules | map(select($inputs[.] == true))')"
+          fi
+
+          if [[ "$modules" == "[]" ]]; then
+            echo "::error::Select at least one acceptance-test module."
+            exit 1
+          fi
+
+          echo "modules=$modules" >> "$GITHUB_OUTPUT"
+          echo "Selected modules: $(jq -r 'join(", ")' <<< "$modules")" >> "$GITHUB_STEP_SUMMARY"
+
+  testacc:
+    name: Acceptance tests (${{ matrix.module }})
+    needs: select-modules
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        module: ${{ fromJSON(needs.select-modules.outputs.modules) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 130
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -45,20 +131,11 @@ jobs:
           terraform_wrapper: false
       - run: go mod download
 
-      # Fail fast with a clear message if the repo hasn't been configured with
-      # credentials, rather than letting every test fail with a confusing auth
-      # error. See the env block below for the full list of required secrets.
-      - name: Check credentials are configured
+      # Fail fast on the configuration this module needs rather than surfacing
+      # missing fixtures as skipped tests after the module has run.
+      - name: Check acceptance test configuration
         env:
-          NSCALE_SERVICE_TOKEN: ${{ secrets.NSCALE_SERVICE_TOKEN }}
-        run: |
-          if [ -z "$NSCALE_SERVICE_TOKEN" ]; then
-            echo "::error::NSCALE_SERVICE_TOKEN is not set. Configure the acceptance-test secrets in repo Settings → Secrets and variables → Actions. See .github/workflows/acceptance-tests.yml for the full list."
-            exit 1
-          fi
-
-      - name: Run acceptance tests
-        env:
+          MODULE: ${{ matrix.module }}
           NSCALE_SERVICE_TOKEN: ${{ secrets.NSCALE_SERVICE_TOKEN }}
           NSCALE_ORGANIZATION_ID: ${{ secrets.NSCALE_ORGANIZATION_ID }}
           NSCALE_PROJECT_ID: ${{ secrets.NSCALE_PROJECT_ID }}
@@ -67,12 +144,88 @@ jobs:
           NSCALE_COMPUTE_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_COMPUTE_SERVICE_API_ENDPOINT }}
           NSCALE_STORAGE_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_STORAGE_SERVICE_API_ENDPOINT }}
           NSCALE_IDENTITY_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_IDENTITY_SERVICE_API_ENDPOINT }}
+          NSCALE_RESERVATION_SERVICE_API_ENDPOINT: ${{ vars.NSCALE_RESERVATION_SERVICE_API_ENDPOINT }}
           NSCALE_TEST_IMAGE_ID: ${{ secrets.NSCALE_TEST_IMAGE_ID }}
           NSCALE_TEST_FLAVOR_ID: ${{ secrets.NSCALE_TEST_FLAVOR_ID }}
           NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID: ${{ secrets.NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID }}
           NSCALE_TEST_FILE_STORAGE_CLASS_ID: ${{ secrets.NSCALE_TEST_FILE_STORAGE_CLASS_ID }}
+          NSCALE_TEST_RESERVATION_ACCELERATOR: ${{ vars.NSCALE_TEST_RESERVATION_ACCELERATOR }}
+          NSCALE_TEST_RESERVATION_IMAGE_ID: ${{ vars.NSCALE_TEST_RESERVATION_IMAGE_ID }}
+          NSCALE_TEST_RESERVATION_UNIT: ${{ vars.NSCALE_TEST_RESERVATION_UNIT }}
+          NSCALE_TEST_RESERVATION_REGION_ID: ${{ vars.NSCALE_TEST_RESERVATION_REGION_ID }}
+          NSCALE_TEST_ROLE_ID: ${{ secrets.NSCALE_TEST_ROLE_ID }}
+        run: |
+          required=(
+            NSCALE_SERVICE_TOKEN
+            NSCALE_ORGANIZATION_ID
+            NSCALE_PROJECT_ID
+            NSCALE_REGION_ID
+            NSCALE_TEST_RESERVATION_REGION_ID
+          )
+
+          case "$MODULE" in
+            filestorage)
+              required+=(NSCALE_REGION_SERVICE_API_ENDPOINT NSCALE_TEST_FILE_STORAGE_CLASS_ID)
+              ;;
+            identity)
+              required+=(NSCALE_IDENTITY_SERVICE_API_ENDPOINT NSCALE_TEST_ROLE_ID)
+              ;;
+            instance)
+              required+=(NSCALE_COMPUTE_SERVICE_API_ENDPOINT NSCALE_REGION_SERVICE_API_ENDPOINT NSCALE_TEST_IMAGE_ID NSCALE_TEST_FLAVOR_ID)
+              ;;
+            network|securitygroup|sshca)
+              required+=(NSCALE_REGION_SERVICE_API_ENDPOINT)
+              ;;
+            objectstorage)
+              required+=(NSCALE_STORAGE_SERVICE_API_ENDPOINT NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID)
+              ;;
+            region)
+              required+=(NSCALE_COMPUTE_SERVICE_API_ENDPOINT)
+              ;;
+            reservation)
+              required+=(NSCALE_REGION_SERVICE_API_ENDPOINT NSCALE_RESERVATION_SERVICE_API_ENDPOINT)
+              required+=(NSCALE_TEST_RESERVATION_ACCELERATOR NSCALE_TEST_RESERVATION_IMAGE_ID NSCALE_TEST_RESERVATION_UNIT)
+              ;;
+            *)
+              echo "::error::Unknown acceptance-test module: $MODULE"
+              exit 1
+              ;;
+          esac
+
+          missing=()
+          for variable in "${required[@]}"; do
+            if [[ -z "${!variable}" ]]; then
+              missing+=("$variable")
+            fi
+          done
+
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error::Missing $MODULE acceptance-test configuration: ${missing[*]}. Configure it in repo Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Run acceptance tests
+        env:
+          MODULE: ${{ matrix.module }}
+          NSCALE_SERVICE_TOKEN: ${{ secrets.NSCALE_SERVICE_TOKEN }}
+          NSCALE_ORGANIZATION_ID: ${{ secrets.NSCALE_ORGANIZATION_ID }}
+          NSCALE_PROJECT_ID: ${{ secrets.NSCALE_PROJECT_ID }}
+          NSCALE_REGION_ID: ${{ secrets.NSCALE_REGION_ID }}
+          NSCALE_REGION_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_REGION_SERVICE_API_ENDPOINT }}
+          NSCALE_COMPUTE_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_COMPUTE_SERVICE_API_ENDPOINT }}
+          NSCALE_STORAGE_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_STORAGE_SERVICE_API_ENDPOINT }}
+          NSCALE_IDENTITY_SERVICE_API_ENDPOINT: ${{ secrets.NSCALE_IDENTITY_SERVICE_API_ENDPOINT }}
+          NSCALE_RESERVATION_SERVICE_API_ENDPOINT: ${{ vars.NSCALE_RESERVATION_SERVICE_API_ENDPOINT }}
+          NSCALE_TEST_IMAGE_ID: ${{ secrets.NSCALE_TEST_IMAGE_ID }}
+          NSCALE_TEST_FLAVOR_ID: ${{ secrets.NSCALE_TEST_FLAVOR_ID }}
+          NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID: ${{ secrets.NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID }}
+          NSCALE_TEST_FILE_STORAGE_CLASS_ID: ${{ secrets.NSCALE_TEST_FILE_STORAGE_CLASS_ID }}
+          NSCALE_TEST_RESERVATION_ACCELERATOR: ${{ vars.NSCALE_TEST_RESERVATION_ACCELERATOR }}
+          NSCALE_TEST_RESERVATION_IMAGE_ID: ${{ vars.NSCALE_TEST_RESERVATION_IMAGE_ID }}
+          NSCALE_TEST_RESERVATION_REGION_ID: ${{ vars.NSCALE_TEST_RESERVATION_REGION_ID }}
+          NSCALE_TEST_RESERVATION_UNIT: ${{ vars.NSCALE_TEST_RESERVATION_UNIT }}
           NSCALE_TEST_SSH_CA_PUBLIC_KEY: ${{ secrets.NSCALE_TEST_SSH_CA_PUBLIC_KEY }}
           NSCALE_TEST_ROLE_ID: ${{ secrets.NSCALE_TEST_ROLE_ID }}
           TF_VAR_role_id: ${{ secrets.TF_VAR_ROLE_ID }}
           TF_VAR_user_ids: ${{ secrets.TF_VAR_USER_IDS }}
-        run: make testacc
+        run: make testacc "PKG=./internal/services/${MODULE}/"

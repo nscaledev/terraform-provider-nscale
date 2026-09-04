@@ -54,9 +54,10 @@ testacc-env:
 # testacc-profile runs the suite against one gitignored terraform.<profile>.tfvars.
 #
 # Profiles exist because no single region can satisfy every test: `staging` uses
-# no-glo1, the only region with both storage classes, and `staging-reservation`
-# uses stgstack, the only one with usable reservation capacity. A profile omits
-# the fixtures its region cannot provide, so those tests skip rather than fail.
+# no-glo1, the only region with both storage classes, while
+# `staging-reservation` selects a region with usable reservation capacity. A
+# profile omits the fixtures its region cannot provide, so those tests skip
+# rather than fail.
 #
 #   make testacc-profile PROFILE=staging
 #   make testacc-profile PROFILE=staging-reservation

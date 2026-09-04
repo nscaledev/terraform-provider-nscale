@@ -125,7 +125,7 @@ resource "nscale_reservation" "training" {
 ## Test plan
 
 - **Unit converters:** `NewReservationModel` (status fields, optional topology fields nil/set, tag stripping); `NscaleReservationCreateParams` (org/project/region defaulting, count).
-- **Acceptance:** `_basic` (create + assert id/machine_flavor_id/claimed_unit_count + `PlanOnly` guard + import with `ImportStateVerifyIgnore: ["timeouts"]`); data source round-trip via id. No `_update` (immutable).
+- **Acceptance:** `_basic` (create + assert id/machine_flavor_id/claimed_unit_count + `PlanOnly` guard + import with `ImportStateVerifyIgnore: ["timeouts", "topology_observed_at"]` because the observation timestamp changes whenever the controller validates the topology); data source round-trip via id. No `_update` (immutable).
 - **Negative:** 507 insufficient capacity surfaces cleanly (manual / staging only).
 - All acc tests gate behind `TF_ACC=1` and skip without env vars. **Expected to fail until the staging reservation service is deployed** — that is acceptable per the task.
 
