@@ -25,4 +25,4 @@ package version
 // define. Keep the `x-release-please-version` annotation on the same line: it
 // is the anchor release-please matches, and the `extra-files` entry in
 // release-please-config.json is what brings this file into scope.
-var ProviderVersion = "1.4.0" // x-release-please-version
+var ProviderVersion = "1.5.0" // x-release-please-version

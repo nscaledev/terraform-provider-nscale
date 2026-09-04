@@ -11,6 +11,21 @@ in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) style, using the
 categories `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 `DEPRECATIONS` and `DOCS`; they are preserved as-is below.
 
+## [1.5.0](https://github.com/nscaledev/terraform-provider-nscale/compare/v1.4.0...v1.5.0) (2026-09-04)
+
+
+### Features
+
+* **filestorage:** add NFS policy settings ([#78](https://github.com/nscaledev/terraform-provider-nscale/issues/78)) ([9d4ab9e](https://github.com/nscaledev/terraform-provider-nscale/commit/9d4ab9e69a972687c78c5d6aeaf0dadc276b888b))
+* **reservation:** add nscale_reservation_unit data source ([#79](https://github.com/nscaledev/terraform-provider-nscale/issues/79)) ([9a63593](https://github.com/nscaledev/terraform-provider-nscale/commit/9a63593cb914d7df7cff78ff239820978a2cd7ad))
+* upgrade nscale-sdk-go to v0.2.0 ([#74](https://github.com/nscaledev/terraform-provider-nscale/issues/74)) ([f79bb50](https://github.com/nscaledev/terraform-provider-nscale/commit/f79bb500f14a97eea4994c0ee135960cb0fc5f1b))
+
+
+### Bug Fixes
+
+* **tests:** fix the reservations acc tests ([#83](https://github.com/nscaledev/terraform-provider-nscale/issues/83)) ([bcf52b1](https://github.com/nscaledev/terraform-provider-nscale/commit/bcf52b131becf4a3f04fcef6b76beb31d97e3375))
+* **test:** split nfs tests and fix null pointer ([#82](https://github.com/nscaledev/terraform-provider-nscale/issues/82)) ([9db9ab5](https://github.com/nscaledev/terraform-provider-nscale/commit/9db9ab5d9c7158275733702bca3fa30854c91d54))
+
 ## [1.4.0] - 2026-08-10
 
 ### FEATURES
