@@ -1,0 +1,79 @@
+---
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Maintains the "chore: release x.y.z" PR against main. Merging that PR makes
+  # this job cut the tag + GitHub Release (with the CHANGELOG entry as the
+  # release body) and set `release_created`, which gates the GoReleaser run
+  # below.
+  #
+  # Version bumps come from the conventional-commit history, which
+  # pr-commit-validation.yml already enforces on every PR title. Squash-merging
+  # is what turns those titles into the commit subjects release-please reads.
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      # Deliberately the default GITHUB_TOKEN and not a GitHub App token.
+      #
+      # nscale-cli runs release-please as the NSCALE_ACTIONS app because
+      # `build-and-test` is a required status check on its main, and a PR opened
+      # with GITHUB_TOKEN never gets one, so it could not be merged. This repo
+      # has no required status checks, so that constraint does not apply — and
+      # this repo is public, where an app private key (a credential good for
+      # every repo the app is installed on) is a blast radius worth avoiding for
+      # no gain.
+      #
+      # The trade-off: release PRs get no CI run. They only touch CHANGELOG.md,
+      # .release-please-manifest.json, and version/version.go, none of which the
+      # test or schema-baseline jobs are sensitive to.
+      #
+      # If required status checks are ever added to main, swap the token for an
+      # app token and share the NSCALE_ACTIONS_APP_PK org secret with this repo:
+      #
+      #   - name: Generate a token
+      #     id: app-token
+      #     uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.1.4
+      #     with:
+      #       app-id: ${{ vars.NSCALE_ACTIONS_APP_ID }}
+      #       private-key: ${{ secrets.NSCALE_ACTIONS_APP_PK }}
+      #
+      # ...then pass `token: ${{ steps.app-token.outputs.token }}` below.
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # Build the provider binaries and attach them to the release release-please
+  # just cut. Called explicitly rather than left to a `push: tags` trigger:
+  # tags created with GITHUB_TOKEN do not fire workflows at all, so the tag
+  # trigger would silently never run. See the header comment in release.yml.
+  release:
+    name: Release
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    uses: ./.github/workflows/release.yml
+    permissions:
+      contents: write
+    with:
+      tag: ${{ needs.release-please.outputs.tag_name }}
+    secrets: inherit

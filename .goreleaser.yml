@@ -60,6 +60,13 @@ release:
   extra_files:
     - glob: 'terraform-registry-manifest.json'
       name_template: '{{ .ProjectName }}_{{ .Version }}_manifest.json'
+  # release-please creates the GitHub Release (with the CHANGELOG entry as the
+  # body) before this runs, and goreleaser only attaches the binaries to it.
+  # keep-existing stops goreleaser from replacing that curated body — which,
+  # given `changelog.disable` below, would leave the release with no notes at
+  # all. This is goreleaser's default; it is set explicitly so the dependency
+  # is visible.
+  mode: keep-existing
   # If you want to manually examine the release before its live, uncomment this line:
   # draft: true
 
