@@ -113,6 +113,17 @@ is new.
 This divergence is independent evidence for option (B) — pinning to the SDK would
 ship us a client that is already stale.
 
+**Re-checked 2026-09-07: the canonical spec is now 76,296 bytes** (from 69,755
+when this was written). New in the cluster surface since then, all immutable
+after creation and none modelled here: `spec.sshCertificateAuthorityId`,
+`apiServer.authorization` (tenant `ClusterRole` bindings) and
+`apiServer.authentication` (Nscale webhook override + external OIDC issuers). See
+open question 7. Note also that **the spec still does not annotate
+`metadata.name` or `clusterNetwork.*` as immutable even though the server
+enforces both** — see [Immutability](#immutability). Regenerating the client is
+cheap; re-reading the spec for constraint changes is the part that needs doing
+deliberately.
+
 | Operation | Verb + path | Response |
 | --- | --- | --- |
 | `listClusters` | `GET /api/v1/clusters` | `200 []ClusterV1Read` |
@@ -157,7 +168,7 @@ from every other resource in the provider.
 
 | Name | Type | R/O/C | Plan modifiers | Notes |
 | --- | --- | --- | --- | --- |
-| `name` | String | Required | — | `metadata.name`; `NameValidator()` |
+| `name` | String | Required | **`RequiresReplace`** | `metadata.name`; `NameValidator()`. Immutable — server rejects a rename with 422 *"cluster names are immutable"*. |
 | `description` | String | Optional | — | `metadata.description` |
 | `tags` | Map(String) | Optional+Computed | — | `metadata.tags`; `NoReservedPrefix`; strip operation tags on read |
 | `network_id` | String | Required | **`RequiresReplace`** | `spec.networkId`. Immutable per spec comment on `clusterUpdateSpecV1`. Also determines project + region. |
@@ -165,9 +176,9 @@ from every other resource in the provider.
 | `api_server` | SingleNested | Optional+Computed | — | `spec.apiServer`; see below |
 | `api_server.public_ip` | Bool | Optional+Computed | — | server default `false` |
 | `api_server.allowed_cidrs` | Set(String) | Optional+Computed | — | server default `["0.0.0.0/0"]`; 1–32 items, unique, IPv4 CIDR pattern → `SetValidator` size + `CIDRValidator` |
-| `cluster_network` | SingleNested | Optional+Computed | — | `spec.clusterNetwork` |
-| `cluster_network.pod_cidr` | String | Optional+Computed | — | server default `10.240.0.0/12` |
-| `cluster_network.service_cidr` | String | Optional+Computed | — | server default `10.96.0.0/16` |
+| `cluster_network` | SingleNested | Optional+Computed | **`RequiresReplace`** | `spec.clusterNetwork` |
+| `cluster_network.pod_cidr` | String | Optional+Computed | **`RequiresReplace`** | server default `10.240.0.0/12`. Immutable — CEL `self == oldSelf`, server 422. |
+| `cluster_network.service_cidr` | String | Optional+Computed | **`RequiresReplace`** | server default `10.96.0.0/16`. Immutable — CEL `self == oldSelf`, server 422. |
 | `addons` | SingleNested | Optional+Computed | — | `spec.addons` |
 | `addons.hardware` | Bool | Optional+Computed | — | server default **`true`** on create |
 
@@ -176,9 +187,12 @@ meaning) and contains nothing sensitive, so the list-vs-set caveat in
 [playbook §1.3](../.claude/skills/tf-provider-feature/reference/playbook.md) does
 not bite.
 
-`cluster_network` is **mutable in place** — no `RequiresReplace`. Decided
-2026-08-24. Changing `pod_cidr` / `service_cidr` goes through the normal PUT and
-is waited on like any other update.
+`cluster_network` **forces replacement**. This reverses the 2026-08-24 decision —
+see [Immutability](#immutability) and open question 4. `pod_cidr` and
+`service_cidr` are enforced immutable by a CEL `self == oldSelf` rule on the
+underlying CRD and by the server, which returns 422
+*"clusterNetwork.podCidr is immutable"*. Planning an in-place update there
+produces an apply that always fails.
 
 ### Computed
 
@@ -330,12 +344,43 @@ status.observedGeneration != nil && *status.observedGeneration >= metadata.gener
 
 | Phase | Pending | Target | Hard failure |
 | --- | --- | --- | --- |
-| Create / Update | not settled; `pending`; `provisioning` | settled ∧ `provisioned` ∧ `healthStatus != error` | settled ∧ (`provisioningStatus == error` ∨ `healthStatus == error`) |
+| Create / Update | not settled; `pending`; `provisioning`; `provisioned` ∧ (`degraded` ∨ `unknown`) | settled ∧ `provisioned` ∧ `healthy` | `error` provisioning, or settled ∧ `provisioned` ∧ `healthStatus == error` |
 | Delete | `deprovisioning`, or any still-readable state | 404 | `provisioningStatus == error` **after deprovisioning has been observed** → terminal, fail immediately rather than waiting out the timeout |
+
+Success is all three conditions, not merely "not error": `healthy` is required,
+so `degraded` and `unknown` keep polling rather than passing. **Audited
+2026-09-07 — the implemented `classify` does exactly this.** (An earlier draft of
+this table wrote the target as `healthStatus != error`, which would have let a
+`degraded` cluster pass. It never shipped that way.)
 
 The delete rule is deliberately narrower than the shared `DeleteStateWatcher`,
 which treats `error` as terminal from the first poll. A cluster that was already
 sitting in `error` before the destroy must still be allowed to deprovision.
+
+### What those statuses aggregate upstream
+
+This matters for how long an apply can legitimately take, and it is not visible
+from the cluster's own fields:
+
+- **`provisioned` on a cluster is an aggregate** of infrastructure, control
+  plane, core add-ons, hardware add-ons, authorization, **and every node pool
+  being `Provisioned`**. A cluster is therefore *not* `provisioned` while any of
+  its pools is scaling or rolling.
+- **`healthy` requires** the control plane healthy and no pool, add-on or
+  authorization `degraded`.
+
+Two consequences:
+
+1. **A cluster apply that overlaps a node pool roll waits for the roll.** Once
+   `nscale_kubernetes_node_pool` exists, a config that changes both a cluster
+   field and a pool field in one apply — or an operator rolling a pool by hand
+   during a `terraform apply` — makes the cluster's own update wait out the
+   pool's rolling replacement. The `update` timeout has to cover that, not just
+   the control-plane upgrade it was sized for.
+2. **It explains the `_basic` failure already recorded below.** *"one or more
+   add-ons are degraded"* set `provisioningStatus: error` on the cluster because
+   add-on health is folded into the cluster aggregate — the waiter was reading a
+   composite, not a control-plane-only signal.
 
 ### Timeouts
 
@@ -346,7 +391,8 @@ with a new "managed Kubernetes control plane" class:
 | | Create | Update | Delete |
 | --- | --- | --- | --- |
 | Original guess | 30m | 45m | 30m |
-| **Actual, after measurement** | **60m** | **90m** | **30m** |
+| After measurement | 60m | 90m | 30m |
+| **After the drain audit (2026-09-07)** | **60m** | **90m** | **60m** |
 
 **Measured on uni-dev 2026-08-26: create took 32m18s, delete 2m11s.** The
 original 30m create default would have failed on the very first real apply —
@@ -358,27 +404,95 @@ control-plane upgrade, not a config write.
 This is the single most valuable thing the manual test caught, and it was only
 catchable against real infrastructure.
 
+### Why delete goes to 60m: node drain has no deadline
+
+The 2m11s delete was measured on a cluster **with no node pools** — nothing to
+drain. That number does not generalise, and the mechanism is worth stating
+because it bounds nothing:
+
+- A compute node pool is a plain CAPI v1.14 `MachineDeployment`. nks-core renders
+  **no rollout strategy and no drain, volume-detach or deletion timeouts**, so
+  upstream CAPI defaults apply: `RollingUpdate` with `maxSurge: 1` /
+  `maxUnavailable: 0`, and the Machine controller cordons and drains each node
+  through the Eviction API before deleting it. PodDisruptionBudgets are therefore
+  honoured.
+- With no drain timeout configured, **an unsatisfiable PDB blocks the drain
+  indefinitely** — the deletion never proceeds and there is no server-side
+  deadline to fall back on. That applies to pool rolls, pool deletes and cluster
+  deletes alike.
+- From Terraform's side this presents as a plain timeout: the waiter polls until
+  it gives up, leaving a cluster that still exists and still bills, needing
+  manual intervention (fix or delete the PDB) before a retry can succeed.
+
+*Sourcing: the CAPI default cordon/drain/eviction behaviour is upstream
+documented and not re-verified here; what was verified is that nks-core sets no
+override.* Reservation pools never roll, and CAPNS documents no in-place resize,
+rolling update or per-node drain for that backend, so this is a compute-pool
+concern specifically.
+
+Raising the delete default to 60m does not fix a stuck PDB — nothing on the
+provider side can. It stops the common case (a cluster with a handful of pools
+draining normally) from tripping a default sized for a workerless cluster, and
+the docs should name the PDB failure mode so the timeout diagnostic is
+interpretable.
+
 ---
 
 ## Immutability
 
-- `network_id` — `RequiresReplace`. **Confirmed by the NKS team (Matt Pryor,
-  2026-08-24):** networkId is immutable for the lifetime of a cluster. The
-  "Immutable after creation" annotation appears only on `clusterUpdateSpecV1`
-  (not on the create spec) because PUT is full-object-replacement — the field
-  must be *present* in every update, carrying the same value it was created
-  with. Supplying a different one is expected to return **422**. Changing it
-  requires teardown and rebuild, which is exactly what `RequiresReplace` gives us.
-`network_id` is the **only** field that forces replacement.
+**Revised 2026-09-07** after an audit of the nks-core CRD validation rules and
+the server's actual 422s. Three fields the original spec treated as mutable are
+not, and the correction is load-bearing: a plan that shows an in-place update on
+any of them is a plan whose apply always fails.
 
-Because `network_id` is `RequiresReplace`, Terraform can never plan a PUT that
-changes it: any change destroys and recreates. The update converter therefore
-just carries the planned (== prior) value straight through, satisfying the
-"same networkID in the initial POST and every subsequent PUT" rule for free.
+| Field | API truth | Provider |
+| --- | --- | --- |
+| `network_id` | immutable — CEL rule + server 422 *"networkId is immutable"* | **`RequiresReplace`** ✅ already correct |
+| `name` | immutable — server 422 *"cluster names are immutable"* | **`RequiresReplace`** ⚠️ **changed** |
+| `cluster_network.pod_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`RequiresReplace`** ⚠️ **changed** |
+| `cluster_network.service_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`RequiresReplace`** ⚠️ **changed** |
+| `platform_release_id` | mutable — in-place rolling control-plane upgrade | no modifier ✅ already correct |
+| `description`, `tags`, `api_server.*`, `addons.hardware` | mutable in place | no modifier |
 
-Everything else is mutable in place: `name`, `description`, `tags`,
-`platform_release_id` (the upgrade path), `api_server.*`, `addons.hardware`,
-`cluster_network.pod_cidr`, `cluster_network.service_cidr`.
+### Where "API truth" actually lives
+
+Not in the published OpenAPI document. Verified against
+`nks-core/main/openapi.yaml` as of today: the only immutability annotations it
+carries are on `clusterUpdateSpecV1.networkId`,
+`clusterUpdateSpecV1.sshCertificateAuthorityId`, `apiServer.authorization` and
+`apiServer.authentication`. `metadata.name` and `clusterNetwork.*` are
+documented as freely settable, and the generated client will happily serialise a
+change to either.
+
+That is why the original spec got them wrong — it read the OpenAPI document,
+which under-documents the constraint. Enforcement sits in the CRD's CEL
+validation rules and surfaces as a 422 at apply time.
+
+**Default to `RequiresReplace` unless a field is proven mutable**, by a spec
+annotation *and* an acceptance-test step that actually mutates it. The failure
+modes are asymmetric: an unnecessary `RequiresReplace` is a needless rebuild the
+user can see coming in the plan, while a missing one is a plan that promises an
+in-place change and then 422s mid-apply. Loosening later is safe; tightening is a
+breaking change ([playbook §6.1](../.claude/skills/tf-provider-feature/reference/playbook.md)).
+
+### Consequence for the update path
+
+With `network_id`, `name` and `cluster_network.*` all `RequiresReplace`,
+Terraform can never plan a PUT that changes any of them. The update converter
+carries the planned (== prior) values straight through, which satisfies the
+"same networkID in the initial POST and every subsequent PUT" rule for free and
+does the same for the CIDRs and the name.
+
+What remains genuinely updatable in place is a short list:
+`platform_release_id`, `description`, `tags`, `api_server.*`, `addons.hardware`.
+
+### Consequence for users: the CIDRs are a create-time decision
+
+`cluster_network` is exactly the block a real config sets away from its defaults
+(see [Attaching an existing corporate-routed network](#attaching-an-existing-corporate-routed-network)),
+and getting it wrong now costs a cluster rebuild rather than an update. Worth
+stating plainly in the docs rather than leaving users to discover it from a
+replacement plan.
 
 ## Write-once / sensitive fields
 
@@ -441,6 +555,15 @@ check that proves the Optional+Computed defaults (`api_server`, `cluster_network
 - **`networkId` must be re-sent unchanged on every PUT.** A PUT carrying a
   different `networkId` is expected to return **422** rather than move the
   cluster. `RequiresReplace` means Terraform never generates that request.
+- **`metadata.name` and `clusterNetwork.*` are immutable too, and the OpenAPI
+  document does not say so.** The server returns 422 *"cluster names are
+  immutable"* / *"clusterNetwork.podCidr is immutable"*; enforcement is a CRD CEL
+  rule, not a schema annotation. See [Immutability](#immutability).
+- **The canonical spec has grown three more immutable fields since this spec was
+  written** — `spec.sshCertificateAuthorityId` ("Immutable after creation,
+  including whether it is set"), `apiServer.authorization` and
+  `apiServer.authentication` (both fixed at creation). None are modelled here;
+  see open question 7.
 - `409 Conflict` on `updateCluster` — concurrent modification. Surface unmodified
   per [playbook §3.1](../.claude/skills/tf-provider-feature/reference/playbook.md);
   do not auto-retry (it is not transient, it means someone else wrote).
@@ -465,6 +588,75 @@ Recommend filing `nscale_kubernetes_node_pool` as an immediate follow-up.
 Flagging rather than expanding scope — that is the ticket owner's call, and the
 node pool spec (`NodePoolRequestSpecV1`: provisioning modes, taints,
 reservations, flavours, autoscaling) is comparable in size to this one.
+
+Node pools are now specified separately (`.specs/kubernetes_node_pool.md`, PR
+#77). Nothing about their attribute surface belongs here, but two of their
+properties reach back into this resource and are covered above: the cluster's
+`provisioned`/`healthy` aggregate includes every pool
+([waiter semantics](#what-those-statuses-aggregate-upstream)), and pool node
+drain is what makes the cluster delete timeout hard to bound
+([timeouts](#why-delete-goes-to-60m-node-drain-has-no-deadline)).
+
+---
+
+## Attaching an existing corporate-routed network
+
+The default-everything example is not what production configs look like. The
+common shape is an existing corporate-routed Nscale network plus explicitly
+chosen pod and service CIDRs, with no public API endpoint:
+
+```hcl
+resource "nscale_kubernetes_cluster" "main" {
+  name       = "production"
+  network_id = "b5023904-09c6-4d62-9395-752d1b505d3b" # existing, corporate-routed
+
+  platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
+
+  cluster_network = {
+    pod_cidr     = "100.65.0.0/16"
+    service_cidr = "172.20.0.0/16"
+  }
+
+  api_server = {
+    public_ip = false
+  }
+}
+```
+
+This is the config most affected by the immutability correction above:
+`network_id` and both CIDRs force replacement, so **the whole network layout is
+a create-time decision**. There is no in-place path from a pod CIDR that turns
+out to collide with a corporate route — only destroy and rebuild. Doc-worthy, and
+an argument for the docs leading with this example rather than the
+accept-the-defaults one.
+
+Nothing here needs new Terraform surface. `cluster_network` is the only knob, and
+it already exists. What is *not* yet answered is what the platform does with it,
+and that shapes the guidance the docs can honestly give:
+
+**Open with the NKS team (see open question 8):**
+
+1. **Worker addressing.** Given the config above, do workers get addresses from
+   the attached network's prefix (e.g. `7.247.16.0/20`) while pod and service
+   traffic stays on the separate CIDRs? The spec's only statement is that region,
+   project and organization are inherited from the network; worker IPAM is not
+   described.
+2. **Pod egress to corporate routes.** When a pod reaches the corporate
+   `10.0.0.0/8` route, does NKS SNAT it to its worker's network address? If it
+   does not, the pod CIDR has to be routable corporate-side, which turns a
+   cluster-local choice into a network-team dependency — and an immutable one.
+3. **`Service type=LoadBalancer`.** Can NKS provision both private and public
+   addresses, and how is the choice made — a Service annotation (in-cluster, so
+   the `kubernetes` provider's problem, not this one) or cluster-level
+   configuration (in which case this schema has a gap)? Are security-group rules
+   and NodePort rules managed automatically, or does the caller open them?
+
+Question 3 is the only one that could change this resource's schema, and only if
+the private/public selection turns out to be cluster-level. Questions 1 and 2 are
+documentation: users need the answers before committing to CIDRs they cannot
+change. **Neither blocks this PR** — the surface is the same either way — but
+answer 3 before the schema is frozen, because adding a required cluster-level
+LoadBalancer field later is cheap while changing one is not.
 
 ---
 
@@ -545,10 +737,15 @@ provider "kubernetes" {
   **in-place** (not replace) → assert `applied_platform_release_id` catches up →
   `PlanOnly` step.
 - `_replace`: change `network_id` → assert plan is a replace.
-- `_update_cluster_network`: change `pod_cidr` → assert **in-place**, assert the
-  new value reads back, `PlanOnly` step. This is the step that proves the
-  mutable-CIDR decision; if the API rejects or ignores the change, it fails here
-  rather than in a user's apply.
+- `_replaceOnNameChange`: change `name` → assert plan is a **replace**, not an
+  update. Cheap (plan-only is enough for the assertion) and it pins a constraint
+  the OpenAPI document does not carry.
+- `_replaceOnClusterNetworkChange`: change `pod_cidr` → assert the plan is a
+  **replace**. Replaces the old `_update_cluster_network` step, which asserted
+  in-place and was written against the since-corrected mutability decision. A
+  plan-only assertion is sufficient and avoids paying for two cluster builds; if
+  it ever plans an update again, the 422 is caught here rather than in a user's
+  apply.
 - `api_server.public_ip = false` step + `PlanOnly` (the bool-zero guard).
 - Data source by `id` matches the resource.
 - Platform releases list non-empty; filtered-by-architecture subset ⊆ unfiltered.
@@ -570,7 +767,8 @@ Slower and more expensive than the rest of the suite — worth a comment in
 | `_rejectsSettingScope` | PASS (0.15s) |
 | `PlatformReleasesDataSource_basic` / `_eligibleOnly` / `_filterSubset` | PASS |
 | `_replaceOnNetworkChange` | SKIP — needs a second network in the same project+region; uni-dev has none |
-| `_boolZeroValues`, `_updateRelease`, `_updateClusterNetwork` | not yet run |
+| `_boolZeroValues`, `_updateRelease` | not yet run |
+| `_updateClusterNetwork` | **withdrawn** — asserted in-place on an immutable field; replaced by `_replaceOnClusterNetworkChange` |
 
 **`_basic` failed once before passing on retry**, and the failure is worth
 recording because it exercised the failure path for the first time: NKS set
@@ -622,15 +820,35 @@ median — a 30m default would pass on a fast day and fail on a slow one.
    `observedGeneration` is populated and equals `generation` on a settled
    cluster, and `eligibleTargets` comes back as `[]` (not absent) when there is
    no upgrade — the empty-vs-null distinction the converter relies on.
-4. ~~**Is `cluster_network` mutable?**~~ **Decided 2026-08-24: yes — in-place, no
-   replacement.** `pod_cidr` / `service_cidr` changes go through the normal PUT.
-   Note this is the *permissive* choice: if the API turns out to reject or
-   silently ignore a CIDR change, users get a failed apply or silent drift rather
-   than a rebuild. Worth an explicit acceptance-test step
-   (`_update_cluster_network`) so we find out early. Tightening this to
-   `RequiresReplace` later would be a breaking change
+4. ~~**Is `cluster_network` mutable?**~~ **Answered 2026-09-07: no — it is
+   immutable, and the 2026-08-24 "yes, in-place" decision was wrong.** CEL
+   `self == oldSelf` on the CRD plus server 422
+   *"clusterNetwork.podCidr is immutable"*. Now `RequiresReplace`; `name` was
+   wrong the same way and is fixed with it. The permissive choice recorded here
+   was the risk it warned about, and it landed: the failure mode was not silent
+   drift but a plan that promises an in-place update and then 422s. Because this
+   moves *toward* `RequiresReplace` it is safe to change now — the reverse
+   (tightening after release) would have been breaking
    ([playbook §6.1](../.claude/skills/tf-provider-feature/reference/playbook.md)).
+   **The lesson worth keeping: verify mutability against the CRD and a real
+   mutation, not against the OpenAPI annotations.**
 5. **Node pools — separate ticket?** A cluster without them has no workers. See
-   scope note above.
+   scope note above. Now specified in `.specs/kubernetes_node_pool.md` (PR #77).
 6. **`nscale_kubernetes_cluster_auth` fast-follow — confirm deferred.** This spec
    ships the documented `exec` block only.
+7. **Three new immutable spec fields — model now or defer?** The canonical spec
+   has gained `spec.sshCertificateAuthorityId`, `apiServer.authorization` and
+   `apiServer.authentication` since this was written, all immutable after
+   creation. Recommendation: add **`ssh_certificate_authority_id`** now —
+   Optional + `RequiresReplace`, one string, and the provider already exposes
+   `nscale_ssh_certificate_authority` to produce the ID, so leaving it out means
+   NKS worker SSH trust cannot be configured from Terraform at all. Defer
+   `authorization` (RBAC bindings: nested list of role + subject sets) and
+   `authentication` (webhook override + external OIDC issuers) to their own
+   change — both are immutable, so they are `RequiresReplace` blocks that need
+   their own acceptance coverage, and neither is on the DX-2007 critical path.
+8. **Networking behaviour with an existing corporate-routed network** — worker
+   IPAM, pod-egress SNAT, and how `Service type=LoadBalancer` selects private vs
+   public. See
+   [Attaching an existing corporate-routed network](#attaching-an-existing-corporate-routed-network).
+   Only the LoadBalancer question can affect this schema; the other two are docs.
