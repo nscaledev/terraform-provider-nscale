@@ -47,21 +47,26 @@ cluster (which got them from its network). Same `Computed`-only treatment.
 
 | Name | Type | R/O/C | Plan modifiers | Notes |
 | --- | --- | --- | --- | --- |
-| `name` | String | Required | — | `metadata.name`; `NameValidator()` |
-| `cluster_id` | String | Required | **`RequiresReplace`** | `spec.clusterId`. A pool cannot move clusters — see Open questions. |
-| `provisioning_mode` | String | Required | **`RequiresReplace`** | `compute` \| `reservation`. `stringvalidator.OneOf`. See Open questions. |
-| `replicas` | Int64 | Required | — | `spec.replicas`. **min 0**, max 2147483647. Scale-to-zero is legal. |
+| `name` | String | Required | **`RequiresReplace`** | `metadata.name`; `NameValidator()`. Immutable server-side. |
+| `cluster_id` | String | Required | **`RequiresReplace`** | `spec.clusterId`. Immutable server-side (422). |
+| `provisioning_mode` | String | Required | **`RequiresReplace`** | `compute` \| `reservation`. `stringvalidator.OneOf`. Immutable server-side (422). |
+| `replicas` | Int64 | Required | **`RequiresReplaceIf`** mode is `reservation` | `spec.replicas`. **min 0**, max 2147483647. Scale-to-zero is legal on compute pools; reservation pools cannot be scaled at all. |
 | `description` | String | Optional | — | `metadata.description` |
 | `tags` | Map(String) | Optional+Computed | — | `metadata.tags`; `NoReservedPrefix` |
 | `compute` | SingleNested | Optional | — | Required iff mode is `compute` |
-| `compute.flavor_id` | String | Required within block | — | `spec.compute.flavorId` |
+| `compute.flavor_id` | String | Required within block | **`RequiresReplace`** | `spec.compute.flavorId`. Immutable server-side (422). |
 | `reservation` | SingleNested | Optional | — | Required iff mode is `reservation` |
-| `reservation.reservation_id` | String | Required within block | — | `spec.reservation.reservationId` |
-| `taints` | ListNested | Optional | — | Max 64. **Disruptive** — see §Taints. |
+| `reservation.reservation_id` | String | Required within block | **`RequiresReplace`** | `spec.reservation.reservationId`. Immutable server-side (422). |
+| `taints` | ListNested | Optional | **`RequiresReplaceIf`** mode is `reservation` | Max 64. In place on compute pools, and **rolls every worker** — see §Rolls. |
 | `taints[].key` | String | Required | — | maxLength 317, K8s qualified-name pattern |
 | `taints[].value` | String | Optional | — | maxLength 63, K8s label-value pattern |
 | `taints[].effect` | String | Required | — | `NoSchedule` \| `PreferNoSchedule` \| `NoExecute` |
-| `labels` | Map(String) | Optional | — | Max 64 entries, value maxLength 63. **Disruptive** — see §Taints. |
+| `labels` | Map(String) | Optional | **`RequiresReplaceIf`** mode is `reservation` | Max 64 entries, value maxLength 63. Same as `taints`. |
+
+Immutability is **confirmed**, not assumed: each of the fields marked
+`RequiresReplace` is guarded by a CEL `self == oldSelf` rule and rejected by the
+server with a 422 (see §Answered). One of the first draft's assumptions was
+answered against us — `compute.flavor_id` is *not* an in-place update.
 
 `taints` is a **List**, not a Set: the API returns an array and Kubernetes taint
 ordering is stable, so a list avoids spurious reordering diffs while keeping the
@@ -99,9 +104,10 @@ argument and would invite confusion about which is authoritative. The three
 observed counts (`current`, `ready`, `upToDate`) are the ones that tell a user
 something they don't already know.
 
-The node pool pins its own platform release, distinct from the cluster's —
-hence `applied_platform_release_id` and its version here as well as on the
-cluster.
+The node pool **reports** its own platform release, separately from the
+cluster's — hence `applied_platform_release_id` and its version here as well as
+on the cluster. Whether a pool can be *pinned* independently is still open
+(question 4): the release is read-only in this spec either way.
 
 ### Cross-field validation
 
@@ -110,6 +116,11 @@ cluster.
 - `provisioning_mode = "compute"` → `compute` set, `reservation` unset
 - `provisioning_mode = "reservation"` → `reservation` set, `compute` unset
 
+`provisioning_mode` now does double duty: it gates which capacity block is
+valid, *and* it gates whether `replicas`, `taints` and `labels` force
+replacement (see §Immutability). Both readings of it should come from the same
+place in the code, so the two never disagree about what mode a pool is in.
+
 The ticket's acceptance criterion is explicit that mis-configuration must fail
 at plan/validate, not apply. Prefer the framework's
 `resourcevalidator.Conflicting` / `RequiredTogether` where they fit; a small
@@ -117,40 +128,109 @@ custom validator otherwise, following the shape of
 `computecluster/validator.go`
 ([playbook §3.3](../.claude/skills/tf-provider-feature/reference/playbook.md)).
 
-## Taints and labels are disruptive — say so loudly
+## Rolls: what a taint or label edit actually does
 
-Straight from the spec:
+### Compute pools
 
-> Taints are not continuously reconciled onto running nodes, so a change applies
-> to newly created workers only **and rolls the pool's existing workers** so the
-> new taints take effect.
+A compute pool is a plain CAPI v1.14 `MachineDeployment`. Editing `taints` or
+`labels` re-hashes the `KubeadmConfigTemplate` name, which changes the
+`MachineDeployment`'s template ref, which makes CAPI roll every worker in the
+pool. So editing either **replaces every node in the pool** — but it does so as
+a controlled rolling update, not a stampede:
 
-Same wording for labels. So editing either **replaces every node in the pool**.
+- nks-core renders **no rollout strategy and no drain, volume-detach or
+  deletion timeouts**, so upstream CAPI defaults apply: `RollingUpdate` with
+  `maxSurge: 1` and `maxUnavailable: 0`.
+- The Machine controller **cordons and drains** each node through the Eviction
+  API before deleting it, so **PodDisruptionBudgets are honoured**.
+- With no drain timeout set, an **unsatisfiable PDB blocks the roll
+  indefinitely** — and the Terraform waiter simply times out. The same is true
+  of a pool delete and a cluster delete.
 
-This must appear in the `MarkdownDescription` of both attributes, not just the
-prose docs — it is the one place a user will see it before they apply. A user
-who thinks they are adding a label and instead recycles their entire fleet has
-been badly served.
+Two practical consequences for this resource:
 
-Terraform will show these as ordinary in-place updates, because that is what
-they are at the API level. We cannot make the plan itself warn, which is exactly
-why the attribute description has to carry the weight.
+1. `maxSurge: 1`/`maxUnavailable: 0` means the roll is **serial** — one extra
+   node at a time, each drained before its predecessor goes. Wall-clock is
+   roughly `replicas × per-node (provision + join + drain)`, which is what the
+   update timeout has to cover. See §Timeouts.
+2. A timed-out apply on a PDB-blocked roll is **not** a failed roll. The
+   `MachineDeployment` is still mid-rollout when Terraform gives up, and the
+   next apply picks up where it left off. The error message should say so
+   rather than implying the pool is broken.
+
+The CAPI default behaviour above is upstream behaviour, taken as read. What was
+verified in nks-core is the narrower and more load-bearing fact: **nks-core sets
+no override**, so the defaults are what apply.
+
+### Reservation pools
+
+A reservation pool is backed by a placement, and **a placement never rolls**.
+CAPNS documents no in-place resize, no rolling update and no per-node drain for
+that backend. Nothing a template change would express can take effect, which is
+why `replicas`, `taints`, `labels` and the platform release are all immutable in
+this mode — the API rejects the edit rather than accepting a change that could
+never land.
+
+For the provider this means a reservation pool is **effectively immutable**:
+only `description` and `tags` update in place. Everything else forces
+replacement, and replacement releases and re-claims the placement.
+
+### What the schema has to say
+
+The disruption must appear in the `MarkdownDescription` of `taints` and
+`labels`, not just the prose docs — it is the one place a user sees it before
+they apply. On a compute pool Terraform shows a taint edit as an ordinary
+in-place update, because that is what it is at the API level; the plan cannot
+warn, so the attribute description carries the weight. On a reservation pool the
+plan *does* warn, because `RequiresReplaceIf` fires.
 
 ## Lifecycle
 
 - **Create:** `POST` → `201`, async.
 - **Read:** `GET` by id. 404 → `RemoveResource`.
-- **Update:** `PUT`, full replacement, async. Scaling `replicas` is the common
-  case and **must not disturb taints or labels** — build the whole
-  `nodePoolUpdateSpecV1` from config every time.
-- **Delete:** `DELETE` → `202`, async, poll to not-found.
+- **Update:** `PUT`, full replacement, async. On a compute pool the common case
+  is scaling `replicas`, which **must not disturb taints or labels** — build the
+  whole `nodePoolUpdateSpecV1` from config every time. On a reservation pool
+  only `description` and `tags` reach this path; everything else has already
+  been diverted to replacement by `RequiresReplaceIf`.
+- **Delete:** `DELETE` → `202`, async, poll to not-found. On a compute pool this
+  drains every node, so it is as slow as a roll and blocks on PDBs the same way.
 
 ### Waiters — reuse, don't duplicate
 
-The settledness rules are **identical** to the cluster: `observedGeneration >=
-generation` before trusting status, `provisioned` + `healthStatus: error` is a
-failure, delete polls to not-found with a post-deprovisioning error being
-terminal.
+The settledness rules are **identical** to the cluster, and the cluster's
+`classify` is stricter than "not an error". Success requires all three of:
+
+1. `status.observedGeneration >= metadata.generation`
+2. `provisioningStatus == provisioned`
+3. `healthStatus == healthy`
+
+`error` provisioning, or `provisioned` with `healthStatus: error`, fails the
+apply. `degraded` and `unknown` keep polling. Delete polls to 404, and treats
+`error` as terminal only once `deprovisioning` has been observed.
+
+**The provider must not compare replica counts itself**, and the cluster
+implementation does not. Upstream, a compute pool reaching `provisioned`
+already requires the `MachineDeployment` status to be current, none of
+`RollingOut`, `ScalingUp`, `ScalingDown`, `Remediating` or `Deleting` to be
+true, `MachinesUpToDate` true, and `spec.replicas == desired ==
+status.replicas`; `healthy` additionally requires `Available` and
+`MachinesReady` true with `readyReplicas == replicas`. A settled
+`provisioned` + `healthy` therefore already implies current, ready and
+up-to-date all equal desired. Adding a count comparison in the provider would
+duplicate that check, and would be the copy that drifts.
+
+Reservation pools are the weaker case: readiness there is decided on counts
+alone (`readyReplicas == spec.replicas`), and the ready count is coarse. The
+waiter is unchanged, but a reservation pool reporting `healthy` is a softer
+guarantee than a compute pool doing so, and the docs should not overclaim.
+
+One cross-resource consequence worth knowing: a cluster is not `provisioned`
+while any of its pools is scaling or rolling, because cluster `provisioned`
+aggregates infrastructure, control plane, core and hardware add-ons,
+authorization *and* every node pool being `Provisioned`. So a cluster update
+applied concurrently with a pool roll waits for the roll — the cluster's
+timeout has to survive a node pool's slowest operation, not just its own.
 
 The ticket is explicit, and correct, that this should be **one generic watcher
 shared by clusters and node pools** — the CLI centralises it in `statuswait`
@@ -170,36 +250,75 @@ move with it.
 
 ### Timeouts
 
-Node pools should be **faster than a control plane** — they are worker VMs
-joining an existing cluster, not a new control plane. But this is an assumption,
-and DX-2007 taught us that guessing here is exactly how you ship a default that
-fails on a slow day.
+A single worker joining an existing cluster is **faster than a control plane**.
+A *roll* of a whole pool is not: `maxSurge: 1`/`maxUnavailable: 0` makes it
+serial, so it costs roughly `replicas ×` per-node time, plus drain.
 
 Proposed starting point, **to be corrected by measurement in Phase 4**:
 
 | | Create | Update | Delete |
 | --- | --- | --- | --- |
-| Proposed | 30m | 30m | 30m |
+| Proposed | 30m | **60m** | **60m** |
 
-Update gets the same as create because a taint/label edit rolls every worker —
-effectively a full re-provision of the pool. Scaling up is bounded by the same
-per-node time. Record the observed numbers in the code comment as DX-2007 did.
+Update and delete get double the create budget, revised up from the first
+draft's flat 30m, because both walk the pool one node at a time and both drain:
+
+- **Update** covers the worst case, a taint or label edit rolling every worker.
+  At a plausible 5m per node a 10-worker pool needs ~50m, which the original
+  30m would not have survived. If measurement shows per-node time is high, the
+  honest answer may be to document "raise `timeouts.update` for large pools"
+  rather than pick a default big enough for any pool.
+- **Delete** drains every node on the way out, so it is bounded the same way.
+
+Neither default can be made safe against a PDB that cannot be satisfied —
+there is no drain timeout upstream, so the block is indefinite and the
+Terraform timeout is the only bound. That is a documentation problem, not a
+tuning one.
+
+Record the observed numbers in the code comment as DX-2007 did.
 
 ## Immutability
 
-- `cluster_id` — a pool belongs to one cluster.
-- `provisioning_mode` — compute and reservation are different capacity sources.
+Confirmed against the API's CEL rules and the server's 422 responses. It is
+**mode-dependent**, which the first draft did not anticipate.
 
-Everything else is in-place: `name`, `description`, `tags`, `replicas`,
-`compute.flavor_id`, `reservation.reservation_id`, `taints`, `labels`.
+| Field | Compute pool | Reservation pool |
+| --- | --- | --- |
+| `name` | replace | replace |
+| `cluster_id` | replace | replace |
+| `provisioning_mode` | replace | replace |
+| `compute.flavor_id` | replace | n/a |
+| `reservation.reservation_id` | n/a | replace |
+| `replicas` | **in place** | replace |
+| `taints` | **in place** (rolls the pool) | replace |
+| `labels` | **in place** (rolls the pool) | replace |
+| platform release | in place | replace |
+| `description`, `tags` | in place | in place |
 
-**Both of these are assumptions, not confirmed.** See Open questions.
+The right-hand column follows from §Rolls: a placement never rolls, so the API
+refuses edits that could never take effect rather than accepting them silently.
 
-`compute.flavor_id` being mutable is worth its own thought: changing the flavour
-of a running pool means replacing every node. If the API accepts it, it is an
-in-place update that happens to be maximally disruptive — the same category as
-taints, and it needs the same warning in its description. If the API rejects it,
-it needs `RequiresReplace`.
+`compute.flavor_id` is the one the first draft got wrong. It reasoned that a
+flavour change *could* be an in-place update that happens to be maximally
+disruptive, in the same category as taints. It is not — the API rejects it, so
+it needs `RequiresReplace`, and a plan that shows a full replacement is telling
+the truth.
+
+### Implementation note
+
+`replicas`, `taints` and `labels` need `RequiresReplaceIf` rather than a plain
+`RequiresReplace` — `int64planmodifier`, `listplanmodifier` and
+`mapplanmodifier` all provide it. The condition reads `provisioning_mode` and
+fires only for `reservation`. Because `provisioning_mode` itself forces
+replacement, reading it from config or state is equivalent: a mode change
+replaces the resource regardless.
+
+Three attributes sharing one predicate wants a single helper
+(`requiresReplaceIfReservation`) rather than three copies of the same closure.
+
+Scaling a reservation pool destroying and recreating it is a sharp edge worth
+saying out loud in the docs: `replicas 2 → 3` on a reservation pool is not a
+scale, it is a rebuild, and it releases and re-claims the placement.
 
 ## Write-once / sensitive fields
 
@@ -218,8 +337,16 @@ post-import plan that DX-2007 has, for the same reason.
 
 ## Known API constraints
 
-- **`replicas` minimum is 0.** Scale-to-zero is legal, and worth an acceptance
-  test — it is both a plausible user action and the `omitempty` canary.
+- **`replicas` minimum is 0.** Scale-to-zero is legal on a compute pool, and
+  worth an acceptance test — it is both a plausible user action and the
+  `omitempty` canary. A reservation pool cannot be scaled at all.
+- **There is no drain timeout.** Upstream CAPI cordons and drains each node
+  through the Eviction API and nks-core sets no `nodeDrainTimeout`, so an
+  unsatisfiable PodDisruptionBudget blocks a roll, a pool delete or a cluster
+  delete indefinitely. Terraform's timeout is the only bound.
+- **Reservation-pool readiness is coarse** — decided on `readyReplicas ==
+  spec.replicas` alone, with no equivalent of the compute pool's
+  `MachinesUpToDate` / `Available` conditions.
 - `taints` max 64; `labels` max 64 entries.
 - Taint key maxLength 317, value maxLength 63, both regex-constrained. Mirror
   the patterns as schema validators so a bad key fails at plan time.
@@ -245,6 +372,7 @@ resource "nscale_kubernetes_node_pool" "workers" {
     flavor_id = data.nscale_instance_flavor.worker.id
   }
 
+  # Editing these on a compute pool rolls every worker, one at a time.
   labels = {
     "workload" = "general"
   }
@@ -260,7 +388,8 @@ resource "nscale_kubernetes_node_pool" "gpu" {
     reservation_id = nscale_reservation.gpu.id
   }
 
-  # Changing taints rolls every worker in this pool.
+  # A reservation pool never rolls, so editing these — or replicas — replaces
+  # the pool and re-claims the placement.
   taints = [{
     key    = "nvidia.com/gpu"
     value  = "true"
@@ -292,52 +421,128 @@ story neither ticket exercises otherwise.
 - `_basic` compute pool: create → check `ready_replicas` → `PlanOnly` → import.
 - `_scale`: `replicas` 1 → 3 → in-place, ID unchanged, `PlanOnly` after.
 - `_scaleToZero`: `replicas` → 0, in-place, `PlanOnly` after.
-- `_taints`: add a taint → in-place → `PlanOnly`.
-- `_replace`: change `provisioning_mode` → plans a replace.
+- `_taints`: add a taint on a compute pool → in-place, ID unchanged → `PlanOnly`.
+  Assert `up_to_date_replicas` returns to `replicas`, which is what proves the
+  roll finished rather than the waiter returning early.
+- `_replace`: one case per immutable field — `provisioning_mode`, `name`,
+  `cluster_id`, `compute.flavor_id` — each plans a replace. `flavor_id` is the
+  one that regressed from the first draft, so it is the one that matters most.
+- `_reservationImmutable`: on a reservation pool, `replicas`, `taints` and
+  `labels` each plan a **replace**, not an update. This is the
+  `RequiresReplaceIf` predicate under test, and the failure mode if it is wrong
+  is a plan that promises an in-place change and then 422s at apply.
 - `_reservation`: gated on a reservation env var, skipped when absent.
 - Data source by id agrees with the resource.
 - Negative: mode/block mismatch fails at **plan**, asserted with `ExpectError`
   and `PlanOnly: true`.
 
+`_reservationImmutable` can run as `PlanOnly` against a single created pool —
+it asserts on plan output, so it does not need to pay for three rebuilds.
+
 **Cost:** each pool is real compute. Cheaper than a control plane, but the
 suite still wants a separate CI lane, as the cluster one does.
 
+## Answered
+
+The three questions that blocked schema decisions have come back from the NKS
+team, confirmed against CEL rules and server 422s.
+
+1. ~~**Is `cluster_id` actually immutable?**~~ **Yes.** Server 422s.
+   `RequiresReplace` is right. The absence of an `immutable` annotation in the
+   published spec proved nothing, as suspected.
+
+2. ~~**Is `provisioning_mode` immutable?**~~ **Yes.** Server 422s. There is no
+   in-place compute→reservation migration. `RequiresReplace` is right, and is
+   not needlessly destructive.
+
+3. ~~**Is `compute.flavor_id` mutable?**~~ **No** — and neither is
+   `reservation.reservation_id`. Both are CEL-guarded and 422 on change. Both
+   need `RequiresReplace`. This is the one the draft guessed wrong: it assumed
+   in-place-but-disruptive, and had we shipped that, every flavour change would
+   have planned clean and failed at apply.
+
+That also surfaced something the draft did not ask about: **immutability is
+mode-dependent**, and reservation pools additionally freeze `replicas`,
+`taints`, `labels` and the platform release. See §Immutability.
+
+One reading to confirm: `name` was reported as immutable alongside the
+reservation-pool answers, and this spec takes it as immutable in **both** modes,
+matching the cluster (whose server message is "cluster names are immutable"). If
+it turns out to be reservation-only, `name` should drop to a plain in-place
+update on compute pools — cheap to change now, breaking to change after release.
+
 ## Open questions
 
-1. **Is `cluster_id` actually immutable?** Near-certain, but the NKS spec carries
-   **no `immutable` annotation on it** — the only one in the whole document is
-   on the cluster's `networkId`. DX-2007 taught us that the annotation's absence
-   proves nothing either way, since PUT is full replacement and every field
-   appears in the update shape regardless. Worth one line to the NKS team rather
-   than an assumption, because `RequiresReplace` is a breaking change to add or
-   remove later.
+4. **Does a node pool carry its own `platformReleaseId` on the write path?**
+   The evidence conflicts. `nodePoolRequestSpecV1` has **no**
+   `platformReleaseId` field, which says the pool inherits the cluster's — but
+   the immutability answers describe `platformReleaseID` as immutable *on
+   reservation pools*, which implies a per-pool field exists somewhere below the
+   public API. Either the field is internal and `status.release` simply reports
+   what was inherited, or an argument is missing from this spec. One line to the
+   NKS team settles it; until then the spec exposes the release read-only.
 
-2. **Is `provisioning_mode` immutable?** Same reasoning, less obvious answer.
-   Switching a pool from compute to reservation could plausibly be a supported
-   in-place migration. If it is, `RequiresReplace` would be needlessly
-   destructive — and destructive-by-default is the harder mistake to walk back.
+5. **What does a reservation-backed pool need in place first?** Whether the
+   reservation must be `provisioned`, in the same region, and unclaimed is not
+   something the spec states. Affects both the example and whether the
+   acceptance test can be self-contained.
 
-3. **Is `compute.flavor_id` mutable, and if so does it roll the pool?** Governs
-   whether it needs `RequiresReplace` or a disruption warning.
+6. **Cluster deletion cascades to node pools.** Terraform normally destroys
+   pools first via the `cluster_id` dependency, and a pool delete that 404s is
+   already treated as success. Worth an explicit destroy test of the whole
+   stack. Note the drain interaction: a cluster delete drains worker nodes the
+   same way a pool delete does, so a PDB that cannot be satisfied blocks the
+   cluster destroy too.
 
-4. **Do node pools need their own platform release?** `status.release` exists on
-   the pool, but `nodePoolRequestSpecV1` has **no** `platformReleaseId` field —
-   so the pool appears to inherit the cluster's. Confirm, because if a pool can
-   be pinned independently, an argument is missing from this spec.
+7. **Does a PDB-blocked roll surface usefully?** If the waiter times out
+   mid-rollout, the pool is still rolling and the next apply resumes. Confirm
+   that is what actually happens, and make the timeout error say it — "timed out
+   waiting for the pool to settle; the rollout is still in progress, and may be
+   blocked by a PodDisruptionBudget" is a materially better message than a bare
+   deadline.
 
-5. **What does a reservation-backed pool need in place first?** The example
-   references `nscale_reservation`, but whether the reservation must be
-   `provisioned`, in the same region, and unclaimed is not something the spec
-   states. Affects both the example and whether the acceptance test can be
-   self-contained.
+### Worker networking — belongs to the cluster, felt on the pool
 
-6. **Cluster deletion cascades to node pools** (the cluster ticket says delete
-   removes "a cluster and its node pools"). What does Terraform see if a user
-   destroys a cluster while pool resources still exist in state? Ideally the
-   pool's delete gets a 404 and treats it as success — that is already the
-   behaviour — but the *ordering* matters: Terraform will normally destroy pools
-   first via the `cluster_id` dependency. Worth an explicit destroy test of the
-   whole stack.
+These have been asked by users and are not answered anywhere yet. The
+*arguments* involved (`network_id`, `pod_cidr`, `service_cidr`,
+`api_server.public_ip`) all live on `nscale_kubernetes_cluster`, so the answers
+belong in the cluster docs — but every one of them is observed on the workers,
+which is why they are tracked here too.
 
-Questions 1–3 are the ones that block schema decisions and should go to the NKS
-team as a batch. 4–6 can be settled empirically in Phase 4.
+For the usual deployment — an existing corporate-routed Nscale network, with
+separate pod and Service CIDRs:
+
+```yaml
+spec:
+  networkId: <corporate-routed network>
+  clusterNetwork:
+    podCidr: 100.65.0.0/16
+    serviceCidr: 172.20.0.0/16
+  apiServer:
+    publicIP: false
+```
+
+8. **Do workers get addresses from the network's own prefix** (e.g. a
+   `7.247.16.0/20`) while pod and Service addresses stay in the separate CIDRs
+   above? If so, `nscale_kubernetes_node_pool` should expose the worker
+   addresses, or at least say where they come from — today the spec exposes no
+   node address at all, and a user who needs to firewall their workers has
+   nothing to reference.
+
+9. **Is pod egress SNAT'd to the worker's address?** When a pod reaches a
+   corporate `10.0.0.0/8` route, does NKS SNAT it to its worker's `7.247.x.x`
+   address? This decides whether corporate ACLs can be written against the
+   network prefix or have to admit the pod CIDR as well. It is the single
+   question most likely to be asked in a review of the docs.
+
+10. **Service `type=LoadBalancer`: private and public.** Can NKS provision both?
+    How is one selected — a Service annotation, or something cluster-level? And
+    are security-group and NodePort rules managed automatically as a
+    consequence? If selection is per-Service, this is outside Terraform's scope
+    entirely and the docs should say so plainly and point at the NKS
+    documentation, rather than leaving a user to guess there is a missing
+    provider argument. If it is cluster-level, the cluster resource is missing
+    an argument.
+
+8–10 go to the NKS team with 4; they gate documentation, and 10 may gate a
+cluster schema decision. 5–7 can be settled empirically in Phase 4.

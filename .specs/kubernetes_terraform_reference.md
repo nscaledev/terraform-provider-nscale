@@ -390,7 +390,8 @@ resource "nscale_kubernetes_node_pool" "gpu" {
     reservation_id = nscale_reservation.gpu.id
   }
 
-  # Editing taints rolls every worker in this pool. See below.
+  # This pool is reservation-backed, so editing taints replaces it. On a
+  # compute pool the same edit rolls the workers in place. See below.
   taints = [{
     key    = "nvidia.com/gpu"
     value  = "true"
@@ -401,18 +402,29 @@ resource "nscale_kubernetes_node_pool" "gpu" {
 
 ### Arguments
 
-| Argument | Type | Required | Changing it |
-| --- | --- | --- | --- |
-| `name` | String | yes | updates in place |
-| `cluster_id` | String | yes | **forces replacement** |
-| `provisioning_mode` | String | yes | **forces replacement** |
-| `replicas` | Number | yes | scales in place |
-| `description` | String | no | updates in place |
-| `tags` | Map(String) | no | updates in place |
-| `compute` | Object | if mode is `compute` | updates in place |
-| `reservation` | Object | if mode is `reservation` | updates in place |
-| `taints` | List(Object) | no | in place, **rolls the pool** |
-| `labels` | Map(String) | no | in place, **rolls the pool** |
+What changing an argument does depends on the pool's `provisioning_mode`. A
+compute pool can be scaled and re-labelled in place; a reservation pool is
+close to immutable.
+
+| Argument | Type | Required | On a `compute` pool | On a `reservation` pool |
+| --- | --- | --- | --- | --- |
+| `name` | String | yes | **forces replacement** | **forces replacement** |
+| `cluster_id` | String | yes | **forces replacement** | **forces replacement** |
+| `provisioning_mode` | String | yes | **forces replacement** | **forces replacement** |
+| `compute.flavor_id` | String | if mode is `compute` | **forces replacement** | n/a |
+| `reservation.reservation_id` | String | if mode is `reservation` | n/a | **forces replacement** |
+| `replicas` | Number | yes | scales in place | **forces replacement** |
+| `taints` | List(Object) | no | in place, **rolls the pool** | **forces replacement** |
+| `labels` | Map(String) | no | in place, **rolls the pool** | **forces replacement** |
+| `description` | String | no | updates in place | updates in place |
+| `tags` | Map(String) | no | updates in place | updates in place |
+
+The reservation column is not a provider choice. A reservation pool is backed
+by a placement, and a placement never rolls — so a template change could not
+take effect, and the API rejects it rather than accepting it silently. The
+provider plans a replacement so the change is at least achievable, but note
+that replacing a reservation pool releases and re-claims the placement.
+`replicas 2 → 3` on a reservation pool is a rebuild, not a scale.
 
 `provisioning_mode` is `compute` or `reservation` and selects which capacity
 block applies:
@@ -425,8 +437,8 @@ block applies:
 Supplying the wrong block for the mode, or both, fails at **plan** time rather
 than apply.
 
-`replicas` has a minimum of **0** — scaling a pool to zero is legal and keeps
-the pool definition without any workers.
+`replicas` has a minimum of **0** — scaling a compute pool to zero is legal and
+keeps the pool definition without any workers.
 
 `taints[]` takes `key` (required), `value` (optional) and `effect` — one of
 `NoSchedule`, `PreferNoSchedule`, `NoExecute`. Maximum 64 taints; `labels` is
@@ -438,10 +450,28 @@ The API does not reconcile taints or labels onto running nodes. A change applies
 to newly created workers, and the pool's existing workers are **rolled** so it
 takes effect.
 
-Terraform will show this as an ordinary in-place update, because that is what it
-is at the API level — the plan cannot warn you. Treat a taint or label edit as a
-rolling replacement of the pool, and size `replicas` and disruption budgets
-accordingly.
+Terraform will show this as an ordinary in-place update on a compute pool,
+because that is what it is at the API level — the plan cannot warn you. Treat a
+taint or label edit as a rolling replacement of the pool.
+
+The roll is orderly rather than abrupt:
+
+- One extra node at a time (`maxSurge: 1`, `maxUnavailable: 0`), so the pool
+  never drops below `replicas` ready workers.
+- Each outgoing node is **cordoned and drained** through the Eviction API, so
+  **PodDisruptionBudgets are honoured**.
+- Because the roll is serial, it takes roughly `replicas ×` the time to build
+  and drain one node. Size `timeouts.update` accordingly for a large pool.
+
+!> **A PodDisruptionBudget that can never be satisfied blocks the roll
+indefinitely.** There is no drain timeout, so the pool stops mid-rollout and
+`terraform apply` eventually hits its own timeout. The same applies to
+destroying a pool and to destroying a cluster, both of which drain workers. If
+an apply times out this way the rollout is still in progress; fix the PDB and
+apply again.
+
+On a **reservation** pool none of this applies — those pools never roll, and the
+plan shows a replacement instead.
 
 ### Attributes
 
@@ -465,19 +495,33 @@ finished: `current` is how many exist, `ready` how many can take work, and
 `up_to_date` how many are on the latest template. During a taint-driven roll,
 `up_to_date` climbs as workers are replaced.
 
+You do not have to watch them to know an apply is done. A completed apply
+already means the pool is `provisioned` **and** `healthy`, which on a compute
+pool means the rollout is complete and all three counts equal `replicas`. The
+counts are there for reading a pool mid-flight — through the data source, or
+after an apply that timed out.
+
 ### Timeouts, provisioning and import
 
 Same model as the cluster: asynchronous create, update and delete, each waited
-on, with the same settledness rule so an apply never returns while the reported
-status still describes the previous configuration.
+on. An apply returns only once the pool's reported status has caught up with the
+spec you submitted, the pool is `provisioned`, and its health is `healthy`. A
+pool that reaches `provisioned` in an `error` health state fails the apply
+rather than passing quietly.
 
-Proposed defaults are 30m across create, update and delete — worker VMs joining
-an existing cluster should be quicker than a control plane build. **These are
-assumptions and will be corrected by measurement**, exactly as the cluster's
-were: its 30m create default turned out to be too short on the first real apply.
+Proposed defaults, **assumptions to be corrected by measurement** exactly as the
+cluster's were — its 30m create default turned out to be too short on the first
+real apply:
 
-Update shares the create timeout because a taint or label edit rolls the whole
-pool, which costs about as much as building it.
+| Create | Update | Delete |
+| --- | --- | --- |
+| 30m | 60m | 60m |
+
+Creating a pool is a set of worker VMs joining an existing cluster, and is
+quicker than a control plane build. Update and delete get longer because both
+walk the pool one node at a time: an update may roll every worker, and a delete
+drains every worker. For a large pool, raise `timeouts.update` rather than
+assuming the default fits.
 
 Import is passthrough on the pool ID.
 
@@ -486,9 +530,15 @@ Import is passthrough on the pool ID.
 - Updates replace the whole spec, as with the cluster. Scaling `replicas` must
   not disturb `taints` or `labels`, so the provider rebuilds the full spec from
   configuration on every update.
-- A pool pins its own platform release, reported separately from the cluster's.
+- A pool reports its own platform release, separately from the cluster's.
 - Deleting a cluster removes its node pools. Terraform normally destroys the
   pools first, because they depend on `cluster_id`.
+- A cluster is not `provisioned` while any of its pools is scaling or rolling.
+  If you change a cluster and one of its pools in the same apply, the cluster
+  waits for the pool.
+- Readiness for a **reservation** pool is a coarser signal than for a compute
+  pool: it is decided on ready-versus-desired counts alone, without the
+  up-to-date and availability checks a compute pool goes through.
 
 ---
 
