@@ -71,7 +71,7 @@ resource "nscale_kubernetes_cluster" "main" {
   }
 
   addons = {
-    hardware = true
+    hardware = { enabled = true }
   }
 
   # `timeouts` is a block — no `=`.
@@ -112,7 +112,8 @@ resource "nscale_kubernetes_cluster" "main" {
 
 | Field | Type | Default |
 | --- | --- | --- |
-| `hardware` | Bool | **`true`** |
+| `hardware` | Object | `{ enabled = true }` |
+| `hardware.enabled` | Bool | **`true`** |
 
 All defaults are applied by the API, not the provider, and are read back into
 state. Omit a block to accept them.

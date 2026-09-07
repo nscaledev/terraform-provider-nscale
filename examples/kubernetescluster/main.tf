@@ -56,7 +56,7 @@ resource "nscale_kubernetes_cluster" "main" {
   }
 
   addons = {
-    hardware = true
+    hardware = { enabled = true }
   }
 
   tags = {

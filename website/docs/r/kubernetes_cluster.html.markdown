@@ -56,10 +56,10 @@ resource "nscale_kubernetes_cluster" "main" {
   }
 
   addons = {
-    hardware = true
+    hardware = { enabled = true }
   }
 
-  # Only needed if the defaults (60m/90m/30m) do not suit; shown here for
+  # Only needed if the defaults (60m/90m/60m) do not suit; shown here for
   # illustration. Note these raise the defaults rather than lower them.
   timeouts {
     create = "90m"
@@ -137,7 +137,14 @@ resource "nscale_kubernetes_cluster" "main" {
 
 Optional:
 
-- `hardware` (Boolean) Whether the optional hardware addon profile is enabled. Defaults to `true`.
+- `hardware` (Attributes) Configuration for the optional hardware addon profile. (see [below for nested schema](#nestedatt--addons--hardware))
+
+<a id="nestedatt--addons--hardware"></a>
+### Nested Schema for `addons.hardware`
+
+Optional:
+
+- `enabled` (Boolean) Whether the addon profile is enabled. Defaults to `true`.
 
 
 <a id="nestedatt--api_server"></a>

@@ -17,7 +17,17 @@ Named `kubernetescluster` (not `kubernetes`) to sit alongside the existing
 
 ---
 
-## ⚠️ Decision required before implementation: how we get the NKS Go client
+## ✅ Resolved: how we get the NKS Go client
+
+> **Decided 2026-08-25: option (B).** Kept as a decision record; the analysis
+> below is the state of the world at the time. Since then the SDK-wide migration
+> landed independently (PR #74), so the provider's `main` is on
+> `nscale-sdk-go v0.3.0` and option (A) is no longer hypothetical. The in-tree
+> client stays for now because the SDK's *released* `kubernetes` package still
+> vendors the older 66,291-byte spec, which has neither the `organizationID`
+> filter nor `usableOrganizationIds` that the platform-releases data source
+> below depends on. `nscale-sdk-go` `main` does carry the current spec, so the
+> swap becomes safe as soon as a tag containing it exists.
 
 The ticket says "generate the NKS Go client in `nscale-sdk-go` (new `nks`
 package)". **That work is already done** — but not in a version we can consume
@@ -80,7 +90,7 @@ the generated types are identical (same spec, same generator).
 Cost of the follow-up: one import rewrite in one package. Cost of getting (A)
 wrong this week: every resource in the provider.
 
-**This is the one open question that blocks Phase 2. Everything below assumes (B).**
+**Everything below assumes (B).**
 
 ---
 
@@ -137,7 +147,8 @@ deliberately.
 **Types used:** `ClusterV1Read/Create/Update`, `ClusterCreateSpecV1`,
 `ClusterUpdateSpecV1`, `ClusterSpecV1`, `ClusterStatusV1`,
 `ClusterApiServerAccessV1`, `ClusterApiServerStatusV1`, `ClusterNetworkV1`,
-`ClusterAddonsCreateV1`, `ClusterReleaseStatusV1`,
+`ClusterAddonsV1`, `ClusterAddonsCreateV1`, `ClusterAddonProfileV1`,
+`ClusterAddonProfileCreateV1`, `ClusterReleaseStatusV1`,
 `ClusterKubernetesVersionStatusV1`, `ProjectScopedResourceReadMetadataV1`,
 `ResourceMetadata`, `PlatformReleaseV1Read`, `PlatformReleaseStatusV1`,
 `ListPlatformReleasesParams`.
@@ -180,7 +191,16 @@ from every other resource in the provider.
 | `cluster_network.pod_cidr` | String | Optional+Computed | **`RequiresReplace`** | server default `10.240.0.0/12`. Immutable — CEL `self == oldSelf`, server 422. |
 | `cluster_network.service_cidr` | String | Optional+Computed | **`RequiresReplace`** | server default `10.96.0.0/16`. Immutable — CEL `self == oldSelf`, server 422. |
 | `addons` | SingleNested | Optional+Computed | — | `spec.addons` |
-| `addons.hardware` | Bool | Optional+Computed | — | server default **`true`** on create |
+| `addons.hardware` | SingleNested | Optional+Computed | — | `clusterAddonProfileCreateV1`; see below |
+| `addons.hardware.enabled` | Bool | Optional+Computed | — | server default **`true`** on create |
+
+**`addons.hardware` is an object, not a bool.** The spec models each addon
+profile as `clusterAddonProfileV1` / `clusterAddonProfileCreateV1` — currently
+`{enabled: boolean}`, with the create variant defaulting to `true`. So the HCL is
+`addons = { hardware = { enabled = true } }`. An earlier revision of this spec
+had `hardware` as a plain bool, matching the spec at the time; the wrapper object
+is what lets a profile grow per-profile settings without another breaking change,
+so it is worth mirroring rather than flattening back to a bool provider-side.
 
 `allowed_cidrs` is a **Set** (spec says `uniqueItems: true`, order carries no
 meaning) and contains nothing sensitive, so the list-vs-set caveat in
@@ -224,20 +244,23 @@ between plans.
 
 **Deliberately excluded** (observability noise that would churn state every plan,
 and none of it is actionable from HCL): `status.addons` component-level rollout
-detail, `status.controlPlane` replica counts, `status.nodePools` summary counts.
-Revisit if users ask.
+detail, `status.controlPlane` replica counts, `status.nodePools` summary counts,
+and `status.authorization` (`clusterAuthorizationStatusV1` — present only when
+API server authorization bindings are configured, which this resource does not
+yet let you set; see open question 7). That accounts for every field of
+`clusterStatusV1`. Revisit if users ask.
 
 ### `omitempty`-bool check ([playbook §1.6](../.claude/skills/tf-provider-feature/reference/playbook.md))
 
 **Not applicable on the write path.** Every optional write-side scalar in the NKS
 spec is generated as a pointer:
-`ClusterAddonsCreateV1.Hardware *bool`, `ClusterApiServerAccessV1.PublicIP *bool`,
+`ClusterAddonProfileCreateV1.Enabled *bool`, `ClusterApiServerAccessV1.PublicIP *bool`,
 `ClusterApiServerAccessV1.AllowedCidrs *[]string`, `ClusterNetworkV1.PodCidr *string`,
 `ClusterNetworkV1.ServiceCidr *string`. A configured `false` serialises correctly.
 
-Unit tests still assert `public_ip = false` and `hardware = false` round-trip
-explicitly — that is the cheapest guard against a future regeneration flipping a
-pointer to a value type.
+Unit tests still assert `public_ip = false` and `hardware.enabled = false`
+round-trip explicitly — that is the cheapest guard against a future regeneration
+flipping a pointer to a value type.
 
 ---
 
@@ -289,6 +312,14 @@ order and users will want `releases[0]`.
 Exposing `deprecated`/`withdrawn`/`prerelease` as computed fields (rather than
 only as filters) is what lets a config select "latest eligible" without
 hardcoding an ID — the ticket's stated motivation.
+
+**Deliberately excluded:** `status.addons` (`platformReleaseAddonsV1` — the
+component-and-version manifest for the `core` and `hardware` profiles). It is a
+required field on `platformReleaseStatusV1`, so this is an omission rather than
+an absence: it is catalogue trivia that nothing in a config can act on, and
+modelling it means a nested list of component/version pairs per profile. That
+accounts for every field of `platformReleaseStatusV1`. Revisit if users ask to
+pin or assert on component versions.
 
 **CLI selection convention to mirror, documented in prose, not enforced in code:**
 create should offer only non-deprecated + non-withdrawn releases; update keeps
@@ -452,7 +483,7 @@ any of them is a plan whose apply always fails.
 | `cluster_network.pod_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`RequiresReplace`** ⚠️ **changed** |
 | `cluster_network.service_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`RequiresReplace`** ⚠️ **changed** |
 | `platform_release_id` | mutable — in-place rolling control-plane upgrade | no modifier ✅ already correct |
-| `description`, `tags`, `api_server.*`, `addons.hardware` | mutable in place | no modifier |
+| `description`, `tags`, `api_server.*`, `addons.hardware.enabled` | mutable in place | no modifier |
 
 ### Where "API truth" actually lives
 
@@ -484,7 +515,8 @@ carries the planned (== prior) values straight through, which satisfies the
 does the same for the CIDRs and the name.
 
 What remains genuinely updatable in place is a short list:
-`platform_release_id`, `description`, `tags`, `api_server.*`, `addons.hardware`.
+`platform_release_id`, `description`, `tags`, `api_server.*`,
+`addons.hardware.enabled`.
 
 ### Consequence for users: the CIDRs are a create-time decision
 
@@ -646,17 +678,22 @@ and that shapes the guidance the docs can honestly give:
    does not, the pod CIDR has to be routable corporate-side, which turns a
    cluster-local choice into a network-team dependency — and an immutable one.
 3. **`Service type=LoadBalancer`.** Can NKS provision both private and public
-   addresses, and how is the choice made — a Service annotation (in-cluster, so
-   the `kubernetes` provider's problem, not this one) or cluster-level
-   configuration (in which case this schema has a gap)? Are security-group rules
-   and NodePort rules managed automatically, or does the caller open them?
+   addresses, how is the choice made, and are security-group and NodePort rules
+   managed automatically or does the caller open them?
 
-Question 3 is the only one that could change this resource's schema, and only if
-the private/public selection turns out to be cluster-level. Questions 1 and 2 are
-documentation: users need the answers before committing to CIDRs they cannot
-change. **Neither blocks this PR** — the surface is the same either way — but
-answer 3 before the schema is frozen, because adding a required cluster-level
-LoadBalancer field later is cheap while changing one is not.
+**None of the three can change this resource's schema.** Question 3 was the only
+candidate — it would have mattered if private/public selection were cluster-level
+configuration — and the spec settles it: `loadBalancer`, `nodePort`,
+`securityGroup` and `ingress` appear **nowhere in the NKS API**. There is no
+cluster-level LoadBalancer surface to model, so selection is either an in-cluster
+Service annotation (the `kubernetes` provider's concern) or platform-implicit.
+`cluster_network` is the whole of this resource's involvement in the question.
+
+So all three are **documentation, not schema**, and none blocks this PR. They are
+still worth answering before users commit to a layout, because the CIDRs cannot
+be changed afterwards — questions 1 and 2 decide whether the pod CIDR has to be
+routable corporate-side, which turns a cluster-local choice into a network-team
+dependency and an immutable one.
 
 ---
 
@@ -682,7 +719,7 @@ resource "nscale_kubernetes_cluster" "main" {
   }
 
   addons = {
-    hardware = true
+    hardware = { enabled = true }
   }
 
   # `timeouts` is a block.
@@ -720,7 +757,8 @@ provider "kubernetes" {
   "spec↔model round-trip".
 - Nil/absent optional sub-objects: `status.apiServer` nil (pre-provisioning),
   `status.release` nil, `endpoints.public` nil, `kubernetesVersion.observed` nil.
-- `public_ip = false` and `hardware = false` serialise **explicitly**, not omitted.
+- `public_ip = false` and `hardware.enabled = false` serialise **explicitly**, not
+  omitted.
 - Unset platform-release filters produce `nil` params, i.e. **no query string key**
   (assert on the encoded URL, not just the struct).
 - Settled predicate: `observedGeneration` nil / `< generation` / `>= generation`.
@@ -814,7 +852,7 @@ median — a 30m default would pass on a fast day and fail on a slow one.
 3. ~~**Do the server defaults echo back on read?**~~ **CONFIRMED empirically
    2026-08-26** against a real provisioned cluster on uni-dev. `GET` returns all
    three optional blocks fully populated with the applied defaults:
-   `addons.hardware: true`, `apiServer: {publicIP, allowedCidrs: ["0.0.0.0/0"]}`,
+   `addons.hardware: {enabled: true}`, `apiServer: {publicIP, allowedCidrs: ["0.0.0.0/0"]}`,
    `clusterNetwork: {podCidr: "10.240.0.0/12", serviceCidr: "10.96.0.0/16"}`.
    The Optional+Computed design holds. Also confirmed on the same read:
    `observedGeneration` is populated and equals `generation` on a settled
@@ -851,4 +889,7 @@ median — a 30m default would pass on a fast day and fail on a slow one.
    IPAM, pod-egress SNAT, and how `Service type=LoadBalancer` selects private vs
    public. See
    [Attaching an existing corporate-routed network](#attaching-an-existing-corporate-routed-network).
-   Only the LoadBalancer question can affect this schema; the other two are docs.
+   **None of these can change the schema** — verified 2026-09-07 that the NKS
+   API has no `loadBalancer`, `nodePort`, `securityGroup` or `ingress` surface at
+   all, so the LoadBalancer question (the only schema-relevant candidate) is
+   answered by inspection. All three are documentation asks for the NKS team.
