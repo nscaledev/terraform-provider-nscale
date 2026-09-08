@@ -4,14 +4,18 @@ What this adds to the provider, and what the published documentation will say.
 Everything here is what a practitioner sees; nothing about how it is built
 internally.
 
-The published pages are:
+| Type | Status | Page |
+| --- | --- | --- |
+| Resource: `nscale_kubernetes_cluster` | agreed | `website/docs/r/kubernetes_cluster.html.markdown` |
+| Data Source: `nscale_kubernetes_cluster` | agreed | `website/docs/d/kubernetes_cluster.html.markdown` |
+| Data Source: `nscale_kubernetes_platform_releases` | agreed | `website/docs/d/kubernetes_platform_releases.html.markdown` |
+| Resource: `nscale_kubernetes_node_pool` | **proposed** | `website/docs/r/kubernetes_node_pool.html.markdown` |
+| Data Source: `nscale_kubernetes_node_pool` | **proposed** | `website/docs/d/kubernetes_node_pool.html.markdown` |
+| Runnable example | | `examples/kubernetescluster/main.tf` |
 
-| Page | File |
-| --- | --- |
-| Resource: `nscale_kubernetes_cluster` | `website/docs/r/kubernetes_cluster.html.markdown` |
-| Data Source: `nscale_kubernetes_cluster` | `website/docs/d/kubernetes_cluster.html.markdown` |
-| Data Source: `nscale_kubernetes_platform_releases` | `website/docs/d/kubernetes_platform_releases.html.markdown` |
-| Runnable example | `examples/kubernetescluster/main.tf` |
+The node pool sections are a proposal and still changeable; the cluster and
+platform release sections describe behaviour that has been built and exercised
+against a live API.
 
 ---
 
@@ -402,13 +406,214 @@ are superseded quickly; avoid them in production.
 
 ---
 
-## Not included
+## Resource: `nscale_kubernetes_node_pool` — PROPOSED
 
-**Node pools.** NKS models them as a separate top-level resource, and this
-change does not implement one. A `nscale_kubernetes_cluster` on its own is a
-control plane with no workers — usable for `apply`, `import` and `destroy`, but
-you cannot schedule anything on it until node pools are created outside
-Terraform.
+> **Not yet implemented.** This section is the proposed surface, circulated for
+> agreement. Everything above describes shipped behaviour; everything here is
+> still changeable. Detail and open questions in
+> [`kubernetes_node_pool.md`](kubernetes_node_pool.md).
+
+The workers for a cluster. NKS models node pools as a separate top-level
+resource rather than a field on the cluster, so they are a separate Terraform
+resource that references the cluster by ID.
+
+A cluster with no node pools has nowhere to schedule work, so in practice every
+cluster has at least one.
+
+### Example
+
+```hcl
+resource "nscale_kubernetes_node_pool" "workers" {
+  name              = "workers"
+  cluster_id        = nscale_kubernetes_cluster.main.id
+  provisioning_mode = "compute"
+  replicas          = 3
+
+  compute = {
+    flavor_id = data.nscale_instance_flavor.worker.id
+  }
+
+  taints = [{
+    key         = "workload"
+    value       = "general"
+    effect      = "PreferNoSchedule"
+    propagation = "OnInitialization"
+  }]
+}
+
+resource "nscale_kubernetes_node_pool" "gpu" {
+  name              = "gpu"
+  cluster_id        = nscale_kubernetes_cluster.main.id
+  provisioning_mode = "reservation"
+  replicas          = 2
+
+  reservation = {
+    reservation_id = nscale_reservation.gpu.id
+  }
+
+  # This pool is reservation-backed, so editing taints replaces it. On a
+  # compute pool the same edit rolls the workers in place. See below.
+  taints = [{
+    key         = "nvidia.com/gpu"
+    value       = "true"
+    effect      = "NoSchedule"
+    propagation = "Always"
+  }]
+}
+```
+
+### Arguments
+
+What changing an argument does depends on the pool's `provisioning_mode`. A
+compute pool can be scaled and re-labelled in place; a reservation pool is
+close to immutable.
+
+| Argument | Type | Required | On a `compute` pool | On a `reservation` pool |
+| --- | --- | --- | --- | --- |
+| `name` | String | yes | **forces replacement** | **forces replacement** |
+| `cluster_id` | String | yes | **forces replacement** | **forces replacement** |
+| `provisioning_mode` | String | yes | **forces replacement** | **forces replacement** |
+| `compute.flavor_id` | String | if mode is `compute` | **forces replacement** | n/a |
+| `reservation.reservation_id` | String | if mode is `reservation` | n/a | **forces replacement** |
+| `replicas` | Number | yes | scales in place | **forces replacement** |
+| `taints` | List(Object) | no | in place, **rolls the pool** | **forces replacement** |
+| `description` | String | no | updates in place | updates in place |
+| `tags` | Map(String) | no | updates in place | updates in place |
+
+There is **no `labels` argument.** Node pool labels do not exist in the NKS API;
+use `taints` to control what schedules onto a pool.
+
+The reservation column is not a provider choice. A reservation pool is backed
+by a placement, and a placement never rolls — so a template change could not
+take effect, and the API rejects it rather than accepting it silently. The
+provider plans a replacement so the change is at least achievable, but note
+that replacing a reservation pool releases and re-claims the placement.
+`replicas 2 → 3` on a reservation pool is a rebuild, not a scale.
+
+`provisioning_mode` is `compute` or `reservation` and selects which capacity
+block applies:
+
+| Block | Field | Notes |
+| --- | --- | --- |
+| `compute` | `flavor_id` | required when mode is `compute` |
+| `reservation` | `reservation_id` | required when mode is `reservation`; pairs with `nscale_reservation` |
+
+Supplying the wrong block for the mode, or both, fails at **plan** time rather
+than apply.
+
+`replicas` has a minimum of **0** — scaling a compute pool to zero is legal and
+keeps the pool definition without any workers.
+
+`taints[]` takes `key`, `effect` and `propagation` (all required) plus `value`
+(optional). `effect` is one of `NoSchedule`, `PreferNoSchedule`, `NoExecute`;
+`propagation` is `Always` or `OnInitialization`. Maximum 64 taints.
+
+`propagation` has no default and must be stated on every taint. It selects
+whether the taint is reconciled onto running workers (`Always`) or applied only
+as each worker is created (`OnInitialization`).
+
+### Editing taints replaces every node in the pool
+
+The API does not reconcile taints onto running nodes. A change applies to newly
+created workers, and the pool's existing workers are **rolled** so it takes
+effect.
+
+Terraform will show this as an ordinary in-place update on a compute pool,
+because that is what it is at the API level — the plan cannot warn you. Treat a
+taint edit as a rolling replacement of the pool.
+
+The roll is orderly rather than abrupt:
+
+- One extra node at a time (`maxSurge: 1`, `maxUnavailable: 0`), so the pool
+  never drops below `replicas` ready workers.
+- Each outgoing node is **cordoned and drained** through the Eviction API, so
+  **PodDisruptionBudgets are honoured**.
+- Because the roll is serial, it takes roughly `replicas ×` the time to build
+  and drain one node. Size `timeouts.update` accordingly for a large pool.
+
+!> **A PodDisruptionBudget that can never be satisfied blocks the roll
+indefinitely.** There is no drain timeout, so the pool stops mid-rollout and
+`terraform apply` eventually hits its own timeout. The same applies to
+destroying a pool and to destroying a cluster, both of which drain workers. If
+an apply times out this way the rollout is still in progress; fix the PDB and
+apply again.
+
+On a **reservation** pool none of this applies — those pools never roll, and the
+plan shows a replacement instead.
+
+### Attributes
+
+| Attribute | Type | Notes |
+| --- | --- | --- |
+| `id` | String | |
+| `project_id` / `organization_id` / `region_id` | String | inherited via the cluster |
+| `creation_time` | String | |
+| `provisioning_status` / `health_status` | String | as the cluster |
+| `provisioning_status_detail` / `health_status_detail` | String | the text behind an `error` or `degraded` state |
+| `current_replicas` | Number | workers that exist |
+| `ready_replicas` | Number | workers ready to schedule |
+| `up_to_date_replicas` | Number | workers on the current pool template |
+| `kubernetes_version` | String | version the workers report |
+| `placement_id` | String | reservation mode only |
+
+A node pool has **no platform release attributes**. It inherits the cluster's
+release and reports nothing of its own — read
+`nscale_kubernetes_cluster.applied_platform_release_id` instead.
+
+The three replica counts are what tell you whether a scale or a roll has
+finished: `current` is how many exist, `ready` how many can take work, and
+`up_to_date` how many are on the latest template. During a taint-driven roll,
+`up_to_date` climbs as workers are replaced.
+
+You do not have to watch them to know an apply is done. A completed apply
+already means the pool is `provisioned` **and** `healthy`, which on a compute
+pool means the rollout is complete and all three counts equal `replicas`. The
+counts are there for reading a pool mid-flight — through the data source, or
+after an apply that timed out.
+
+### Timeouts, provisioning and import
+
+Same model as the cluster: asynchronous create, update and delete, each waited
+on. An apply returns only once the pool's reported status has caught up with the
+spec you submitted, the pool is `provisioned`, and its health is `healthy`. A
+pool that reaches `provisioned` in an `error` health state fails the apply
+rather than passing quietly.
+
+Proposed defaults, **assumptions to be corrected by measurement** exactly as the
+cluster's were — its 30m create default turned out to be too short on the first
+real apply:
+
+| Create | Update | Delete |
+| --- | --- | --- |
+| 30m | 60m | 60m |
+
+Creating a pool is a set of worker VMs joining an existing cluster, and is
+quicker than a control plane build. Update and delete get longer because both
+walk the pool one node at a time: an update may roll every worker, and a delete
+drains every worker. For a large pool, raise `timeouts.update` rather than
+assuming the default fits.
+
+Import is passthrough on the pool ID.
+
+### Notes
+
+- Updates replace the whole spec, as with the cluster. Scaling `replicas` must
+  not disturb `taints`, so the provider rebuilds the full spec from
+  configuration on every update.
+- A pool has no platform release of its own; it inherits the cluster's.
+- Deleting a cluster removes its node pools. Terraform normally destroys the
+  pools first, because they depend on `cluster_id`.
+- A cluster is not `provisioned` while any of its pools is scaling or rolling.
+  If you change a cluster and one of its pools in the same apply, the cluster
+  waits for the pool.
+- Readiness for a **reservation** pool is a coarser signal than for a compute
+  pool: it is decided on ready-versus-desired counts alone, without the
+  up-to-date and availability checks a compute pool goes through.
+
+
+---
+
+## Not included
 
 **A production endpoint default.** Pending the NKS service migration;
 `nks_service_api_endpoint` must be set explicitly until then.
