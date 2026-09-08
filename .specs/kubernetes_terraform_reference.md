@@ -9,12 +9,13 @@ internally.
 | Resource: `nscale_kubernetes_cluster` | agreed | `website/docs/r/kubernetes_cluster.html.markdown` |
 | Data Source: `nscale_kubernetes_cluster` | agreed | `website/docs/d/kubernetes_cluster.html.markdown` |
 | Data Source: `nscale_kubernetes_platform_releases` | agreed | `website/docs/d/kubernetes_platform_releases.html.markdown` |
-| Resource: `nscale_kubernetes_node_pool` | **proposed** | not yet written |
-| Data Source: `nscale_kubernetes_node_pool` | **proposed** | not yet written |
+| Resource: `nscale_kubernetes_node_pool` | **proposed** | `website/docs/r/kubernetes_node_pool.html.markdown` |
+| Data Source: `nscale_kubernetes_node_pool` | **proposed** | `website/docs/d/kubernetes_node_pool.html.markdown` |
 | Runnable example | | `examples/kubernetescluster/main.tf` |
 
-The node pool sections are a proposal and still changeable; everything else
-describes behaviour that has been built and exercised against a live API.
+The node pool sections are a proposal and still changeable; the cluster and
+platform release sections describe behaviour that has been built and exercised
+against a live API.
 
 ---
 
@@ -74,7 +75,7 @@ resource "nscale_kubernetes_cluster" "main" {
   }
 
   addons = {
-    hardware = true
+    hardware = { enabled = true }
   }
 
   # `timeouts` is a block — no `=`.
@@ -88,13 +89,13 @@ resource "nscale_kubernetes_cluster" "main" {
 
 | Argument | Type | Required | Changing it |
 | --- | --- | --- | --- |
-| `name` | String | yes | updates in place |
+| `name` | String | yes | **forces replacement** |
 | `network_id` | String | yes | **forces replacement** |
 | `platform_release_id` | String | yes | in-place cluster upgrade |
 | `description` | String | no | updates in place |
 | `tags` | Map(String) | no | updates in place |
 | `api_server` | Object | no | updates in place |
-| `cluster_network` | Object | no | updates in place |
+| `cluster_network` | Object | no | **forces replacement** |
 | `addons` | Object | no | updates in place |
 
 `api_server`:
@@ -115,13 +116,47 @@ resource "nscale_kubernetes_cluster" "main" {
 
 | Field | Type | Default |
 | --- | --- | --- |
-| `hardware` | Bool | **`true`** |
+| `hardware` | Object | `{ enabled = true }` |
+| `hardware.enabled` | Bool | **`true`** |
 
 All defaults are applied by the API, not the provider, and are read back into
 state. Omit a block to accept them.
 
 If `public_ip` is `true` and `allowed_cidrs` is omitted, the API server is
 reachable from anywhere — the default allowlist is `0.0.0.0/0`.
+
+### The name and the network layout are fixed at creation
+
+`name`, `network_id`, `pod_cidr` and `service_cidr` cannot be changed on an
+existing cluster — the API rejects it. Changing any of them in your
+configuration produces a **replacement**: Terraform destroys the cluster and
+builds a new one. There is no in-place path.
+
+That is worth planning for, because pod and service CIDRs are exactly the
+settings you pick to fit an existing network:
+
+```hcl
+resource "nscale_kubernetes_cluster" "main" {
+  name       = "production"
+  network_id = nscale_network.corporate.id
+
+  platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
+
+  # Separate from the attached network's own prefix. Fixed for the life of the
+  # cluster — a collision discovered later means a rebuild, not an update.
+  cluster_network = {
+    pod_cidr     = "100.65.0.0/16"
+    service_cidr = "172.20.0.0/16"
+  }
+
+  api_server = {
+    public_ip = false
+  }
+}
+```
+
+Everything else — `platform_release_id`, `description`, `tags`, `api_server`,
+`addons` — updates in place.
 
 ### Attributes
 
@@ -170,15 +205,23 @@ between projects, and the API rejects it on an existing cluster.
 | --- | --- |
 | `create` | 60m |
 | `update` | 90m |
-| `delete` | 30m |
+| `delete` | 60m |
 
 Sized from measurement: cluster builds have been observed anywhere from ~6 to
 ~32 minutes in the same region on the same release, so the defaults allow
-roughly twice the slowest observation. Deletes take around 2 minutes.
+roughly twice the slowest observation.
 
 Raise these rather than lower them. A create timeout shorter than the real build
 time fails the apply on a cluster that was going to come up fine — and leaves it
 running and billing, with Terraform no longer tracking it.
+
+**Deletes are slower than they look.** An empty cluster deletes in about two
+minutes, but deleting a cluster that has node pools drains every worker first,
+respecting PodDisruptionBudgets. A PDB that cannot be satisfied — a single-replica
+deployment with `minAvailable: 1`, say — blocks the drain with no deadline, so the
+delete never completes and Terraform eventually times out with the cluster still
+present. If that happens, resolve the PDB in the cluster and re-run `destroy`;
+raising the timeout alone will not help.
 
 ### Provisioning behaviour
 
@@ -191,10 +234,19 @@ from the write itself, so for a window after any apply the status describes the
 computed values written to state — endpoints, versions, applied release —
 describe the cluster you actually asked for.
 
-A cluster reporting `provisioned` but `health_status = "error"` is treated as a
-failure, and the API's own explanation is surfaced. Transitional health
-(`degraded`, `unknown`) is not a failure — addons and node registration settle
-after the control plane first reports provisioned.
+An apply succeeds only when the cluster is settled, `provisioned` **and**
+`healthy`. A cluster reporting `provisioned` but `health_status = "error"` is
+treated as a failure, and the API's own explanation is surfaced. Transitional
+health (`degraded`, `unknown`) is not a failure and is not success either — the
+provider keeps waiting, because addons and node registration settle after the
+control plane first reports provisioned.
+
+Both statuses are aggregates over the whole cluster, not just its control plane.
+`provisioned` folds in infrastructure, the control plane, core and hardware
+addons, authorization, and every node pool; `healthy` requires the control plane
+healthy with nothing degraded anywhere. So a cluster is not `provisioned` while
+any of its node pools is scaling or rolling, and an apply that overlaps a node
+pool roll waits for that roll to finish before it returns.
 
 ### Import
 
@@ -247,6 +299,14 @@ the network.
 
 - **Updates replace the whole spec.** NKS exposes `PUT`, not `PATCH`. Removing an
   argument from your configuration clears it rather than leaving it alone.
+- **What NKS does with your pod and service CIDRs is not fully documented yet** —
+  specifically how workers are addressed relative to the attached network's own
+  prefix, whether pod egress to routes reachable from that network is
+  source-NAT'd to the worker address, and how a `Service` of
+  `type=LoadBalancer` picks a private or public address. Confirm these with the
+  NKS team before committing to a layout, since the CIDRs cannot be changed
+  afterwards. None of it is Terraform surface: the `kubernetes` provider creates
+  Services, this one only sets the CIDRs.
 - **Choose a current release for a new cluster** — neither deprecated nor
   withdrawn. Creating on a deprecated release fails with HTTP 422. When
   *upgrading*, a release that has since been deprecated is still selectable
@@ -343,8 +403,6 @@ stricter than anything derivable from the catalogue.
 operator decision and can be reversed. `withdrawn` is stronger — pulled from
 selection, with a reason and message. `prerelease` versions are selectable but
 are superseded quickly; avoid them in production.
-
----
 
 ---
 
@@ -551,6 +609,7 @@ Import is passthrough on the pool ID.
 - Readiness for a **reservation** pool is a coarser signal than for a compute
   pool: it is decided on ready-versus-desired counts alone, without the
   up-to-date and availability checks a compute pool goes through.
+
 
 ---
 

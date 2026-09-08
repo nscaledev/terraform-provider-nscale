@@ -33,6 +33,8 @@ data "nscale_kubernetes_platform_releases" "eligible" {
 }
 
 resource "nscale_kubernetes_cluster" "main" {
+  # name, network_id and both cluster_network CIDRs are immutable: the API
+  # rejects a change to any of them, so Terraform replaces the cluster instead.
   name        = "kubernetes-example"
   description = "Example NKS cluster managed by Terraform"
 
@@ -40,12 +42,21 @@ resource "nscale_kubernetes_cluster" "main" {
   platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
 
   # Nested attributes, not blocks — note the `=`.
+  #
+  # Pod and service addresses stay clear of the attached network's own prefix.
+  # Omit the block to take the API defaults (10.240.0.0/12 and 10.96.0.0/16);
+  # either way the values are fixed for the life of the cluster.
+  cluster_network = {
+    pod_cidr     = "100.65.0.0/16"
+    service_cidr = "172.20.0.0/16"
+  }
+
   api_server = {
     public_ip = false
   }
 
   addons = {
-    hardware = true
+    hardware = { enabled = true }
   }
 
   tags = {
@@ -53,9 +64,13 @@ resource "nscale_kubernetes_cluster" "main" {
   }
 
   # `timeouts` is a block, so no `=`. Defaults are 60m create / 90m update /
-  # 30m delete, sized from a measured 32-minute build. Override only to raise
+  # 60m delete, sized from a measured 32-minute build. Override only to raise
   # them — a create timeout shorter than the real build time fails an apply on
   # a cluster that was going to come up fine, and leaves it running.
+  #
+  # Destroying a cluster that has node pools drains every worker first and
+  # honours PodDisruptionBudgets, and an unsatisfiable PDB blocks that with no
+  # deadline. If a destroy times out, fix the PDB rather than raise this.
   timeouts {
     create = "90m"
   }

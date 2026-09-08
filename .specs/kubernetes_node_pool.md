@@ -660,49 +660,29 @@ update on compute pools — cheap to change now, breaking to change after releas
    either carries the drain-blocked reason, and quote it in the timeout error
    if so.
 
-### Worker networking — belongs to the cluster, felt on the pool
+### Worker networking — owned by the cluster spec
 
-These have been asked by users and are not answered anywhere yet. The
-*arguments* involved (`network_id`, `pod_cidr`, `service_cidr`,
-`api_server.public_ip`) all live on `nscale_kubernetes_cluster`, so the answers
-belong in the cluster docs — but every one of them is observed on the workers,
-which is why they are tracked here too.
+The worker addressing, pod-egress SNAT and `Service type=LoadBalancer`
+questions this spec previously carried as 8–10 now live in
+[`kubernetes_cluster.md`](kubernetes_cluster.md) — see §Attaching an existing
+corporate-routed network and its open question 8. That is the right home: the
+arguments involved (`network_id`, `cluster_network.pod_cidr`,
+`cluster_network.service_cidr`, `api_server.public_ip`) are all cluster
+arguments, and the cluster spec has since answered the only schema-relevant part
+of them — `loadBalancer`, `nodePort`, `securityGroup` and `ingress` appear
+nowhere in the NKS API, so there is no cluster-level LoadBalancer surface to
+model and nothing missing from either resource's schema.
 
-For the usual deployment — an existing corporate-routed Nscale network, with
-separate pod and Service CIDRs:
+One consequence is genuinely node-pool-side and stays here:
 
-```yaml
-spec:
-  networkId: <corporate-routed network>
-  clusterNetwork:
-    podCidr: 100.65.0.0/16
-    serviceCidr: 172.20.0.0/16
-  apiServer:
-    publicIP: false
-```
-
-8. **Do workers get addresses from the network's own prefix** (e.g. a
-   `7.247.16.0/20`) while pod and Service addresses stay in the separate CIDRs
-   above? If so, `nscale_kubernetes_node_pool` should expose the worker
-   addresses, or at least say where they come from — today the spec exposes no
-   node address at all, and a user who needs to firewall their workers has
-   nothing to reference.
-
-9. **Is pod egress SNAT'd to the worker's address?** When a pod reaches a
-   corporate `10.0.0.0/8` route, does NKS SNAT it to its worker's `7.247.x.x`
-   address? This decides whether corporate ACLs can be written against the
-   network prefix or have to admit the pod CIDR as well. It is the single
-   question most likely to be asked in a review of the docs.
-
-10. **Service `type=LoadBalancer`: private and public.** Can NKS provision both?
-    How is one selected — a Service annotation, or something cluster-level? And
-    are security-group and NodePort rules managed automatically as a
-    consequence? If selection is per-Service, this is outside Terraform's scope
-    entirely and the docs should say so plainly and point at the NKS
-    documentation, rather than leaving a user to guess there is a missing
-    provider argument. If it is cluster-level, the cluster resource is missing
-    an argument.
+13. **Should the pool expose its workers' addresses?** If workers do take
+    addresses from the attached network's prefix, a user who needs to firewall
+    them corporate-side has nothing in Terraform to reference — this spec
+    exposes no node address at all, and `nodePoolStatusV1` carries none either.
+    Whether that is a gap depends on the answer to the cluster spec's question,
+    which is why it is filed rather than designed. If the answer is yes and the
+    API later exposes per-machine addresses, this is where they belong.
 
 **11 is the only blocker.** It gates the schema and the safety warning that is
-the loudest thing on the page. 8–10 gate documentation, and 10 may gate a
-cluster schema decision. 5–7 can be settled empirically in Phase 4.
+the loudest thing on the page. 13 is documentation-or-gap pending the cluster
+spec's networking answers, and 5–7 can be settled empirically in Phase 4.

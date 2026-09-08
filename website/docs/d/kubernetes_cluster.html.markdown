@@ -69,7 +69,14 @@ output "api_endpoint" {
 
 Read-Only:
 
-- `hardware` (Boolean) Whether the optional hardware addon profile is enabled.
+- `hardware` (Attributes) Configuration for the optional hardware addon profile. (see [below for nested schema](#nestedatt--addons--hardware))
+
+<a id="nestedatt--addons--hardware"></a>
+### Nested Schema for `addons.hardware`
+
+Read-Only:
+
+- `enabled` (Boolean) Whether the addon profile is enabled.
 
 
 <a id="nestedatt--api_server"></a>
