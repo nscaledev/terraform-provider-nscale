@@ -36,26 +36,21 @@ output "ready" {
 
 ### Read-Only
 
-- `applied_platform_release_id` (String) The platform release last observed as applied to the node pool.
 - `cluster_id` (String) The identifier of the cluster the node pool belongs to.
 - `compute` (Attributes) On-demand capacity options. Null unless `provisioning_mode` is `compute`. (see [below for nested schema](#nestedatt--compute))
 - `creation_time` (String) The timestamp when the node pool was created.
 - `current_replicas` (Number) The number of workers that exist.
 - `description` (String) The description of the node pool.
 - `health_status` (String) The health state of the node pool.
+- `health_status_detail` (String) The explanation behind a `degraded` or `error` health state.
 - `kubernetes_version` (String) The Kubernetes version reported by the pool's workers.
-- `labels` (Map of String) Kubernetes labels applied to the pool's workers.
 - `name` (String) The name of the node pool.
 - `organization_id` (String) The identifier of the organization the node pool belongs to.
 - `placement_id` (String) The identifier of the placement backing the pool. Null unless `provisioning_mode` is `reservation`.
-- `platform_release_deprecated` (Boolean) Whether the applied platform release is currently deprecated.
-- `platform_release_kubernetes_version` (String) The Kubernetes version supplied by the applied platform release.
-- `platform_release_withdrawal_message` (String) The explanation for withdrawing the applied platform release.
-- `platform_release_withdrawal_reason` (String) The reason operators withdrew the applied platform release.
-- `platform_release_withdrawn` (Boolean) Whether operators have withdrawn the applied platform release.
 - `project_id` (String) The identifier of the project the node pool belongs to.
 - `provisioning_mode` (String) The capacity source for the pool's workers.
 - `provisioning_status` (String) The provisioning state of the node pool.
+- `provisioning_status_detail` (String) The explanation behind an `error` provisioning state.
 - `ready_replicas` (Number) The number of workers ready to schedule work.
 - `region_id` (String) The identifier of the region the node pool is provisioned in.
 - `replicas` (Number) The desired number of workers.
@@ -87,6 +82,7 @@ Read-Only:
 
 - `effect` (String) The taint effect.
 - `key` (String) The taint key.
+- `propagation` (String) When the taint is applied to workers. `Always` or `OnInitialization`.
 - `value` (String) The taint value.
 
 ## Notes
@@ -99,6 +95,7 @@ Read-Only:
 * `health_status` is `healthy` only once the pool has fully settled. For a compute pool that means the rollout is
   complete and all three counts equal `replicas`. For a reservation pool it is a coarser signal, decided on
   ready-versus-desired counts alone.
-* The platform release attributes describe the pool's own release, which is reported separately from the cluster's.
+* A node pool has no platform release of its own. It inherits the cluster's — read
+  [`nscale_kubernetes_cluster`](kubernetes_cluster.html)`.applied_platform_release_id` instead.
 * See the [`nscale_kubernetes_node_pool` resource](../r/kubernetes_node_pool.html) for the capacity modes, which fields
-  are immutable in each mode, and how a `taints` or `labels` edit rolls a compute pool.
+  are immutable in each mode, and how a `taints` edit rolls a compute pool.

@@ -375,9 +375,12 @@ resource "nscale_kubernetes_node_pool" "workers" {
     flavor_id = data.nscale_instance_flavor.worker.id
   }
 
-  labels = {
-    workload = "general"
-  }
+  taints = [{
+    key         = "workload"
+    value       = "general"
+    effect      = "PreferNoSchedule"
+    propagation = "OnInitialization"
+  }]
 }
 
 resource "nscale_kubernetes_node_pool" "gpu" {
@@ -393,9 +396,10 @@ resource "nscale_kubernetes_node_pool" "gpu" {
   # This pool is reservation-backed, so editing taints replaces it. On a
   # compute pool the same edit rolls the workers in place. See below.
   taints = [{
-    key    = "nvidia.com/gpu"
-    value  = "true"
-    effect = "NoSchedule"
+    key         = "nvidia.com/gpu"
+    value       = "true"
+    effect      = "NoSchedule"
+    propagation = "Always"
   }]
 }
 ```
@@ -415,9 +419,11 @@ close to immutable.
 | `reservation.reservation_id` | String | if mode is `reservation` | n/a | **forces replacement** |
 | `replicas` | Number | yes | scales in place | **forces replacement** |
 | `taints` | List(Object) | no | in place, **rolls the pool** | **forces replacement** |
-| `labels` | Map(String) | no | in place, **rolls the pool** | **forces replacement** |
 | `description` | String | no | updates in place | updates in place |
 | `tags` | Map(String) | no | updates in place | updates in place |
+
+There is **no `labels` argument.** Node pool labels do not exist in the NKS API;
+use `taints` to control what schedules onto a pool.
 
 The reservation column is not a provider choice. A reservation pool is backed
 by a placement, and a placement never rolls — so a template change could not
@@ -440,19 +446,23 @@ than apply.
 `replicas` has a minimum of **0** — scaling a compute pool to zero is legal and
 keeps the pool definition without any workers.
 
-`taints[]` takes `key` (required), `value` (optional) and `effect` — one of
-`NoSchedule`, `PreferNoSchedule`, `NoExecute`. Maximum 64 taints; `labels` is
-capped at 64 entries.
+`taints[]` takes `key`, `effect` and `propagation` (all required) plus `value`
+(optional). `effect` is one of `NoSchedule`, `PreferNoSchedule`, `NoExecute`;
+`propagation` is `Always` or `OnInitialization`. Maximum 64 taints.
 
-### Editing taints or labels replaces every node in the pool
+`propagation` has no default and must be stated on every taint. It selects
+whether the taint is reconciled onto running workers (`Always`) or applied only
+as each worker is created (`OnInitialization`).
 
-The API does not reconcile taints or labels onto running nodes. A change applies
-to newly created workers, and the pool's existing workers are **rolled** so it
-takes effect.
+### Editing taints replaces every node in the pool
+
+The API does not reconcile taints onto running nodes. A change applies to newly
+created workers, and the pool's existing workers are **rolled** so it takes
+effect.
 
 Terraform will show this as an ordinary in-place update on a compute pool,
 because that is what it is at the API level — the plan cannot warn you. Treat a
-taint or label edit as a rolling replacement of the pool.
+taint edit as a rolling replacement of the pool.
 
 The roll is orderly rather than abrupt:
 
@@ -481,14 +491,16 @@ plan shows a replacement instead.
 | `project_id` / `organization_id` / `region_id` | String | inherited via the cluster |
 | `creation_time` | String | |
 | `provisioning_status` / `health_status` | String | as the cluster |
+| `provisioning_status_detail` / `health_status_detail` | String | the text behind an `error` or `degraded` state |
 | `current_replicas` | Number | workers that exist |
 | `ready_replicas` | Number | workers ready to schedule |
 | `up_to_date_replicas` | Number | workers on the current pool template |
 | `kubernetes_version` | String | version the workers report |
-| `applied_platform_release_id` | String | release pinned to this pool |
-| `platform_release_kubernetes_version` | String | |
-| `platform_release_deprecated` / `_withdrawn` | Bool | |
 | `placement_id` | String | reservation mode only |
+
+A node pool has **no platform release attributes**. It inherits the cluster's
+release and reports nothing of its own — read
+`nscale_kubernetes_cluster.applied_platform_release_id` instead.
 
 The three replica counts are what tell you whether a scale or a roll has
 finished: `current` is how many exist, `ready` how many can take work, and
@@ -528,9 +540,9 @@ Import is passthrough on the pool ID.
 ### Notes
 
 - Updates replace the whole spec, as with the cluster. Scaling `replicas` must
-  not disturb `taints` or `labels`, so the provider rebuilds the full spec from
+  not disturb `taints`, so the provider rebuilds the full spec from
   configuration on every update.
-- A pool reports its own platform release, separately from the cluster's.
+- A pool has no platform release of its own; it inherits the cluster's.
 - Deleting a cluster removes its node pools. Terraform normally destroys the
   pools first, because they depend on `cluster_id`.
 - A cluster is not `provisioned` while any of its pools is scaling or rolling.

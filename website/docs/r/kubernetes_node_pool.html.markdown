@@ -15,13 +15,16 @@ pools has nowhere to schedule work.
 draws from a [`nscale_reservation`](reservation.html). Supplying the wrong block for the mode, or both, fails at plan
 time.
 
-!> **Editing `taints` or `labels` replaces every node in a compute pool.** NKS does not reconcile them onto running
-workers, so a change rolls the pool. Terraform shows this as an ordinary in-place update, because that is what it is at
-the API level — see [Rolling a pool](#rolling-a-pool) for how the roll behaves and how PodDisruptionBudgets affect it.
+!> **Editing `taints` replaces every node in a compute pool.** NKS does not reconcile them onto running workers, so a
+change rolls the pool. Terraform shows this as an ordinary in-place update, because that is what it is at the API level
+— see [Rolling a pool](#rolling-a-pool) for how the roll behaves and how PodDisruptionBudgets affect it.
 
-~> **A reservation pool is close to immutable.** Only `description` and `tags` update in place. `replicas`, `taints` and
-`labels` all force replacement, because the placement backing the pool never rolls and the change could not otherwise
-take effect. Scaling a reservation pool is a rebuild, not a scale.
+~> **A reservation pool is close to immutable.** Only `description` and `tags` update in place. `replicas` and `taints`
+both force replacement, because the placement backing the pool never rolls and the change could not otherwise take
+effect. Scaling a reservation pool is a rebuild, not a scale.
+
+~> **There is no `labels` argument.** NKS node pools have no labels field. Use `taints` to control what schedules onto
+a pool.
 
 ~> **`project_id`, `organization_id` and `region_id` are read-only.** They are inherited via the cluster, which derives
 them from its network. Setting any of them is an error.
@@ -43,9 +46,12 @@ resource "nscale_kubernetes_node_pool" "workers" {
   }
 
   # Editing these later rolls the pool's workers, one at a time.
-  labels = {
-    workload = "general"
-  }
+  taints = [{
+    key         = "workload"
+    value       = "general"
+    effect      = "PreferNoSchedule"
+    propagation = "OnInitialization"
+  }]
 }
 
 resource "nscale_kubernetes_node_pool" "gpu" {
@@ -61,9 +67,10 @@ resource "nscale_kubernetes_node_pool" "gpu" {
   # This pool is reservation-backed, so editing taints — or replicas — replaces
   # it rather than updating it in place.
   taints = [{
-    key    = "nvidia.com/gpu"
-    value  = "true"
-    effect = "NoSchedule"
+    key         = "nvidia.com/gpu"
+    value       = "true"
+    effect      = "NoSchedule"
+    propagation = "Always"
   }]
 }
 ```
@@ -82,7 +89,6 @@ resource "nscale_kubernetes_node_pool" "gpu" {
 
 - `compute` (Attributes) On-demand capacity options. Required when `provisioning_mode` is `compute`, and rejected otherwise. (see [below for nested schema](#nestedatt--compute))
 - `description` (String) The description of the node pool.
-- `labels` (Map of String) Kubernetes labels applied to the pool's workers. Maximum 64 entries. On a compute pool, changing this rolls every worker in the pool, one at a time, draining each. Immutable when `provisioning_mode` is `reservation`: changing it there forces a new node pool to be created.
 - `reservation` (Attributes) Reserved capacity options. Required when `provisioning_mode` is `reservation`, and rejected otherwise. (see [below for nested schema](#nestedatt--reservation))
 - `tags` (Map of String) A map of tags assigned to the node pool.
 - `taints` (Attributes List) Kubernetes taints applied to the pool's workers. Maximum 64. On a compute pool, changing this rolls every worker in the pool, one at a time, draining each. Immutable when `provisioning_mode` is `reservation`: changing it there forces a new node pool to be created. (see [below for nested schema](#nestedatt--taints))
@@ -90,21 +96,17 @@ resource "nscale_kubernetes_node_pool" "gpu" {
 
 ### Read-Only
 
-- `applied_platform_release_id` (String) The platform release last observed as applied to the node pool. Pinned per pool, and reported separately from the cluster's.
 - `creation_time` (String) The timestamp when the node pool was created.
 - `current_replicas` (Number) The number of workers that exist.
 - `health_status` (String) The health state of the node pool.
+- `health_status_detail` (String) The explanation behind a `degraded` or `error` health state.
 - `id` (String) A unique identifier for the node pool.
 - `kubernetes_version` (String) The Kubernetes version reported by the pool's workers.
 - `organization_id` (String) The identifier of the organization the node pool belongs to. Inherited via the cluster and cannot be set.
 - `placement_id` (String) The identifier of the placement backing the pool. Null unless `provisioning_mode` is `reservation`.
-- `platform_release_deprecated` (Boolean) Whether the applied platform release is currently deprecated.
-- `platform_release_kubernetes_version` (String) The Kubernetes version supplied by the applied platform release.
-- `platform_release_withdrawal_message` (String) The explanation for withdrawing the applied platform release. Null unless it is withdrawn.
-- `platform_release_withdrawal_reason` (String) The reason operators withdrew the applied platform release. One of `SecurityIssue`, `FunctionalRegression`, `CompatibilityIssue`, `ComplianceIssue`, `OperationalIssue` or `Other`. Null unless it is withdrawn.
-- `platform_release_withdrawn` (Boolean) Whether operators have withdrawn the applied platform release.
 - `project_id` (String) The identifier of the project the node pool belongs to. Inherited via the cluster and cannot be set.
 - `provisioning_status` (String) The provisioning state of the node pool.
+- `provisioning_status_detail` (String) The explanation behind an `error` provisioning state.
 - `ready_replicas` (Number) The number of workers ready to schedule work.
 - `region_id` (String) The identifier of the region the node pool is provisioned in. Inherited via the cluster and cannot be set.
 - `up_to_date_replicas` (Number) The number of workers running the current pool template. Climbs as workers are replaced during a roll.
@@ -114,7 +116,7 @@ resource "nscale_kubernetes_node_pool" "gpu" {
 
 Required:
 
-- `flavor_id` (String) The instance flavor used for each worker. Immutable: changing this forces a new node pool to be created.
+- `flavor_id` (String) The instance flavor used for each worker. 1 to 128 characters. Immutable: changing this forces a new node pool to be created.
 
 
 <a id="nestedatt--reservation"></a>
@@ -131,7 +133,8 @@ Required:
 Required:
 
 - `effect` (String) The taint effect. One of `NoSchedule`, `PreferNoSchedule` or `NoExecute`.
-- `key` (String) The taint key. A Kubernetes qualified name, up to 317 characters.
+- `key` (String) The taint key. A Kubernetes qualified name, 1 to 317 characters.
+- `propagation` (String) When the taint is applied to workers. `Always` reconciles it onto running workers; `OnInitialization` applies it as each worker is created. The API has no default, so this must be set on every taint.
 
 Optional:
 
@@ -149,8 +152,8 @@ Optional:
 
 ## Rolling a pool
 
-Changing `taints` or `labels` on a compute pool changes the template its workers are built from, so every existing
-worker is replaced. The replacement is a controlled rolling update:
+Changing `taints` on a compute pool changes the template its workers are built from, so every existing worker is
+replaced. The replacement is a controlled rolling update:
 
 * One extra node at a time — the pool adds a worker before removing one, and never drops below `replicas` ready
   workers.
@@ -163,6 +166,12 @@ worker is replaced. The replacement is a controlled rolling update:
 the pool stops mid-rollout and `terraform apply` runs out its own timeout. The same applies to destroying a pool, and
 to destroying a cluster — both drain their workers. A timeout here does not mean the roll failed: it is still in
 progress. Fix the disruption budget and apply again.
+
+Each taint's `propagation` controls when it reaches a worker: `Always` reconciles it onto running workers, and
+`OnInitialization` applies it as each worker is created. Either way, changing the set of taints changes the worker
+template, so plan for a roll whichever value you use.
+
+Reservation pools never roll. Any change that would need one forces replacement instead.
 
 Reservation pools never roll. Any change that would need one forces replacement instead.
 
@@ -211,8 +220,9 @@ terraform import nscale_kubernetes_node_pool.workers XXXXXXXX-XXXX-XXXX-XXXX-XXX
 configuration on every update. Removing an argument clears it rather than leaving it alone.
 
 * Deleting a cluster removes its node pools. Terraform destroys pools first, because they depend on `cluster_id`.
-* `taints` is a list and round-trips in the order the API returns. `labels` accepts empty-string values, as Kubernetes
-  does.
+* `taints` is a list and round-trips in the order the API returns.
+* A node pool has no platform release of its own. It inherits the cluster's — read
+  [`nscale_kubernetes_cluster`](kubernetes_cluster.html)`.applied_platform_release_id` instead.
 * A reservation-backed pool fails to provision if the reservation has no capacity available.
 * `name`, `cluster_id`, `provisioning_mode`, `compute.flavor_id` and `reservation.reservation_id` are all immutable at
   the API, which rejects a change outright. The provider plans a replacement so the change is achievable rather than
