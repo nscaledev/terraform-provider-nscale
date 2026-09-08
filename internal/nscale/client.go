@@ -29,6 +29,10 @@ import (
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
 
+	// nks is generated in-tree rather than taken from nscale-sdk-go; see
+	// internal/nks/gen.go for the reasoning and the migration path.
+	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+
 	// legacycomputeapi is the still-on-unikorn-cloud client used solely by the
 	// deprecated nscale_compute_cluster resource. The cluster surface was
 	// removed when the compute spec was regenerated for nscale-sdk-go, so
@@ -47,10 +51,14 @@ type Client struct {
 	Reservation    reservationapi.ClientInterface
 	LegacyCompute  legacycomputeapi.ClientInterface
 	Storage        storageapi.ClientInterface
+	// NKS is nil when nks_service_api_endpoint is unset. Reach it through
+	// RequireNKS, never directly, so an unconfigured endpoint surfaces as a
+	// resource-level diagnostic rather than a nil dereference.
+	NKS nks.ClientInterface
 }
 
 func NewClient(
-	regionServiceBaseURL, computeServiceBaseURL, identityServiceBaseURL, reservationServiceBaseURL, storageServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string,
+	regionServiceBaseURL, computeServiceBaseURL, identityServiceBaseURL, reservationServiceBaseURL, storageServiceBaseURL, nksServiceBaseURL, serviceToken, organizationID, projectID, regionID, userAgent string,
 ) (*Client, error) {
 	httpClient := NewHTTPClient(userAgent, serviceToken)
 
@@ -90,6 +98,19 @@ func NewClient(
 		return nil, fmt.Errorf("failed to create Nscale storage API client: %w", err)
 	}
 
+	// NKS has no default endpoint yet (the service is pending a migration), so an
+	// empty URL is a valid configuration rather than an error. Skip building the
+	// client and let RequireNKS explain the omission if an NKS-backed resource is
+	// actually used — otherwise every existing configuration would have to set an
+	// endpoint it does not need.
+	var nksClient nks.ClientInterface
+	if nksServiceBaseURL != "" {
+		nksClient, err = nks.NewClient(nksServiceBaseURL, nks.WithHTTPClient(httpClient))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create Nscale NKS API client: %w", err)
+		}
+	}
+
 	client := &Client{
 		RegionID:       regionID,
 		OrganizationID: organizationID,
@@ -100,9 +121,34 @@ func NewClient(
 		Reservation:    reservation,
 		LegacyCompute:  legacyCompute,
 		Storage:        storage,
+		NKS:            nksClient,
 	}
 
 	return client, nil
+}
+
+// RequireNKS returns the NKS client, or a diagnostic explaining that the NKS
+// endpoint is unconfigured. NKS is the only service without a baked-in default
+// URL, so this is the one client that can legitimately be absent at point of
+// use; every nscale_kubernetes_* code path must go through here.
+// The generated NKS client only exposes an interface (ClientInterface) as its
+// mockable surface, and Client stores it as one; returning the concrete type
+// here would defeat that.
+func (c *Client) RequireNKS() (nks.ClientInterface, diag.Diagnostics) { //nolint:ireturn // the generated client's only public surface is an interface
+	var diagnostics diag.Diagnostics
+
+	if c.NKS == nil {
+		diagnostics.AddError(
+			"Missing NKS Service API Endpoint",
+			"The nscale_kubernetes_* resources and data sources require the NKS service "+
+				"endpoint to be configured. Set nks_service_api_endpoint on the provider, or "+
+				"the NSCALE_NKS_SERVICE_API_ENDPOINT environment variable. Unlike the other "+
+				"Nscale services, NKS has no default endpoint yet.",
+		)
+		return nil, diagnostics
+	}
+
+	return c.NKS, diagnostics
 }
 
 // ResolveProjectID returns the project ID a project-scoped resource should use:

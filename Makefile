@@ -12,6 +12,16 @@ lint:
 generate:
 	cd tools; go generate ./...
 
+# NKS is the one service whose OpenAPI client is generated in-tree rather than
+# consumed from nscale-sdk-go — see internal/nks/gen.go for why. nks-spec pulls
+# a fresh copy of the canonical spec and regenerates the client; review the
+# resulting diff to both openapi.yaml and nks.gen.go before committing.
+NKS_SPEC_URL = https://raw.githubusercontent.com/nscaledev/openapi/main/nks-core/main/openapi.yaml
+
+nks-spec:
+	curl -fsSL -o internal/nks/openapi.yaml $(NKS_SPEC_URL)
+	go generate ./internal/nks/...
+
 fmt:
 	gofmt -s -w -e .
 
@@ -93,4 +103,4 @@ testacc-profile:
 		test -z "$$missing" || { echo "terraform.$(PROFILE).tfvars does not set:$$missing"; exit 1; }; \
 		$(MAKE) testacc
 
-.PHONY: fmt lint test schema-check schema-update testacc testacc-env testacc-profile build install generate
+.PHONY: fmt lint test schema-check schema-update testacc testacc-env testacc-profile build install generate nks-spec
