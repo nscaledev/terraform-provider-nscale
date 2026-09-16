@@ -47,6 +47,30 @@ func (e ClusterAddonComponentStatusV1) Valid() bool {
 	}
 }
 
+// Defines values for ClusterRoleBindingV1ClusterRole.
+const (
+	Admin        ClusterRoleBindingV1ClusterRole = "admin"
+	ClusterAdmin ClusterRoleBindingV1ClusterRole = "cluster-admin"
+	Edit         ClusterRoleBindingV1ClusterRole = "edit"
+	View         ClusterRoleBindingV1ClusterRole = "view"
+)
+
+// Valid indicates whether the value is a known member of the ClusterRoleBindingV1ClusterRole enum.
+func (e ClusterRoleBindingV1ClusterRole) Valid() bool {
+	switch e {
+	case Admin:
+		return true
+	case ClusterAdmin:
+		return true
+	case Edit:
+		return true
+	case View:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ErrorError.
 const (
 	AccessDenied          ErrorError = "access_denied"
@@ -233,6 +257,24 @@ func (e ProvisioningStatusReason) Valid() bool {
 	}
 }
 
+// Defines values for RbacSubjectV1Kind.
+const (
+	Group RbacSubjectV1Kind = "Group"
+	User  RbacSubjectV1Kind = "User"
+)
+
+// Valid indicates whether the value is a known member of the RbacSubjectV1Kind enum.
+func (e RbacSubjectV1Kind) Valid() bool {
+	switch e {
+	case Group:
+		return true
+	case User:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ResourceHealthStatus.
 const (
 	ResourceHealthStatusDegraded ResourceHealthStatus = "degraded"
@@ -305,6 +347,12 @@ type ClusterAddonComponentV1 struct {
 	Version string `json:"version"`
 }
 
+// ClusterAddonProfileCreateV1 Requested configuration for a single addon profile.
+type ClusterAddonProfileCreateV1 struct {
+	// Enabled Whether the addon profile is enabled. Defaults to true when omitted.
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
 // ClusterAddonProfileStatusV1 Observed addon profile rollout state.
 type ClusterAddonProfileStatusV1 struct {
 	// Components Observed addon component rollout states.
@@ -320,10 +368,16 @@ type ClusterAddonProfileStatusV1 struct {
 	Status ClusterAddonComponentStatusV1 `json:"status"`
 }
 
+// ClusterAddonProfileV1 Configuration for a single addon profile.
+type ClusterAddonProfileV1 struct {
+	// Enabled Whether the addon profile is enabled.
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
 // ClusterAddonsCreateV1 Addon profiles requested during cluster creation.
 type ClusterAddonsCreateV1 struct {
-	// Hardware Whether the optional hardware addon profile is enabled. Defaults to true when omitted during cluster creation.
-	Hardware *bool `json:"hardware,omitempty"`
+	// Hardware Requested configuration for a single addon profile.
+	Hardware *ClusterAddonProfileCreateV1 `json:"hardware,omitempty"`
 }
 
 // ClusterAddonsStatusV1 Observed addon rollout state grouped by profile. Hardware remains visible while a previous installation is being removed and is omitted only after removal is confirmed.
@@ -337,8 +391,8 @@ type ClusterAddonsStatusV1 struct {
 
 // ClusterAddonsV1 Addon profiles configured for a cluster.
 type ClusterAddonsV1 struct {
-	// Hardware Whether the optional hardware addon profile is enabled.
-	Hardware *bool `json:"hardware,omitempty"`
+	// Hardware Configuration for a single addon profile.
+	Hardware *ClusterAddonProfileV1 `json:"hardware,omitempty"`
 }
 
 // ClusterApiServerAccessV1 API server network exposure requested for a cluster.
@@ -346,8 +400,29 @@ type ClusterApiServerAccessV1 struct {
 	// AllowedCidrs Source IPv4 CIDR allowlist for the cluster API endpoint, including private endpoints. If publicIP is true and this field is omitted, the API server is reachable from 0.0.0.0/0.
 	AllowedCidrs *[]string `json:"allowedCidrs,omitempty"`
 
+	// Authentication Kubernetes API server authentication configured for a cluster. Fixed at creation; immutable for the cluster's lifetime, including whether each field is set.
+	Authentication *ClusterApiServerAuthenticationV1 `json:"authentication,omitempty"`
+
+	// Authorization Tenant ClusterRoles bound to caller-specified subjects.
+	Authorization *ClusterApiServerAuthorizationV1 `json:"authorization,omitempty"`
+
 	// PublicIP Whether to expose the API server through a public endpoint.
 	PublicIP *bool `json:"publicIP,omitempty"`
+}
+
+// ClusterApiServerAuthenticationV1 Kubernetes API server authentication configured for a cluster. Fixed at creation; immutable for the cluster's lifetime, including whether each field is set.
+type ClusterApiServerAuthenticationV1 struct {
+	// ExternalIssuers Additional external JWT/OIDC issuers the cluster's API server trusts.
+	ExternalIssuers *[]ClusterExternalIssuerV1 `json:"externalIssuers,omitempty"`
+
+	// NscaleWebhook Per-cluster override of the cell-wide Nscale authentication webhook enablement decision.
+	NscaleWebhook *ClusterNscaleWebhookAuthenticationV1 `json:"nscaleWebhook,omitempty"`
+}
+
+// ClusterApiServerAuthorizationV1 Tenant ClusterRoles bound to caller-specified subjects.
+type ClusterApiServerAuthorizationV1 struct {
+	// ClusterRoleBindings Bindings from a built-in tenant ClusterRole to caller-specified subjects, one binding per role.
+	ClusterRoleBindings []ClusterRoleBindingV1 `json:"clusterRoleBindings"`
 }
 
 // ClusterApiServerEndpointStatusV1 Customer-facing Kubernetes API server endpoint.
@@ -377,6 +452,18 @@ type ClusterApiServerStatusV1 struct {
 	Endpoints ClusterApiServerEndpointsStatusV1 `json:"endpoints"`
 }
 
+// ClusterAuthorizationStatusV1 Observed API server authorization binding state. Present only when bindings are configured.
+type ClusterAuthorizationStatusV1 struct {
+	// Message Human-readable customer-safe message for the authorization state.
+	Message *string `json:"message,omitempty"`
+
+	// Reason Stable machine-readable reason for the authorization state.
+	Reason *string `json:"reason,omitempty"`
+
+	// Status Observed addon component rollout status.
+	Status ClusterAddonComponentStatusV1 `json:"status"`
+}
+
 // ClusterControlPlaneSummaryV1 Observed control plane summary.
 type ClusterControlPlaneSummaryV1 struct {
 	// DesiredReplicas Desired number of control plane replicas.
@@ -402,6 +489,33 @@ type ClusterCreateSpecV1 struct {
 
 	// PlatformReleaseId Platform release selected for the cluster.
 	PlatformReleaseId string `json:"platformReleaseId"`
+
+	// SshCertificateAuthorityId Optional region SSH certificate authority trusted for cluster workers.
+	SshCertificateAuthorityId *string `json:"sshCertificateAuthorityId,omitempty"`
+}
+
+// ClusterExternalIssuerV1 An external JWT/OIDC issuer the cluster's API server trusts.
+type ClusterExternalIssuerV1 struct {
+	// Audiences Acceptable token audiences for this issuer.
+	Audiences []string `json:"audiences"`
+
+	// CaCertificate PEM-encoded CA certificate used to verify the issuer, when it is not signed by a well-known CA.
+	CaCertificate *string `json:"caCertificate,omitempty"`
+
+	// GroupsClaim JWT claim mapped to the authenticated group list.
+	GroupsClaim *string `json:"groupsClaim,omitempty"`
+
+	// GroupsPrefix Prepended to each groups claim value. Required when groupsClaim is set; when set, must be non-empty and must not itself start with, or be a prefix of, a reserved prefix (system:, kubeadm:, nks-management:).
+	GroupsPrefix *string `json:"groupsPrefix,omitempty"`
+
+	// IssuerURL Issuer URL clients present tokens from.
+	IssuerURL string `json:"issuerURL"`
+
+	// UsernameClaim JWT claim mapped to the authenticated username.
+	UsernameClaim *string `json:"usernameClaim,omitempty"`
+
+	// UsernamePrefix Prepended to the username claim value. Required, non-empty, and must not itself start with, or be a prefix of, a reserved prefix (system:, kubeadm:, nks-management:).
+	UsernamePrefix string `json:"usernamePrefix"`
 }
 
 // ClusterKubernetesVersionStatusV1 Kubernetes versions in the applied control-plane template and observed managed control plane.
@@ -437,6 +551,12 @@ type ClusterNodePoolSummaryV1 struct {
 	TotalReadyReplicas *int `json:"totalReadyReplicas,omitempty"`
 }
 
+// ClusterNscaleWebhookAuthenticationV1 Per-cluster override of the cell-wide Nscale authentication webhook enablement decision.
+type ClusterNscaleWebhookAuthenticationV1 struct {
+	// Enabled Overrides the cell-wide decision to enable the Nscale authentication webhook for this cluster. Omit to inherit the cell-wide default.
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
 // ClusterReleaseStatusV1 Applied platform release and observed upgrade eligibility.
 type ClusterReleaseStatusV1 struct {
 	// AppliedId Platform release last observed as applied to the remote cluster.
@@ -461,6 +581,18 @@ type ClusterReleaseStatusV1 struct {
 	Withdrawn *bool `json:"withdrawn,omitempty"`
 }
 
+// ClusterRoleBindingV1 Binds a built-in tenant ClusterRole to caller-specified subjects.
+type ClusterRoleBindingV1 struct {
+	// ClusterRole Built-in tenant ClusterRole to bind.
+	ClusterRole ClusterRoleBindingV1ClusterRole `json:"clusterRole"`
+
+	// Subjects User/Group subjects bound to the role.
+	Subjects []RbacSubjectV1 `json:"subjects"`
+}
+
+// ClusterRoleBindingV1ClusterRole Built-in tenant ClusterRole to bind.
+type ClusterRoleBindingV1ClusterRole string
+
 // ClusterSpecV1 Desired cluster state.
 type ClusterSpecV1 struct {
 	// Addons Addon profiles configured for a cluster.
@@ -477,6 +609,9 @@ type ClusterSpecV1 struct {
 
 	// PlatformReleaseId Platform release selected for the cluster.
 	PlatformReleaseId string `json:"platformReleaseId"`
+
+	// SshCertificateAuthorityId Optional region SSH certificate authority trusted for cluster workers.
+	SshCertificateAuthorityId *string `json:"sshCertificateAuthorityId,omitempty"`
 }
 
 // ClusterStatusV1 Product-specific observed cluster state.
@@ -486,6 +621,9 @@ type ClusterStatusV1 struct {
 
 	// ApiServer Credential-free Kubernetes API server connection data.
 	ApiServer *ClusterApiServerStatusV1 `json:"apiServer,omitempty"`
+
+	// Authorization Observed API server authorization binding state. Present only when bindings are configured.
+	Authorization *ClusterAuthorizationStatusV1 `json:"authorization,omitempty"`
 
 	// ControlPlane Observed control plane summary.
 	ControlPlane *ClusterControlPlaneSummaryV1 `json:"controlPlane,omitempty"`
@@ -522,6 +660,9 @@ type ClusterUpdateSpecV1 struct {
 
 	// PlatformReleaseId Platform release selected for the cluster.
 	PlatformReleaseId string `json:"platformReleaseId"`
+
+	// SshCertificateAuthorityId Optional region SSH certificate authority trusted for cluster workers. Immutable after creation, including whether it is set.
+	SshCertificateAuthorityId *string `json:"sshCertificateAuthorityId,omitempty"`
 }
 
 // ClusterV1Create A cluster creation request.
@@ -932,6 +1073,18 @@ type ProvisioningStatusDetail struct {
 // (e.g. an instance's lifecycle phase) is carried on other mechanisms and
 // never appears here.
 type ProvisioningStatusReason string
+
+// RbacSubjectV1 One RBAC subject bound to a tenant ClusterRole.
+type RbacSubjectV1 struct {
+	// Kind Subject kind.
+	Kind RbacSubjectV1Kind `json:"kind"`
+
+	// Name Subject name.
+	Name string `json:"name"`
+}
+
+// RbacSubjectV1Kind Subject kind.
+type RbacSubjectV1Kind string
 
 // ResourceHealthStatus The health state of a resource.
 type ResourceHealthStatus string

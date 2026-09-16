@@ -135,9 +135,15 @@ func (s *KubernetesClusterDataSource) Schema(
 				MarkdownDescription: "Addon profiles enabled on the cluster.",
 				Computed:            true,
 				Attributes: map[string]schema.Attribute{
-					"hardware": schema.BoolAttribute{
-						MarkdownDescription: "Whether the optional hardware addon profile is enabled.",
+					"hardware": schema.SingleNestedAttribute{
+						MarkdownDescription: "Configuration for the optional hardware addon profile.",
 						Computed:            true,
+						Attributes: map[string]schema.Attribute{
+							"enabled": schema.BoolAttribute{
+								MarkdownDescription: "Whether the addon profile is enabled.",
+								Computed:            true,
+							},
+						},
 					},
 				},
 			},

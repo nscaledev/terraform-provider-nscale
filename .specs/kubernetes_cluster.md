@@ -480,8 +480,8 @@ any of them is a plan whose apply always fails.
 | --- | --- | --- |
 | `network_id` | immutable — CEL rule + server 422 *"networkId is immutable"* | **`RequiresReplace`** ✅ already correct |
 | `name` | immutable — server 422 *"cluster names are immutable"* | **`RequiresReplace`** ⚠️ **changed** |
-| `cluster_network.pod_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`RequiresReplace`** ⚠️ **changed** |
-| `cluster_network.service_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`RequiresReplace`** ⚠️ **changed** |
+| `cluster_network.pod_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`UseStateForUnknown` + `RequiresReplace`** ⚠️ **changed** |
+| `cluster_network.service_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`UseStateForUnknown` + `RequiresReplace`** ⚠️ **changed** |
 | `platform_release_id` | mutable — in-place rolling control-plane upgrade | no modifier ✅ already correct |
 | `description`, `tags`, `api_server.*`, `addons.hardware.enabled` | mutable in place | no modifier |
 
@@ -505,6 +505,25 @@ modes are asymmetric: an unnecessary `RequiresReplace` is a needless rebuild the
 user can see coming in the plan, while a missing one is a plan that promises an
 in-place change and then 422s mid-apply. Loosening later is safe; tightening is a
 breaking change ([playbook §6.1](../.claude/skills/tf-provider-feature/reference/playbook.md)).
+
+### `RequiresReplace` on an Optional+Computed field needs `UseStateForUnknown`
+
+The two CIDRs are `Optional+Computed`, so configuring one and omitting the other
+leaves the omitted one **unknown** in the plan. `RequiresReplace` compares the
+*planned* value against state, not the *configured* value — so an unknown
+sibling reads as a change and triggers a replacement nobody asked for. Pairing
+it with `UseStateForUnknown` (declared first, so it runs first) pins the omitted
+value to state and the comparison comes out equal.
+
+That pairing is also correct on the merits rather than just a workaround: the
+field is immutable, so state is exactly what the server will keep reporting.
+
+The same reasoning does **not** extend to `api_server.*` or
+`addons.hardware.enabled`. Those are mutable and carry no `RequiresReplace`, so
+an unknown there costs a `(known after apply)` line in the plan rather than a
+rebuild — and because NKS updates are a full PUT, pinning a mutable field to
+state would risk promising a value the server then re-defaults away. Configure
+those fields explicitly rather than half-specifying the block.
 
 ### Consequence for the update path
 

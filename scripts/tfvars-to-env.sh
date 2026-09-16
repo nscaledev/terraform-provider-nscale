@@ -59,6 +59,9 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 	identity_service_api_endpoint) emit NSCALE_IDENTITY_SERVICE_API_ENDPOINT "$val" "$key" ;;
 	storage_service_api_endpoint) emit NSCALE_STORAGE_SERVICE_API_ENDPOINT "$val" "$key" ;;
 	reservation_service_api_endpoint) emit NSCALE_RESERVATION_SERVICE_API_ENDPOINT "$val" "$key" ;;
+	# Unlike the endpoints above this one has no provider-side default, so an
+	# omitted key means the kubernetescluster tests skip rather than fall back.
+	nks_service_api_endpoint) emit NSCALE_NKS_SERVICE_API_ENDPOINT "$val" "$key" ;;
 	service_token) emit NSCALE_SERVICE_TOKEN "$val" "$key" ;;
 	*_org_id) emit NSCALE_ORGANIZATION_ID "$val" "$key" ;;
 	*_project_id) emit NSCALE_PROJECT_ID "$val" "$key" ;;
@@ -70,6 +73,13 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 	*_os_class_id) emit NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID "$val" "$key" ;;
 	*_reservation_accelerator) emit NSCALE_TEST_RESERVATION_ACCELERATOR "$val" "$key" ;;
 	*_reservation_unit) emit NSCALE_TEST_RESERVATION_UNIT "$val" "$key" ;;
+	# NKS. The _alt and _upgrade_ rules are unambiguous against the plainer two
+	# because a glob must match the whole suffix: *_nks_network_id_alt cannot be
+	# mistaken for *_nks_network_id, so these stay order-independent.
+	*_nks_network_id) emit NSCALE_TEST_NKS_NETWORK_ID "$val" "$key" ;;
+	*_nks_network_id_alt) emit NSCALE_TEST_NKS_NETWORK_ID_ALT "$val" "$key" ;;
+	*_nks_platform_release_id) emit NSCALE_TEST_NKS_PLATFORM_RELEASE_ID "$val" "$key" ;;
+	*_nks_platform_release_upgrade_id) emit NSCALE_TEST_NKS_PLATFORM_RELEASE_UPGRADE_ID "$val" "$key" ;;
 	*)
 		# Fail rather than warn: a renamed or misspelled key would otherwise
 		# emit no export at all, and the test that needed it would skip silently

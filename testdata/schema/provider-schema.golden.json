@@ -827,9 +827,19 @@
                   "attributes": {
                     "hardware": {
                       "computed": true,
-                      "description": "Whether the optional hardware addon profile is enabled.",
+                      "description": "Configuration for the optional hardware addon profile.",
                       "description_kind": "markdown",
-                      "type": "bool"
+                      "nested_type": {
+                        "attributes": {
+                          "enabled": {
+                            "computed": true,
+                            "description": "Whether the addon profile is enabled.",
+                            "description_kind": "markdown",
+                            "type": "bool"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      }
                     }
                   },
                   "nesting_mode": "single"
@@ -2903,10 +2913,21 @@
                   "attributes": {
                     "hardware": {
                       "computed": true,
-                      "description": "Whether the optional hardware addon profile is enabled. Defaults to `true`.",
+                      "description": "Configuration for the optional hardware addon profile.",
                       "description_kind": "markdown",
-                      "optional": true,
-                      "type": "bool"
+                      "nested_type": {
+                        "attributes": {
+                          "enabled": {
+                            "computed": true,
+                            "description": "Whether the addon profile is enabled. Defaults to `true`.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "bool"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      },
+                      "optional": true
                     }
                   },
                   "nesting_mode": "single"
@@ -2989,20 +3010,20 @@
               },
               "cluster_network": {
                 "computed": true,
-                "description": "Pod and service network CIDRs for the cluster. Omit to accept the API defaults.",
+                "description": "Pod and service network CIDRs for the cluster. Omit to accept the API defaults. Immutable: changing either CIDR forces a new cluster to be created.",
                 "description_kind": "markdown",
                 "nested_type": {
                   "attributes": {
                     "pod_cidr": {
                       "computed": true,
-                      "description": "IPv4 CIDR used for Kubernetes pod addresses. Defaults to `10.240.0.0/12`.",
+                      "description": "IPv4 CIDR used for Kubernetes pod addresses. Defaults to `10.240.0.0/12`. Immutable: changing this forces a new cluster to be created.",
                       "description_kind": "markdown",
                       "optional": true,
                       "type": "string"
                     },
                     "service_cidr": {
                       "computed": true,
-                      "description": "IPv4 CIDR used for Kubernetes service addresses. Defaults to `10.96.0.0/16`.",
+                      "description": "IPv4 CIDR used for Kubernetes service addresses. Defaults to `10.96.0.0/16`. Immutable: changing this forces a new cluster to be created.",
                       "description_kind": "markdown",
                       "optional": true,
                       "type": "string"
@@ -3058,7 +3079,7 @@
                 "type": "string"
               },
               "name": {
-                "description": "The name of the cluster.",
+                "description": "The name of the cluster. Immutable: changing this forces a new cluster to be created.",
                 "description_kind": "markdown",
                 "required": true,
                 "type": "string"

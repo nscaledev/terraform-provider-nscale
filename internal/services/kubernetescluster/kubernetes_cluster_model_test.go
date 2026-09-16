@@ -69,7 +69,7 @@ func fullCluster(t *testing.T) *nks.ClusterV1Read {
 				ServiceCidr: new("10.96.0.0/16"),
 			},
 			Addons: &nks.ClusterAddonsV1{
-				Hardware: new(true),
+				Hardware: &nks.ClusterAddonProfileV1{Enabled: new(true)},
 			},
 		},
 		Status: nks.ClusterStatusV1{
@@ -191,6 +191,33 @@ func TestNewKubernetesClusterModelFull(t *testing.T) {
 	if got := endpoint["certificate_authority_data"].(types.String).ValueString(); got != "Y2E=" {
 		t.Errorf("certificate_authority_data = %q, want Y2E=", got)
 	}
+
+	// addons.hardware is a nested profile object, not a bare bool.
+	hardware := model.Addons.Attributes()["hardware"].(types.Object)
+	if hardware.IsNull() {
+		t.Fatal("addons.hardware should be populated when the API returns the profile")
+	}
+	if !hardware.Attributes()["enabled"].(types.Bool).ValueBool() {
+		t.Error("addons.hardware.enabled = false, want true")
+	}
+}
+
+// TestAddonsProfileAbsent covers `addons` present with the hardware profile
+// absent. That is distinct from `hardware = { enabled = false }`: the API has
+// said nothing about the profile rather than said it is off.
+func TestAddonsProfileAbsent(t *testing.T) {
+	t.Parallel()
+
+	cluster := fullCluster(t)
+	cluster.Spec.Addons.Hardware = nil
+
+	model := NewKubernetesClusterModel(cluster)
+	if model.Addons.IsNull() {
+		t.Fatal("addons should be populated when spec.addons is present")
+	}
+	if !model.Addons.Attributes()["hardware"].(types.Object).IsNull() {
+		t.Error("addons.hardware should be null when the API omits the profile")
+	}
 }
 
 // TestNewKubernetesClusterModelMinimal is the important nil-safety case: a
@@ -308,7 +335,9 @@ func TestCreateParamsBoolZeroValues(t *testing.T) {
 		}),
 		ClusterNetwork: types.ObjectNull(clusterNetworkAttrTypes()),
 		Addons: objectValue(t, addonsAttrTypes(), map[string]attr.Value{
-			"hardware": types.BoolValue(false),
+			"hardware": objectValue(t, addonProfileAttrTypes(), map[string]attr.Value{
+				"enabled": types.BoolValue(false),
+			}),
 		}),
 	}
 
@@ -328,7 +357,9 @@ func TestCreateParamsBoolZeroValues(t *testing.T) {
 				PublicIP *bool `json:"publicIP"`
 			} `json:"apiServer"`
 			Addons *struct {
-				Hardware *bool `json:"hardware"`
+				Hardware *struct {
+					Enabled *bool `json:"enabled"`
+				} `json:"hardware"`
 			} `json:"addons"`
 		} `json:"spec"`
 	}
@@ -344,10 +375,45 @@ func TestCreateParamsBoolZeroValues(t *testing.T) {
 	}
 
 	if decoded.Spec.Addons == nil || decoded.Spec.Addons.Hardware == nil {
-		t.Fatalf("hardware was dropped from the payload: %s", encoded)
+		t.Fatalf("the hardware addon profile was dropped from the payload: %s", encoded)
 	}
-	if *decoded.Spec.Addons.Hardware {
-		t.Errorf("hardware = true, want false: %s", encoded)
+	if decoded.Spec.Addons.Hardware.Enabled == nil {
+		t.Fatalf("hardware.enabled was dropped from the payload: %s", encoded)
+	}
+	if *decoded.Spec.Addons.Hardware.Enabled {
+		t.Errorf("hardware.enabled = true, want false: %s", encoded)
+	}
+}
+
+// TestCreateParamsOmitsAbsentAddonProfile covers the profile-level equivalent of
+// TestCreateParamsOmitsAbsentBlocks: `addons` present but `hardware` omitted must
+// not send an empty profile object, or the API would receive an explicit request
+// it should have defaulted.
+func TestCreateParamsOmitsAbsentAddonProfile(t *testing.T) {
+	t.Parallel()
+
+	model := &KubernetesClusterModel{
+		Name:              types.StringValue("cluster"),
+		NetworkID:         types.StringValue("net-1"),
+		PlatformReleaseID: types.StringValue("rel-1"),
+		Tags:              types.MapNull(types.StringType),
+		APIServer:         types.ObjectNull(apiServerAttrTypes()),
+		ClusterNetwork:    types.ObjectNull(clusterNetworkAttrTypes()),
+		Addons: objectValue(t, addonsAttrTypes(), map[string]attr.Value{
+			"hardware": types.ObjectNull(addonProfileAttrTypes()),
+		}),
+	}
+
+	params, diagnostics := model.NscaleClusterCreateParams(context.Background())
+	if diagnostics.HasError() {
+		t.Fatalf("building create params: %v", diagnostics)
+	}
+
+	if params.Spec.Addons == nil {
+		t.Fatal("addons should be sent when the block is configured")
+	}
+	if params.Spec.Addons.Hardware != nil {
+		t.Error("hardware should be nil when the profile is omitted, so the API applies its default")
 	}
 }
 

@@ -188,6 +188,10 @@ NSCALE_COMPUTE_SERVICE_API_ENDPOINT=...
 NSCALE_IDENTITY_SERVICE_API_ENDPOINT=...
 NSCALE_RESERVATION_SERVICE_API_ENDPOINT=...
 NSCALE_STORAGE_SERVICE_API_ENDPOINT=...
+
+# NKS has NO default host, so this one is required rather than an override.
+# The kubernetescluster tests skip without it.
+NSCALE_NKS_SERVICE_API_ENDPOINT=...
 ```
 
 Per service, additional `NSCALE_TEST_*` vars:
@@ -197,8 +201,50 @@ Per service, additional `NSCALE_TEST_*` vars:
 | `filestorage` | `NSCALE_TEST_FILE_STORAGE_CLASS_ID` |
 | `identity` | `NSCALE_TEST_ROLE_ID` |
 | `instance` | `NSCALE_TEST_IMAGE_ID`, `NSCALE_TEST_FLAVOR_ID` |
+| `kubernetescluster` | `NSCALE_NKS_SERVICE_API_ENDPOINT`, `NSCALE_TEST_NKS_NETWORK_ID`; optionally `NSCALE_TEST_NKS_NETWORK_ID_ALT`, `NSCALE_TEST_NKS_PLATFORM_RELEASE_ID`, `NSCALE_TEST_NKS_PLATFORM_RELEASE_UPGRADE_ID` |
 | `objectstorage` | `NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID` |
 | `reservation` | `NSCALE_TEST_RESERVATION_ACCELERATOR`, `NSCALE_TEST_RESERVATION_UNIT`; placement tests also need `NSCALE_TEST_IMAGE_ID` |
+
+### `kubernetescluster` variables in detail
+
+> **COST WARNING.** This package provisions real NKS control planes — several per
+> run, tens of minutes each. It is by a wide margin the slowest and most
+> expensive package in the suite. Run it on its own with
+> `make testacc PKG=./internal/services/kubernetescluster/` rather than as part
+> of a full `make testacc`.
+
+| Variable | Required | What it selects |
+|---|---|---|
+| `NSCALE_NKS_SERVICE_API_ENDPOINT` | yes | NKS base URL. No default exists provider-side. |
+| `NSCALE_TEST_NKS_NETWORK_ID` | yes | An existing region network to attach clusters to. Its project and region become the cluster's, so it must be a project the token can create clusters in. |
+| `NSCALE_TEST_NKS_NETWORK_ID_ALT` | no | A second network in the **same project and region**, for the test that proves `network_id` forces replacement. A different region makes the platform release unavailable (422). Unset skips that one test. |
+| `NSCALE_TEST_NKS_PLATFORM_RELEASE_ID` | no | Lower half of a known-good upgrade pair. |
+| `NSCALE_TEST_NKS_PLATFORM_RELEASE_UPGRADE_ID` | no | Upper half of that pair. Both unset skips the in-place upgrade test. |
+
+The tests attach to a pre-existing network rather than creating one: network
+creation is already covered by the `network` package, and adding it here would
+add minutes to an already slow suite for no extra coverage.
+
+The upgrade pair is given explicitly rather than derived from the
+`nscale_kubernetes_platform_releases` data source because whether two catalogue
+entries form a valid upgrade pair is a property of the catalogue, not of list
+order.
+
+Running it via a gitignored tfvars profile (see the `testacc-profile` comments
+in the `Makefile`) — always scope with `PKG`:
+
+```
+make testacc-profile PROFILE=staging-nks PKG=./internal/services/kubernetescluster/
+```
+
+The tfvars keys `scripts/tfvars-to-env.sh` maps for this package are
+`nks_service_api_endpoint`, `*_nks_network_id`, `*_nks_network_id_alt`,
+`*_nks_platform_release_id` and `*_nks_platform_release_upgrade_id`.
+
+Set `region_service_api_endpoint` too when the profile is not the default
+environment. It is the one endpoint whose omission does **not** cause a skip:
+it falls back to `https://region.unikorn.nscale.com`, where the test network ID
+does not exist, so the tests fail on a lookup error instead.
 
 Each `acc_test.go` lists the exact vars its `testAccPreCheck` requires. Missing
 vars produce `t.Skipf` — they do not fail.

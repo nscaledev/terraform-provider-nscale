@@ -589,7 +589,8 @@ components:
                 apiServer:
                   publicIP: false
                 addons:
-                  hardware: true
+                  hardware:
+                    enabled: true
               status:
                 regionId: uk-lon-1
                 observedGeneration: 3
@@ -658,7 +659,8 @@ components:
               apiServer:
                 publicIP: false
               addons:
-                hardware: true
+                hardware:
+                  enabled: true
             status:
               regionId: uk-lon-1
               observedGeneration: 3
@@ -727,7 +729,8 @@ components:
               apiServer:
                 publicIP: false
               addons:
-                hardware: true
+                hardware:
+                  enabled: true
             status:
               regionId: uk-lon-1
     nodePoolsV1Response:
@@ -1095,22 +1098,174 @@ components:
           items:
             type: string
             pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/([0-9]|[12][0-9]|3[0-2])$
+        authorization:
+          description: Tenant ClusterRoles bound to caller-specified subjects. Immutable
+            after creation, including whether it is set.
+          $ref: "#/components/schemas/clusterApiServerAuthorizationV1"
+        authentication:
+          $ref: "#/components/schemas/clusterApiServerAuthenticationV1"
+    clusterApiServerAuthorizationV1:
+      description: Tenant ClusterRoles bound to caller-specified subjects.
+      type: object
+      additionalProperties: false
+      required:
+        - clusterRoleBindings
+      properties:
+        clusterRoleBindings:
+          description: Bindings from a built-in tenant ClusterRole to caller-specified
+            subjects, one binding per role.
+          type: array
+          minItems: 1
+          maxItems: 4
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/clusterRoleBindingV1"
+    clusterRoleBindingV1:
+      description: Binds a built-in tenant ClusterRole to caller-specified subjects.
+      type: object
+      additionalProperties: false
+      required:
+        - clusterRole
+        - subjects
+      properties:
+        clusterRole:
+          description: Built-in tenant ClusterRole to bind.
+          type: string
+          enum:
+            - cluster-admin
+            - admin
+            - edit
+            - view
+        subjects:
+          description: User/Group subjects bound to the role.
+          type: array
+          minItems: 1
+          maxItems: 32
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/rbacSubjectV1"
+    rbacSubjectV1:
+      description: One RBAC subject bound to a tenant ClusterRole.
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - name
+      properties:
+        kind:
+          description: Subject kind.
+          type: string
+          enum:
+            - User
+            - Group
+        name:
+          description: Subject name.
+          type: string
+          minLength: 1
+          maxLength: 2048
+    clusterApiServerAuthenticationV1:
+      description: Kubernetes API server authentication configured for a cluster.
+        Fixed at creation; immutable for the cluster's lifetime, including
+        whether each field is set.
+      type: object
+      properties:
+        nscaleWebhook:
+          $ref: "#/components/schemas/clusterNscaleWebhookAuthenticationV1"
+        externalIssuers:
+          description: Additional external JWT/OIDC issuers the cluster's API server trusts.
+          type: array
+          maxItems: 8
+          items:
+            $ref: "#/components/schemas/clusterExternalIssuerV1"
+    clusterNscaleWebhookAuthenticationV1:
+      description: Per-cluster override of the cell-wide Nscale authentication webhook
+        enablement decision.
+      type: object
+      properties:
+        enabled:
+          description: Overrides the cell-wide decision to enable the Nscale
+            authentication webhook for this cluster. Omit to inherit the
+            cell-wide default.
+          type: boolean
+    clusterExternalIssuerV1:
+      description: An external JWT/OIDC issuer the cluster's API server trusts.
+      type: object
+      required:
+        - issuerURL
+        - audiences
+        - usernamePrefix
+      properties:
+        issuerURL:
+          description: Issuer URL clients present tokens from.
+          type: string
+          minLength: 1
+          maxLength: 2048
+        audiences:
+          description: Acceptable token audiences for this issuer.
+          type: array
+          minItems: 1
+          maxItems: 8
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        usernameClaim:
+          description: JWT claim mapped to the authenticated username.
+          type: string
+          maxLength: 256
+          default: sub
+        usernamePrefix:
+          description: Prepended to the username claim value. Required, non-empty, and
+            must not itself start with, or be a prefix of, a reserved prefix
+            (system:, kubeadm:, nks-management:).
+          type: string
+          minLength: 1
+          maxLength: 256
+        groupsClaim:
+          description: JWT claim mapped to the authenticated group list.
+          type: string
+          maxLength: 256
+        groupsPrefix:
+          description: Prepended to each groups claim value. Required when groupsClaim is
+            set; when set, must be non-empty and must not itself start with, or
+            be a prefix of, a reserved prefix (system:, kubeadm:,
+            nks-management:).
+          type: string
+          minLength: 1
+          maxLength: 256
+        caCertificate:
+          description: PEM-encoded CA certificate used to verify the issuer, when it is
+            not signed by a well-known CA.
+          type: string
+          maxLength: 8192
+    clusterAddonProfileV1:
+      description: Configuration for a single addon profile.
+      type: object
+      properties:
+        enabled:
+          description: Whether the addon profile is enabled.
+          type: boolean
+    clusterAddonProfileCreateV1:
+      description: Requested configuration for a single addon profile.
+      type: object
+      properties:
+        enabled:
+          description: Whether the addon profile is enabled. Defaults to true when omitted.
+          type: boolean
+          default: true
     clusterAddonsV1:
       description: Addon profiles configured for a cluster.
       type: object
       properties:
         hardware:
-          description: Whether the optional hardware addon profile is enabled.
-          type: boolean
+          $ref: "#/components/schemas/clusterAddonProfileV1"
     clusterAddonsCreateV1:
       description: Addon profiles requested during cluster creation.
       type: object
       properties:
         hardware:
-          description: Whether the optional hardware addon profile is enabled. Defaults to
-            true when omitted during cluster creation.
-          type: boolean
-          default: true
+          $ref: "#/components/schemas/clusterAddonProfileCreateV1"
     clusterNetworkV1:
       description: Kubernetes cluster pod and service network configuration.
       type: object
@@ -1224,6 +1379,21 @@ components:
           $ref: "#/components/schemas/clusterAddonProfileStatusV1"
         hardware:
           $ref: "#/components/schemas/clusterAddonProfileStatusV1"
+    clusterAuthorizationStatusV1:
+      description: Observed API server authorization binding state. Present only when
+        bindings are configured.
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: "#/components/schemas/clusterAddonComponentStatusV1"
+        reason:
+          description: Stable machine-readable reason for the authorization state.
+          type: string
+        message:
+          description: Human-readable customer-safe message for the authorization state.
+          type: string
     clusterSpecV1:
       description: Desired cluster state.
       type: object
@@ -1236,6 +1406,10 @@ components:
           type: string
         platformReleaseId:
           description: Platform release selected for the cluster.
+          type: string
+        sshCertificateAuthorityId:
+          description: Optional region SSH certificate authority trusted for cluster
+            workers.
           type: string
         clusterNetwork:
           $ref: "#/components/schemas/clusterNetworkV1"
@@ -1257,6 +1431,10 @@ components:
         platformReleaseId:
           description: Platform release selected for the cluster.
           type: string
+        sshCertificateAuthorityId:
+          description: Optional region SSH certificate authority trusted for cluster
+            workers.
+          type: string
         clusterNetwork:
           $ref: "#/components/schemas/clusterNetworkV1"
         apiServer:
@@ -1276,6 +1454,10 @@ components:
           type: string
         platformReleaseId:
           description: Platform release selected for the cluster.
+          type: string
+        sshCertificateAuthorityId:
+          description: Optional region SSH certificate authority trusted for cluster
+            workers. Immutable after creation, including whether it is set.
           type: string
         clusterNetwork:
           $ref: "#/components/schemas/clusterNetworkV1"
@@ -1401,6 +1583,8 @@ components:
           $ref: "#/components/schemas/clusterNodePoolSummaryV1"
         addons:
           $ref: "#/components/schemas/clusterAddonsStatusV1"
+        authorization:
+          $ref: "#/components/schemas/clusterAuthorizationStatusV1"
         release:
           $ref: "#/components/schemas/clusterReleaseStatusV1"
     clusterV1Read:

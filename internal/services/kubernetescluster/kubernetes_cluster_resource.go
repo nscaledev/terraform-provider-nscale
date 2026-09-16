@@ -125,8 +125,12 @@ func (r *KubernetesClusterResource) Schema(
 				},
 			},
 			"name": schema.StringAttribute{
-				MarkdownDescription: "The name of the cluster.",
-				Required:            true,
+				MarkdownDescription: "The name of the cluster. " +
+					"Immutable: changing this forces a new cluster to be created.",
+				Required: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 				Validators: []validator.String{
 					validators.NameValidator(),
 				},
@@ -187,26 +191,52 @@ func (r *KubernetesClusterResource) Schema(
 					},
 				},
 			},
+			// The pod and service CIDRs are enforced immutable by a CEL
+			// `self == oldSelf` rule on the underlying CRD, and the server returns
+			// 422 "clusterNetwork.podCidr is immutable". Planning an in-place update
+			// would produce an apply that always fails, so this replaces instead.
+			// The modifiers sit on the nested CIDRs as well as the object so the plan
+			// names the attribute that actually forced the replacement.
 			"cluster_network": schema.SingleNestedAttribute{
-				MarkdownDescription: "Pod and service network CIDRs for the cluster. Omit to accept the API defaults.",
-				Optional:            true,
-				Computed:            true,
+				MarkdownDescription: "Pod and service network CIDRs for the cluster. Omit to accept the API defaults. " +
+					"Immutable: changing either CIDR forces a new cluster to be created.",
+				Optional: true,
+				Computed: true,
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
+					objectplanmodifier.RequiresReplace(),
 				},
 				Attributes: map[string]schema.Attribute{
+					// UseStateForUnknown must come before RequiresReplace, and is not
+					// optional here. Configuring one CIDR and omitting the other
+					// leaves the omitted one unknown (it is Computed), and
+					// RequiresReplace compares the *planned* value against state —
+					// so an unknown sibling would read as a change and destroy the
+					// cluster for no reason. Pinning it to state is also correct on
+					// the merits: the value is immutable, so state is what the
+					// server will keep reporting.
 					"pod_cidr": schema.StringAttribute{
-						MarkdownDescription: "IPv4 CIDR used for Kubernetes pod addresses. Defaults to `10.240.0.0/12`.",
-						Optional:            true,
-						Computed:            true,
+						MarkdownDescription: "IPv4 CIDR used for Kubernetes pod addresses. Defaults to `10.240.0.0/12`. " +
+							"Immutable: changing this forces a new cluster to be created.",
+						Optional: true,
+						Computed: true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.RequiresReplace(),
+						},
 						Validators: []validator.String{
 							validators.CIDRValidator{},
 						},
 					},
 					"service_cidr": schema.StringAttribute{
-						MarkdownDescription: "IPv4 CIDR used for Kubernetes service addresses. Defaults to `10.96.0.0/16`.",
-						Optional:            true,
-						Computed:            true,
+						MarkdownDescription: "IPv4 CIDR used for Kubernetes service addresses. Defaults to `10.96.0.0/16`. " +
+							"Immutable: changing this forces a new cluster to be created.",
+						Optional: true,
+						Computed: true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+							stringplanmodifier.RequiresReplace(),
+						},
 						Validators: []validator.String{
 							validators.CIDRValidator{},
 						},
@@ -221,16 +251,30 @@ func (r *KubernetesClusterResource) Schema(
 					objectplanmodifier.UseStateForUnknown(),
 				},
 				Attributes: map[string]schema.Attribute{
-					// No framework Default here even though the API documents one
-					// (true on create). The default is the server's to own, so we
-					// leave it unset and read back whatever was applied; a
-					// provider-side booldefault would also only fire when `addons`
-					// itself is present, making omit-the-block and
-					// omit-just-the-field behave differently for no good reason.
-					"hardware": schema.BoolAttribute{
-						MarkdownDescription: "Whether the optional hardware addon profile is enabled. Defaults to `true`.",
+					// A profile is an object rather than a bare bool because that is
+					// how the NKS spec models it (clusterAddonProfileV1), leaving room
+					// for per-profile settings beyond `enabled` without a breaking
+					// change here.
+					"hardware": schema.SingleNestedAttribute{
+						MarkdownDescription: "Configuration for the optional hardware addon profile.",
 						Optional:            true,
 						Computed:            true,
+						PlanModifiers: []planmodifier.Object{
+							objectplanmodifier.UseStateForUnknown(),
+						},
+						Attributes: map[string]schema.Attribute{
+							// No framework Default here even though the API documents one
+							// (true on create). The default is the server's to own, so we
+							// leave it unset and read back whatever was applied; a
+							// provider-side booldefault would also only fire when the
+							// profile itself is present, making omit-the-block and
+							// omit-just-the-field behave differently for no good reason.
+							"enabled": schema.BoolAttribute{
+								MarkdownDescription: "Whether the addon profile is enabled. Defaults to `true`.",
+								Optional:            true,
+								Computed:            true,
+							},
+						},
 					},
 				},
 			},

@@ -79,8 +79,16 @@ type clusterNetworkModel struct {
 	ServiceCIDR types.String `tfsdk:"service_cidr"`
 }
 
+// addonsModel mirrors clusterAddonsV1. Each profile is an object rather than a
+// bare bool: the NKS spec models a profile as clusterAddonProfileV1
+// (`{enabled}`), so mirroring the wrapper lets a profile grow per-profile
+// settings later without a breaking change to this schema.
 type addonsModel struct {
-	Hardware types.Bool `tfsdk:"hardware"`
+	Hardware types.Object `tfsdk:"hardware"`
+}
+
+type addonProfileModel struct {
+	Enabled types.Bool `tfsdk:"enabled"`
 }
 
 func apiServerAttrTypes() map[string]attr.Type {
@@ -97,9 +105,15 @@ func clusterNetworkAttrTypes() map[string]attr.Type {
 	}
 }
 
+func addonProfileAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"enabled": types.BoolType,
+	}
+}
+
 func addonsAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"hardware": types.BoolType,
+		"hardware": types.ObjectType{AttrTypes: addonProfileAttrTypes()},
 	}
 }
 
@@ -194,7 +208,20 @@ func addonsObjectValue(source *nks.ClusterAddonsV1) types.Object {
 	}
 
 	return types.ObjectValueMust(addonsAttrTypes(), map[string]attr.Value{
-		"hardware": types.BoolPointerValue(source.Hardware),
+		"hardware": addonProfileObjectValue(source.Hardware),
+	})
+}
+
+// addonProfileObjectValue flattens one clusterAddonProfileV1. A nil profile is
+// the API omitting it entirely, which is distinct from a profile present with
+// `enabled: false` — so it maps to a null object rather than `{enabled: false}`.
+func addonProfileObjectValue(source *nks.ClusterAddonProfileV1) types.Object {
+	if source == nil {
+		return types.ObjectNull(addonProfileAttrTypes())
+	}
+
+	return types.ObjectValueMust(addonProfileAttrTypes(), map[string]attr.Value{
+		"enabled": types.BoolPointerValue(source.Enabled),
 	})
 }
 
@@ -354,6 +381,11 @@ func (m *KubernetesClusterModel) NscaleClusterCreateParams(
 			ApiServer:         spec.apiServer,
 			ClusterNetwork:    spec.clusterNetwork,
 			Addons:            spec.addons,
+			// Not exposed by this resource yet, so never sent. Worker SSH CA
+			// trust is immutable after creation, including whether it is set,
+			// which makes it a deliberate follow-up rather than something to
+			// wire up implicitly.
+			SshCertificateAuthorityId: nil,
 		},
 	}, diagnostics
 }
@@ -391,6 +423,9 @@ func (m *KubernetesClusterModel) NscaleClusterUpdateParams(
 			ApiServer:         spec.apiServer,
 			ClusterNetwork:    spec.clusterNetwork,
 			Addons:            spec.addons,
+			// See NscaleClusterCreateParams: not exposed, and immutable
+			// server-side anyway, so an update must not try to set it.
+			SshCertificateAuthorityId: nil,
 		},
 	}, diagnostics
 }
@@ -428,6 +463,13 @@ func (m *KubernetesClusterModel) apiServerRequest(
 		// already *bool, so encoding/json emits it explicitly.
 		PublicIP:     model.PublicIP.ValueBoolPointer(),
 		AllowedCidrs: allowedCIDRs,
+		// API server RBAC bindings and external JWT/OIDC issuers are not
+		// exposed by this resource yet. Both are immutable after creation
+		// (including whether they are set at all), so they need their own
+		// design rather than being inferred from anything here — and sending
+		// nil leaves the cluster on the cell-wide defaults.
+		Authorization:  nil,
+		Authentication: nil,
 	}, diagnostics
 }
 
@@ -463,7 +505,38 @@ func (m *KubernetesClusterModel) addonsRequest(ctx context.Context) (*nks.Cluste
 		return nil, diagnostics
 	}
 
+	hardware, hardwareDiagnostics := addonProfileRequest(ctx, model.Hardware)
+	if diagnostics.Append(hardwareDiagnostics...); diagnostics.HasError() {
+		return nil, diagnostics
+	}
+
 	return &nks.ClusterAddonsCreateV1{
-		Hardware: model.Hardware.ValueBoolPointer(),
+		Hardware: hardware,
+	}, diagnostics
+}
+
+// addonProfileRequest builds one clusterAddonProfileCreateV1 from a nested
+// profile object. An omitted or unresolved profile sends nothing, letting the
+// API apply its own default (hardware is enabled on create).
+func addonProfileRequest(
+	ctx context.Context,
+	profile types.Object,
+) (*nks.ClusterAddonProfileCreateV1, diag.Diagnostics) {
+	var diagnostics diag.Diagnostics
+
+	if profile.IsNull() || profile.IsUnknown() {
+		return nil, diagnostics
+	}
+
+	var model addonProfileModel
+	if diagnostics = profile.As(ctx, &model, basetypesObjectOptions()); diagnostics.HasError() {
+		return nil, diagnostics
+	}
+
+	return &nks.ClusterAddonProfileCreateV1{
+		// ValueBoolPointer yields a non-nil *bool for a configured false, so
+		// `enabled = false` stays on the wire rather than being dropped by
+		// omitempty and silently re-defaulted to true by the API.
+		Enabled: model.Enabled.ValueBoolPointer(),
 	}, diagnostics
 }

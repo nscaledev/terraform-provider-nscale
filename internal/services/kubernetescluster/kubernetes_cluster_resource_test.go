@@ -90,17 +90,27 @@ resource "nscale_kubernetes_cluster" "test" {
   network_id          = data.nscale_network.test.id
   platform_release_id = data.nscale_kubernetes_platform_releases.test.releases[0].id
 
+  # allowed_cidrs is set explicitly rather than left to the API default. It is
+  # Optional+Computed, so omitting it inside a block that IS present leaves it
+  # unknown on every subsequent plan, which would fail the PlanOnly step below
+  # for reasons unrelated to the bool round-trip this test is about.
   api_server = {
-    public_ip = false
+    public_ip     = false
+    allowed_cidrs = ["10.0.0.0/8"]
   }
 
   addons = {
-    hardware = false
+    hardware = {
+      enabled = false
+    }
   }
 }
 `, name)
 }
 
+// testAccClusterConfigClusterNetwork sets BOTH CIDRs explicitly. Configuring
+// only one would leave the other unknown between plans, which muddies what the
+// replacement assertion is actually proving.
 func testAccClusterConfigClusterNetwork(name, podCIDR string) string {
 	return testAccPlatformReleaseConfig() + fmt.Sprintf(`
 resource "nscale_kubernetes_cluster" "test" {
@@ -109,7 +119,8 @@ resource "nscale_kubernetes_cluster" "test" {
   platform_release_id = data.nscale_kubernetes_platform_releases.test.releases[0].id
 
   cluster_network = {
-    pod_cidr = %[2]q
+    pod_cidr     = %[2]q
+    service_cidr = "172.20.0.0/16"
   }
 }
 `, name, podCIDR)
@@ -211,7 +222,7 @@ func TestAccKubernetesClusterResource_boolZeroValues(t *testing.T) {
 				Config: testAccClusterConfigBoolZeroValues(name),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(clusterResourceName, "api_server.public_ip", "false"),
-					resource.TestCheckResourceAttr(clusterResourceName, "addons.hardware", "false"),
+					resource.TestCheckResourceAttr(clusterResourceName, "addons.hardware.enabled", "false"),
 				),
 			},
 			{
@@ -261,10 +272,13 @@ func TestAccKubernetesClusterResource_updateRelease(t *testing.T) {
 	})
 }
 
-// TestAccKubernetesClusterResource_updateClusterNetwork proves the mutable-CIDR
-// decision. If the API rejects or silently ignores a pod CIDR change, this fails
-// here rather than in a user's apply.
-func TestAccKubernetesClusterResource_updateClusterNetwork(t *testing.T) {
+// TestAccKubernetesClusterResource_replaceOnClusterNetworkChange pins the pod
+// CIDR as immutable. The underlying CRD enforces it with a CEL
+// `self == oldSelf` rule and the server returns 422
+// "clusterNetwork.podCidr is immutable", so the provider must plan a
+// replacement. If this ever reports an in-place update, applies start failing
+// with a 422 that the user cannot work around.
+func TestAccKubernetesClusterResource_replaceOnClusterNetworkChange(t *testing.T) {
 	name := acctest.RandomWithPrefix("tf-acc-test")
 
 	var clusterID string
@@ -283,13 +297,41 @@ func TestAccKubernetesClusterResource_updateClusterNetwork(t *testing.T) {
 			{
 				Config: testAccClusterConfigClusterNetwork(name, "10.244.0.0/16"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					expectClusterID(&clusterID, true),
+					expectClusterID(&clusterID, false),
 					resource.TestCheckResourceAttr(clusterResourceName, "cluster_network.pod_cidr", "10.244.0.0/16"),
 				),
 			},
 			{
 				Config:   testAccClusterConfigClusterNetwork(name, "10.244.0.0/16"),
 				PlanOnly: true,
+			},
+		},
+	})
+}
+
+// TestAccKubernetesClusterResource_replaceOnNameChange pins the rename as
+// immutable. The API returns 422 "cluster names are immutable", so a rename must
+// be planned as a replacement rather than an update.
+func TestAccKubernetesClusterResource_replaceOnNameChange(t *testing.T) {
+	name := acctest.RandomWithPrefix("tf-acc-test")
+	renamed := acctest.RandomWithPrefix("tf-acc-test")
+
+	var clusterID string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckNKS(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccClusterConfigBasic(name),
+				Check:  captureClusterID(&clusterID),
+			},
+			{
+				Config: testAccClusterConfigBasic(renamed),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					expectClusterID(&clusterID, false),
+					resource.TestCheckResourceAttr(clusterResourceName, "name", renamed),
+				),
 			},
 		},
 	})
