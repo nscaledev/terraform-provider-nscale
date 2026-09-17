@@ -365,6 +365,61 @@ func TestAccKubernetesClusterResource_replaceOnNetworkChange(t *testing.T) {
 // is read-only. project_id is Computed, so the framework must reject any attempt
 // to configure it — this is what stops users assuming the provider's usual
 // project_id argument applies here.
+// testAccClusterConfigNoWait is the concurrent-create path: the cluster returns
+// as soon as it exists so dependents can be created while it provisions.
+func testAccClusterConfigNoWait(name, description string) string {
+	return testAccPlatformReleaseConfig() + fmt.Sprintf(`
+resource "nscale_kubernetes_cluster" "test" {
+  name                 = %[1]q
+  description          = %[2]q
+  network_id           = data.nscale_network.test.id
+  platform_release_id  = data.nscale_kubernetes_platform_releases.test.releases[0].id
+  wait_for_provisioned = false
+}
+`, name, description)
+}
+
+// TestAccKubernetesClusterResource_noWaitUpdate is a regression test.
+//
+// With wait_for_provisioned = false, Update has no settled read to write into
+// state. An earlier version wrote request.Plan instead, which fails: nine
+// computed status attributes carry no UseStateForUnknown, so the framework
+// marks them unknown in an update plan, and persisting an unknown makes
+// Terraform reject the apply with "Provider produced invalid result object
+// after apply". The second step here is the one that catches it — a create
+// alone passes, because create sets state from the create response.
+func TestAccKubernetesClusterResource_noWaitUpdate(t *testing.T) {
+	name := acctest.RandomWithPrefix("tf-acc-test")
+
+	var clusterID string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckNKS(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccClusterConfigNoWait(name, "before"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					captureClusterID(&clusterID),
+					resource.TestCheckResourceAttr(clusterResourceName, "wait_for_provisioned", "false"),
+					// Not waiting, so the cluster is still coming up and its
+					// status describes the moment of creation.
+					resource.TestCheckResourceAttrSet(clusterResourceName, "provisioning_status"),
+				),
+			},
+			// THE regression: an in-place update on the no-wait path.
+			{
+				Config: testAccClusterConfigNoWait(name, "after"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					expectClusterID(&clusterID, true),
+					resource.TestCheckResourceAttr(clusterResourceName, "description", "after"),
+					resource.TestCheckResourceAttrSet(clusterResourceName, "provisioning_status"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccKubernetesClusterResource_rejectsSettingScope(t *testing.T) {
 	name := acctest.RandomWithPrefix("tf-acc-test")
 

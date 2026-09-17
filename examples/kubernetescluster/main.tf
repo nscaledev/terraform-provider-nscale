@@ -72,12 +72,6 @@ variable "api_server_allowed_cidrs" {
   default     = ["10.0.0.0/8"]
 }
 
-variable "hardware_addon_enabled" {
-  type        = bool
-  description = "Enable the optional hardware addon profile."
-  default     = true
-}
-
 locals {
   create_network = var.network_id == null
   network_id     = local.create_network ? nscale_network.main[0].id : data.nscale_network.existing[0].id
@@ -146,17 +140,29 @@ resource "nscale_kubernetes_cluster" "main" {
     allowed_cidrs = var.api_server_allowed_cidrs
   }
 
-  # A profile is an object, not a bool — the wrapper leaves room for per-profile
-  # settings beyond `enabled`.
-  addons = {
-    hardware = {
-      enabled = var.hardware_addon_enabled
-    }
-  }
+  # `addons` is omitted so the API applies its own defaults (hardware is enabled
+  # on create). It is Optional+Computed, so whatever the server chooses is read
+  # back into state — set the block explicitly only to override that.
 
   tags = {
     environment = "example"
   }
+
+  # Return as soon as the cluster exists, so the node pool below is POSTed while
+  # the cluster is still provisioning — which is what the console does, and what
+  # the API permits. Ordering becomes: create cluster, create pool, then read the
+  # settled cluster back through the data source at the bottom of this file.
+  #
+  # Nothing is unwaited-for. The pool's own wait covers the control plane, since
+  # workers cannot reach ready before the API server is up, so a control plane
+  # that fails still fails the apply. What this resource's status attributes lose
+  # is freshness: they describe the moment of creation until the next refresh,
+  # which is why the outputs read the data source instead.
+  #
+  # Set wait_for_provisioned = true (the default) if you would rather this
+  # resource block and have its own status be authoritative — the cost is that
+  # the pool then waits for the whole control-plane build before it starts.
+  wait_for_provisioned = false
 
   # `timeouts` is a block, so no `=`. Defaults are 60m create / 90m update /
   # 60m delete, sized from a measured 32-minute build. Override only to raise
@@ -170,4 +176,164 @@ resource "nscale_kubernetes_cluster" "main" {
   timeouts {
     create = "90m"
   }
+}
+
+# ---------------------------------------------------------------------------
+# Node pools
+#
+# Creating a cluster and adding a pool are separate actions, and a pool can be
+# added at any time — including before the cluster is provisioned and healthy.
+# NKS models pools as a separate top-level resource, so they reference the
+# cluster by ID rather than being a block on it, which is also what makes
+# Terraform create the cluster first and destroy the pools first.
+# ---------------------------------------------------------------------------
+
+# Set this and you get a worker pool, which is what you normally want. Left
+# null the pool is skipped: a cluster with no node pools is permitted by the API
+# and a legitimate thing to run, so the example does not force one.
+#
+# Flavor IDs are region-specific UUIDs, so there is no honest default to offer —
+# look one up with the region service, or `nscale flavor list`.
+variable "worker_flavor_id" {
+  type        = string
+  description = "Compute flavor each worker runs on. Must exist in the cluster's region. Null skips the pool."
+  default     = null
+}
+
+variable "worker_replicas" {
+  type        = number
+  description = "Workers in the on-demand pool. 0 is valid and keeps the pool definition without running workers."
+  default     = 2
+
+  validation {
+    condition     = var.worker_replicas >= 0
+    error_message = "worker_replicas cannot be negative."
+  }
+}
+
+# Set this to add a reservation-backed pool alongside the on-demand one. Left
+# null the pool is skipped, because a reservation-backed pool cannot be created
+# without reserved capacity to draw on.
+variable "gpu_reservation_id" {
+  type        = string
+  description = "Reservation to draw GPU capacity from. Leave null to skip the reservation-backed pool."
+  default     = null
+}
+
+variable "gpu_replicas" {
+  type        = number
+  description = "Workers in the reservation-backed pool. Changing this REBUILDS the pool — see the comment below."
+  default     = 1
+}
+
+# An on-demand pool. This is the one that behaves the way a Terraform user
+# expects: replicas, taints and labels are all in-place updates.
+resource "nscale_kubernetes_node_pool" "workers" {
+  count = var.worker_flavor_id == null ? 0 : 1
+
+  # name, cluster_id, provisioning_mode and compute.flavor_id are all immutable:
+  # the API rejects a change to any of them, so Terraform replaces the pool
+  # instead. A flavour change in particular is a full rebuild — to move a
+  # workload onto a different flavour without an outage, add a second pool and
+  # drain this one.
+  name        = "${var.name}-workers"
+  description = "On-demand workers managed by Terraform"
+
+  cluster_id        = nscale_kubernetes_cluster.main.id
+  provisioning_mode = "compute"
+  replicas          = var.worker_replicas
+
+  # Nested attribute, not a block — note the `=`. Exactly the block matching
+  # provisioning_mode must be present; supplying the other one, or both, fails
+  # at plan time rather than at apply.
+  compute = {
+    flavor_id = var.worker_flavor_id
+  }
+
+  # Editing taints or labels ROLLS THE POOL. NKS applies both during node
+  # registration and never reconciles them onto running nodes, so the only way a
+  # change takes effect is by replacing every worker — one at a time, draining
+  # each through the Eviction API. Terraform shows it as an ordinary in-place
+  # update, because at the API level that is exactly what it is.
+  #
+  # Watch up_to_date_replicas to follow a roll: it drops while workers are being
+  # replaced and returns to replicas when the roll finishes.
+  taints = [{
+    key    = "workload"
+    value  = "general"
+    effect = "PreferNoSchedule"
+  }]
+
+  labels = {
+    tier = "standard"
+  }
+
+  tags = {
+    environment = "example"
+  }
+
+  # Defaults are 30m create / 60m update / 60m delete. Update and delete are
+  # double create because both walk the pool one worker at a time: an update may
+  # roll every worker, and a delete drains every worker on the way out. Raise
+  # update for a large pool — cost is roughly replicas x per-node time.
+  #
+  # No timeout can be made safe against a PodDisruptionBudget that cannot be
+  # satisfied: there is no drain timeout upstream, so the block is indefinite and
+  # this deadline is the only bound. A timeout mid-roll does not mean the roll
+  # failed; the next apply resumes it.
+  timeouts {
+    update = "90m"
+  }
+}
+
+# A reservation-backed pool, drawing on capacity reserved through
+# nscale_reservation. This is the cross-resource story the cluster example does
+# not otherwise show.
+resource "nscale_kubernetes_node_pool" "gpu" {
+  count = var.gpu_reservation_id == null ? 0 : 1
+
+  name        = "${var.name}-gpu"
+  description = "Reservation-backed GPU workers managed by Terraform"
+
+  cluster_id        = nscale_kubernetes_cluster.main.id
+  provisioning_mode = "reservation"
+  replicas          = var.gpu_replicas
+
+  reservation = {
+    reservation_id = var.gpu_reservation_id
+  }
+
+  # A reservation pool is close to immutable, and this is the sharp edge worth
+  # knowing before you write it: the placement backing the pool NEVER ROLLS, so
+  # the API refuses any edit that could only take effect by recycling workers.
+  # replicas, taints and labels therefore all force REPLACEMENT here, not an
+  # update — `replicas 1 -> 2` is a rebuild that releases and re-claims the
+  # placement, not a scale. Only description and tags change in place.
+  #
+  # Terraform does warn about this one, because the plan shows a replacement.
+  taints = [{
+    key    = "nvidia.com/gpu"
+    value  = "true"
+    effect = "NoSchedule"
+  }]
+
+  tags = {
+    environment = "example"
+  }
+}
+
+# Read the cluster back once the pool exists. This is the "then wait for the
+# cluster" half of the ordering: by the time a pool is provisioned and healthy
+# the control plane is necessarily up, so this read returns settled values that
+# the resource above does not yet have.
+#
+# depends_on is what forces it to run last. Without it Terraform is free to read
+# the cluster at the same time it creates the pool, which would defeat the point.
+data "nscale_kubernetes_cluster" "ready" {
+  id = nscale_kubernetes_cluster.main.id
+
+  depends_on = [
+    nscale_kubernetes_node_pool.workers,
+    nscale_kubernetes_node_pool.gpu,
+  ]
 }

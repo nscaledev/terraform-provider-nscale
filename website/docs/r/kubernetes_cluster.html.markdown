@@ -195,22 +195,21 @@ For creates and updates, Terraform polls until three things are true at once:
 1. `status.observedGeneration` has caught up with the cluster's spec generation — until it has, the API is still
    reporting status for the *previous* version of the spec;
 2. `provisioning_status` is `provisioned`; and
-3. `health_status` is `healthy`.
 
 The first condition matters more than it looks. NKS projects status asynchronously and independently of the write
 itself, so a `provisioned` read taken too soon after an apply describes the cluster as it was *before* your change.
 Waiting on it is what guarantees the computed attributes written to state — `api_server_endpoint`,
 `kubernetes_version_*`, `applied_platform_release_id` — describe the cluster you just asked for.
 
-A cluster that reports `provisioned` but `health_status = "error"` is treated as a failure, not a success. Transitional
-health (`degraded`, `unknown`) is neither: the provider keeps waiting, because addons and node registration settle after
-the control plane first reports provisioned.
+~> **Health does not gate the apply.** NKS defines convergence as the generation being observed plus
+`provisioning_status` reaching `provisioned`, and documents health as an independent signal that "does not determine
+convergence". A cluster can therefore report `degraded` — or `error` — on a successful apply; a single NotReady worker
+in one node pool is enough. Read `health_status` to judge whether the cluster is actually well. This matches every
+other resource in this provider, none of which waits on health.
 
-Both statuses are aggregates over the whole cluster rather than its control plane alone. `provisioning_status` folds in
-infrastructure, the control plane, core and hardware addons, authorization and **every node pool**; `health_status`
-requires the control plane healthy with no pool, addon or authorization degraded. A cluster is therefore not
-`provisioned` while any of its node pools is scaling or rolling, so an apply that overlaps a node pool roll waits for
-that roll to complete before returning.
+`provisioning_status` is an aggregate over the whole cluster rather than its control plane alone: it folds in
+infrastructure, the control plane, core and hardware addons, authorization and **every node pool**. So an apply that
+overlaps a node pool roll can wait for that roll to complete before returning.
 
 Deletes poll until the cluster is gone. If the cluster flips to an error state *after* deprovisioning has begun, that
 is a terminal delete failure and Terraform reports it immediately rather than waiting out the timeout.
@@ -224,7 +223,7 @@ The `timeouts` block supports:
 * `delete` - (Default `60m`)
 
 These defaults are deliberately generous. A cluster measured on a development environment took **32 minutes** to reach
-`provisioned` and `healthy`; the defaults allow roughly twice that, because build time varies with region and load.
+`provisioned`; the defaults allow roughly twice that, because build time varies with region and load.
 `update` is longer still, since changing `platform_release_id` is a rolling control-plane upgrade rather than a
 configuration write.
 
@@ -238,6 +237,12 @@ progress and Terraform eventually times out with the cluster still present and s
 not help; resolve the PDB inside the cluster and re-run `terraform destroy`.
 
 ## Import
+
+-> **`timeouts` and `wait_for_provisioned` always show a diff on the first plan after an import.** Neither is returned
+by the API — they are provider-side behaviour — so an import cannot recover them. `wait_for_provisioned` is seeded to
+its default of `true`, which imports cleanly unless your configuration sets it to `false`. Applying the diff is
+harmless; it only writes the values into state.
+
 
 Kubernetes clusters can be imported using the cluster ID:
 

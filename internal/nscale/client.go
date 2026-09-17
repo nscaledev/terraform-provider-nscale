@@ -151,6 +151,20 @@ func (c *Client) RequireNKS() (nks.ClientInterface, diag.Diagnostics) { //nolint
 	return c.NKS, diagnostics
 }
 
+// DiagnosticsError flattens diagnostics into an error, for the paths that must
+// return the (value, error) shape the shared readers and watchers expect. Only
+// used for the RequireNKS guard above, which is a configuration error rather
+// than an API failure — hence its home next to it.
+func DiagnosticsError(diagnostics diag.Diagnostics) error {
+	if !diagnostics.HasError() {
+		return nil
+	}
+
+	first := diagnostics.Errors()[0]
+
+	return fmt.Errorf("%s: %s", first.Summary(), first.Detail())
+}
+
 // ResolveProjectID returns the project ID a project-scoped resource should use:
 // the resource's own value when set, otherwise the provider-level default. The
 // provider treats project_id as optional at configuration time, so the

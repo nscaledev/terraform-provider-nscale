@@ -26,6 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -33,6 +34,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	"github.com/nscaledev/terraform-provider-nscale/internal/nkswait"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 )
@@ -52,6 +54,11 @@ var (
 
 type KubernetesClusterResourceModel struct {
 	KubernetesClusterModel
+
+	// WaitForProvisioned is provider behaviour rather than cluster state, so it
+	// lives here and not on KubernetesClusterModel — the data source shares that
+	// model and must not grow an attribute the API never returns.
+	WaitForProvisioned types.Bool `tfsdk:"wait_for_provisioned"`
 
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
@@ -107,6 +114,23 @@ func (r *KubernetesClusterResource) ImportState(
 	response *resource.ImportStateResponse,
 ) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), request, response)
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	// Provider-side only, so the API cannot tell us what it was. Seed the schema
+	// default rather than leaving it null, which would show as a null -> true
+	// diff on the first plan after an import.
+	//
+	// A config that sets wait_for_provisioned = false still shows one diff after
+	// import (true -> false). That is unavoidable for an attribute the API never
+	// returns — the same reason `timeouts` does it — so it belongs in
+	// ImportStateVerifyIgnore next to timeouts rather than being worked around.
+	// Seeding the default is still the better of the two options, because it
+	// makes the common case (config omits it, or sets true) import cleanly.
+	response.Diagnostics.Append(
+		response.State.SetAttribute(ctx, path.Root("wait_for_provisioned"), true)...,
+	)
 }
 
 func (r *KubernetesClusterResource) Schema(
@@ -375,6 +399,39 @@ func (r *KubernetesClusterResource) Schema(
 				MarkdownDescription: "Whether at least one eligible platform release upgrade target was observed.",
 				Computed:            true,
 			},
+			// Opt out of the readiness wait, so a node pool in the same apply is
+			// created while the cluster is still provisioning rather than after
+			// it. The API permits that — the console POSTs both in the same
+			// breath — but Terraform orders the pool behind this resource
+			// because it references the cluster ID, and there is no way to
+			// depend on a resource existing without also depending on its
+			// Create having finished.
+			//
+			// Default true, which keeps the safe contract: a finished apply
+			// means a usable cluster with every status attribute populated.
+			//
+			// Setting this false moves the waiting elsewhere, and something must
+			// pick it up. A node pool does so implicitly — workers cannot reach
+			// ready before the control plane is up, so a failed control plane
+			// still fails the apply. For the cluster's own observed status, read
+			// it back through the nscale_kubernetes_cluster DATA SOURCE with
+			// depends_on set to the pool; the resource's status attributes are
+			// whatever the create response said and stay stale until the next
+			// refresh. Scaleway is the only other provider that splits the wait
+			// this way, and it documents the missing re-read as a footgun — the
+			// data source is how this provider avoids it.
+			"wait_for_provisioned": schema.BoolAttribute{
+				MarkdownDescription: "Whether `terraform apply` blocks until the cluster reports " +
+					"`provisioned`. Defaults to `true`. " +
+					"Set to `false` to return as soon as the cluster exists, so node pools in the same apply " +
+					"are created while it is still provisioning rather than afterwards. " +
+					"When `false` this resource's status attributes and `api_server_endpoint` describe the " +
+					"moment of creation and stay stale until the next refresh — read them back through the " +
+					"`nscale_kubernetes_cluster` data source, with `depends_on` set to a node pool.",
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(true),
+			},
 			"eligible_upgrade_target_ids": schema.ListAttribute{
 				MarkdownDescription: "Eligible platform release IDs, in upgrade order. " +
 					"Empty when eligibility was observed and no upgrade is available.",
@@ -445,6 +502,13 @@ func (r *KubernetesClusterResource) Create(
 		return
 	}
 
+	// State already holds the ID and every argument from the create response, so
+	// returning here leaves Terraform tracking a real cluster — only its
+	// observed status is not yet filled in.
+	if !data.WaitForProvisioned.ValueBool() {
+		return
+	}
+
 	timeout, diagnostics := data.Timeouts.Create(ctx, defaultCreateTimeout)
 	response.Diagnostics.Append(diagnostics...)
 	if response.Diagnostics.HasError() {
@@ -480,7 +544,7 @@ func (r *KubernetesClusterResource) Read(
 
 	cluster, err := getCluster(ctx, r.client, id)
 	if err != nil {
-		if isNotFound(err) {
+		if nkswait.IsNotFound(err) {
 			response.Diagnostics.AddWarning(
 				"Kubernetes Cluster Not Found",
 				fmt.Sprintf(
@@ -540,12 +604,29 @@ func (r *KubernetesClusterResource) Update(
 	}
 	defer updateResponse.Body.Close()
 
-	if _, readErr := nscale.ReadJSONResponsePointer[nks.ClusterV1Read](updateResponse); readErr != nil {
+	cluster, readErr := nscale.ReadJSONResponsePointer[nks.ClusterV1Read](updateResponse)
+	if readErr != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
 		response.Diagnostics.AddError(
 			"Failed to Update Kubernetes Cluster",
 			fmt.Sprintf("An error occurred while updating the cluster: %s", readErr),
 		)
+		return
+	}
+
+	// Not waiting, so the update response is the only concrete read available —
+	// use it rather than the plan.
+	//
+	// Writing the plan here would be a bug: nine computed status attributes
+	// deliberately carry no UseStateForUnknown (see the schema), so the
+	// framework marks every one of them unknown in an update plan. Persisting
+	// those unknowns makes Terraform reject the apply with "Provider produced
+	// invalid result object after apply", on exactly the path this flag exists
+	// for. The response's status describes the pre-update generation, which is
+	// the trade already accepted by not waiting.
+	if !data.WaitForProvisioned.ValueBool() {
+		data.KubernetesClusterModel = NewKubernetesClusterModel(cluster)
+		response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 		return
 	}
 
@@ -555,9 +636,9 @@ func (r *KubernetesClusterResource) Update(
 		return
 	}
 
-	// The response body above is discarded on purpose: its status still describes
-	// the pre-update generation. Only the settled read from the waiter is safe to
-	// write into state.
+	// The response body above is deliberately NOT used on this path: its status
+	// still describes the pre-update generation. Only the settled read from the
+	// waiter is safe to write into state when we are waiting.
 	final, err := waitClusterProvisioned(ctx, r.client, id, timeout)
 	if err != nil {
 		response.Diagnostics.AddError(
@@ -601,7 +682,7 @@ func (r *KubernetesClusterResource) Delete(
 	}
 	defer deleteResponse.Body.Close()
 
-	if readErr := nscale.ReadEmptyResponse(deleteResponse); readErr != nil && !isNotFound(readErr) {
+	if readErr := nscale.ReadEmptyResponse(deleteResponse); readErr != nil && !nkswait.IsNotFound(readErr) {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
 		response.Diagnostics.AddError(
 			"Failed to Delete Kubernetes Cluster",

@@ -399,6 +399,11 @@ linters:
         - github.com/hashicorp/terraform-plugin-framework/datasource.DataSource
         - github.com/hashicorp/terraform-plugin-framework/attr.Value
         - github.com/hashicorp/terraform-plugin-framework/schema/validator.String
+        # Plan modifiers are interfaces too, and a shared predicate is worth a
+        # helper rather than three copies of the same closure inline in a schema.
+        - github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier.Int64
+        - github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier.List
+        - github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier.Map
 
     wrapcheck:
       # Errors from these packages are surfaced to TF Diagnostics as-is — the framework
@@ -421,6 +426,13 @@ linters:
         - .ReadJSONResponse(
         - .ReadJSONResponsePointer(
         - .IsAPIErrorInUse(
+      # internal/nkswait already phrases its errors for a practitioner and names
+      # the resource kind ("waiting for node pool to be provisioned: ..."), and
+      # its callers hand them straight to a Terraform diagnostic. Wrapping again
+      # would only prefix a second copy of the same sentence. Its signatures are
+      # generic, which ignore-sigs cannot match on.
+      ignore-package-globs:
+        - github.com/nscaledev/terraform-provider-nscale/internal/nkswait
 
   exclusions:
     # Log a warning if an exclusion rule is unused.

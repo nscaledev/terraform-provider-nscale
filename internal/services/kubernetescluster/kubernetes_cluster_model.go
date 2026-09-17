@@ -25,6 +25,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
 
 // KubernetesClusterModel is the Terraform view of an NKS cluster.
@@ -141,7 +143,7 @@ func NewKubernetesClusterModel(source *nks.ClusterV1Read) KubernetesClusterModel
 		ID:          types.StringValue(metadata.Id),
 		Name:        types.StringValue(metadata.Name),
 		Description: types.StringPointerValue(metadata.Description),
-		Tags:        tagMapValueMust(metadata.Tags),
+		Tags:        tftypes.TagMapValueMust(metadata.Tags),
 
 		NetworkID:         types.StringValue(spec.NetworkId),
 		PlatformReleaseID: types.StringValue(spec.PlatformReleaseId),
@@ -345,8 +347,8 @@ func (m *KubernetesClusterModel) writeSpec(ctx context.Context) (writeSpec, diag
 	}, diagnostics
 }
 
-func (m *KubernetesClusterModel) metadataRequest(ctx context.Context) (nks.ResourceMetadata, diag.Diagnostics) {
-	tags, diagnostics := valueTagListPointer(ctx, m.Tags)
+func (m *KubernetesClusterModel) metadataRequest() (nks.ResourceMetadata, diag.Diagnostics) {
+	tagList, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return nks.ResourceMetadata{}, diagnostics
 	}
@@ -354,7 +356,7 @@ func (m *KubernetesClusterModel) metadataRequest(ctx context.Context) (nks.Resou
 	return nks.ResourceMetadata{
 		Name:        m.Name.ValueString(),
 		Description: m.Description.ValueStringPointer(),
-		Tags:        tags,
+		Tags:        nscale.TagsToAPI[nks.Tag](tagList),
 	}, diagnostics
 }
 
@@ -362,7 +364,7 @@ func (m *KubernetesClusterModel) metadataRequest(ctx context.Context) (nks.Resou
 func (m *KubernetesClusterModel) NscaleClusterCreateParams(
 	ctx context.Context,
 ) (nks.ClusterV1Create, diag.Diagnostics) {
-	metadata, diagnostics := m.metadataRequest(ctx)
+	metadata, diagnostics := m.metadataRequest()
 	if diagnostics.HasError() {
 		return nks.ClusterV1Create{}, diagnostics
 	}
@@ -404,7 +406,7 @@ func (m *KubernetesClusterModel) NscaleClusterCreateParams(
 func (m *KubernetesClusterModel) NscaleClusterUpdateParams(
 	ctx context.Context,
 ) (nks.ClusterV1Update, diag.Diagnostics) {
-	metadata, diagnostics := m.metadataRequest(ctx)
+	metadata, diagnostics := m.metadataRequest()
 	if diagnostics.HasError() {
 		return nks.ClusterV1Update{}, diagnostics
 	}
