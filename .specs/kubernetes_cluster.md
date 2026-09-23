@@ -640,8 +640,9 @@ Flagging rather than expanding scope — that is the ticket owner's call, and th
 node pool spec (`NodePoolRequestSpecV1`: provisioning modes, taints,
 reservations, flavours, autoscaling) is comparable in size to this one.
 
-Node pools are now specified separately (`.specs/kubernetes_node_pool.md`, PR
-#77). Nothing about their attribute surface belongs here, but two of their
+Node pools shipped separately (PR #77); their attribute surface is documented
+in `website/docs/r/kubernetes_node_pool.html.markdown`. Nothing about it
+belongs here, but two of their
 properties reach back into this resource and are covered above: the cluster's
 `provisioned`/`healthy` aggregate includes every pool
 ([waiter semantics](#what-those-statuses-aggregate-upstream)), and pool node
@@ -890,7 +891,7 @@ median — a 30m default would pass on a fast day and fail on a slow one.
    **The lesson worth keeping: verify mutability against the CRD and a real
    mutation, not against the OpenAPI annotations.**
 5. **Node pools — separate ticket?** A cluster without them has no workers. See
-   scope note above. Now specified in `.specs/kubernetes_node_pool.md` (PR #77).
+   scope note above. Shipped in PR #77.
 6. **`nscale_kubernetes_cluster_auth` fast-follow — confirm deferred.** This spec
    ships the documented `exec` block only.
 7. **Three new immutable spec fields — model now or defer?** The canonical spec

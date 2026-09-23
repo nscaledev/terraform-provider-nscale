@@ -15,32 +15,20 @@ limitations under the License.
 */
 
 // Package nkswait decides when an asynchronous NKS write has finished, and
-// blocks until it has.
+// blocks until it has. Every NKS resource shares one settledness rule and one
+// status decision table, so they live here once rather than per resource
+// package.
 //
-// Every NKS resource shares one settledness rule and one status decision table,
-// so they live here once rather than per resource package. The CLI centralises
-// the same logic in its statuswait package; a second copy in the provider would
-// be the copy that drifts.
+// It does not use internal/nscale's shared Create/Update/DeleteStateWatcher,
+// which have no concept of observedGeneration. NKS projects status
+// asynchronously and independently of the write, so a "provisioned" read taken
+// too early describes the PREVIOUS spec, and the shared create watcher would
+// return success while writing stale endpoints into state. See IsSettled.
+// (They are also typed on the shared SDK enums, which Go will not bridge to
+// the structurally-identical ones NKS generates.)
 //
-// This package deliberately does not use internal/nscale's shared
-// CreateStateWatcher / UpdateStateWatcher / DeleteStateWatcher. Two reasons,
-// both specific to NKS:
-//
-//  1. The shared watchers key off nscale.ResourceStatus, which is typed on
-//     nscale-sdk-go/common's provisioning-status and tag types. NKS generates
-//     its own structurally-identical enums, and Go will not bridge them.
-//
-//  2. The shared watchers have no concept of observedGeneration. NKS projects
-//     status asynchronously and independently of the write itself, so a
-//     "provisioned" read taken too early describes the PREVIOUS spec. The
-//     shared create watcher would return success while writing stale endpoints
-//     and versions into state. See IsSettled.
-//
-// Note that this package does NOT gate on healthStatus, matching both the
-// shared watchers and every other resource in this provider. See Classify.
-//
-// If a future refactor generalises the shared watchers over observedGeneration,
-// this package should collapse into that.
+// This package does NOT gate on healthStatus, matching the shared watchers and
+// every other resource in this provider. See Classify.
 package nkswait
 
 import (
@@ -51,15 +39,18 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
-const (
-	// Poll timing. 15s is deliberately slower than the 5s/3s the playbook
-	// suggests for the control plane: an NKS build takes tens of minutes, so a
-	// tighter interval only adds API load and log noise without finishing
-	// sooner.
+// Poll timing. 15s is deliberately slower than the 5s/3s the playbook suggests
+// for the control plane: an NKS build takes tens of minutes, so a tighter
+// interval only adds API load and log noise without finishing sooner.
+//
+// Variables rather than constants so the tests can wind them down — pollDelay
+// gates the FIRST read, so a test timeout shorter than it never polls at all.
+var (
 	pollDelay      = 15 * time.Second
 	pollMinTimeout = 15 * time.Second
 )
@@ -85,7 +76,7 @@ const (
 // over the metadata pointer and the generation its own status carries, and
 // nothing here needs to know which resource it is looking at.
 type Status struct {
-	Metadata           *nks.ProjectScopedResourceReadMetadataV1
+	Metadata           *kubernetesapi.ProjectScopedResourceReadMetadataV1
 	ObservedGeneration *int64
 }
 
@@ -103,11 +94,10 @@ type Status struct {
 // A nil observedGeneration means no projection has completed yet — treat as
 // not settled, never as settled-at-zero.
 //
-// This is the NKS-native equivalent of the operation-tag round-trip that
-// internal/nscale's UpdateStateWatcher uses for the cache-backed region API.
-// observedGeneration is strictly better: nothing is written into user-visible
-// tags, so there is no strip-on-read step, and it covers create as well as
-// update.
+// This is the NKS-native equivalent of the operation-tag round-trip
+// internal/nscale's UpdateStateWatcher uses, which is why the NKS models need
+// no RemoveOperationTags step on read: nothing is written into user-visible
+// tags in the first place.
 func IsSettled(status Status) bool {
 	if status.Metadata == nil || status.ObservedGeneration == nil {
 		return false
@@ -123,35 +113,26 @@ func IsSettled(status Status) bool {
 // not be acted on — including an error, which may belong to a spec the user has
 // already replaced.
 //
-// healthStatus is deliberately NOT consulted. NKS defines convergence as
-// observedGeneration catching up plus provisioningStatus reaching provisioned,
-// and says so explicitly: "Health is an independent signal and does not
-// determine convergence… a resource can make provisioning progress while
-// reporting healthy, degraded, or unknown health" (nks-core
-// docs/api-commentary.yaml). Health is a runtime property of a Kubernetes
-// cluster — a single NotReady node makes a perfectly well-provisioned pool
-// degraded — so waiting for healthy hangs on resources the API considers done.
-// Observed on staging 2026-09-16: a pool sat at provisioned/degraded with "one
-// or more node pool workers are not ready" and an earlier version of this
-// function polled it to the deadline.
-//
-// This also matches every other resource in the provider: internal/nscale's
-// shared watchers target {provisioned, error} on provisioningStatus alone and
-// never read health. Callers expose health_status as a computed attribute so a
-// practitioner can see and act on it.
+// healthStatus is deliberately NOT consulted. NKS says so explicitly: "Health
+// is an independent signal and does not determine convergence" (nks-core
+// docs/api-commentary.yaml). A single NotReady node degrades a perfectly
+// well-provisioned pool, so waiting for healthy hangs on resources the API
+// considers done — observed on staging 2026-09-16, where an earlier version of
+// this function polled a provisioned/degraded pool to the deadline. Callers
+// expose health_status as a computed attribute instead.
 func Classify(status Status) string {
 	if !IsSettled(status) {
 		return StateSettling
 	}
 
 	switch status.Metadata.ProvisioningStatus {
-	case nks.ResourceProvisioningStatusError:
+	case kubernetesapi.ResourceProvisioningStatusError:
 		return StateFailed
-	case nks.ResourceProvisioningStatusDeprovisioning:
+	case kubernetesapi.ResourceProvisioningStatusDeprovisioning:
 		return StateDeleting
-	case nks.ResourceProvisioningStatusPending, nks.ResourceProvisioningStatusProvisioning:
+	case kubernetesapi.ResourceProvisioningStatusPending, kubernetesapi.ResourceProvisioningStatusProvisioning:
 		return StateProvisioning
-	case nks.ResourceProvisioningStatusProvisioned:
+	case kubernetesapi.ResourceProvisioningStatusProvisioned:
 		return StateReady
 	default:
 		return StateProvisioning
@@ -166,14 +147,11 @@ func FailureDetail(status Status) string {
 		return "no status was reported"
 	}
 
-	// Quote whichever detail describes what is actually wrong. The provisioning
-	// detail wins only when provisioning is itself the problem: a pool can sit
-	// at provisioned with the cheerful "node pool is available" while health is
-	// degraded with "one or more node pool workers are not ready", and quoting
-	// the former in a failed or timed-out wait states the opposite of the truth.
-	// Observed against staging on 2026-09-16, where a worker came up but never
-	// went Ready.
-	if status.Metadata.ProvisioningStatus == nks.ResourceProvisioningStatusProvisioned {
+	// Quote whichever detail describes what is actually wrong. A pool can sit at
+	// provisioned with the cheerful "node pool is available" while health is
+	// degraded with "one or more node pool workers are not ready", so on a
+	// provisioned resource the health detail is the one worth reporting.
+	if status.Metadata.ProvisioningStatus == kubernetesapi.ResourceProvisioningStatusProvisioned {
 		if detail := status.Metadata.HealthStatusDetail; detail != nil {
 			return fmt.Sprintf("%s: %s", detail.Reason, detail.Message)
 		}
@@ -225,59 +203,73 @@ type Target[T any] struct {
 // AND reports provisioned. Health is not consulted — see Classify. Used by both
 // create and update: the settledness rule makes them the same problem.
 func Provisioned[T any](ctx context.Context, target Target[T]) (*T, error) {
+	// WaitForStateContext discards its last result on timeout and on context
+	// cancellation — it returns a bare (nil, err). Remembering the last read
+	// here is what lets the timeout error quote the status we actually saw.
+	var last *T
+
+	refresh := target.refresh(ctx, StateGone)
+
 	stateChange := &retry.StateChangeConf{
 		// StateGone is pending, not an error: immediately after create the
 		// resource may not yet be readable through the API's cache.
-		Pending:    []string{StateSettling, StateProvisioning, StateDeleting, StateGone},
-		Target:     []string{StateReady},
-		Refresh:    target.refresh(ctx, StateGone),
+		Pending: []string{StateSettling, StateProvisioning, StateDeleting, StateGone},
+		Target:  []string{StateReady},
+		Refresh: func() (any, string, error) {
+			raw, state, err := refresh()
+			if value, ok := raw.(*T); ok {
+				last = value
+			}
+
+			return raw, state, err
+		},
 		Timeout:    target.Timeout,
 		Delay:      pollDelay,
 		MinTimeout: pollMinTimeout,
 	}
 
 	raw, err := stateChange.WaitForStateContext(ctx)
-
-	value, ok := raw.(*T)
-	if !ok {
-		if err != nil {
-			return nil, fmt.Errorf("waiting for %s to be provisioned: %w", target.Kind, err)
-		}
-		// Unreachable in practice: the refresh function only ever yields a *T or
-		// an error. Fail loudly rather than hand back a nil value the caller
-		// would dereference.
-		return nil, fmt.Errorf(
-			"waiting for %s to be provisioned: unexpected refresh result of type %T",
-			target.Kind, raw,
-		)
+	if value, ok := raw.(*T); ok {
+		last = value
 	}
 
 	if err == nil {
-		return value, nil
+		if last == nil {
+			// Unreachable in practice: a nil error means the refresh function
+			// reached the target state, which it can only do by yielding a *T.
+			// Fail loudly rather than hand back a nil the caller would dereference.
+			return nil, fmt.Errorf("waiting for %s to be provisioned: refresh returned no result", target.Kind)
+		}
+
+		return last, nil
 	}
 
-	status := target.Inspect(value)
+	if last == nil {
+		return nil, fmt.Errorf("waiting for %s to be provisioned: %w", target.Kind, err)
+	}
+
+	status := target.Inspect(last)
 
 	// StateChangeConf reports an unexpected state as a generic error; replace it
 	// with the API's own explanation of what went wrong.
 	if Classify(status) == StateFailed {
-		return value, fmt.Errorf("%s entered a failed state — %s", target.Kind, FailureDetail(status))
+		return last, fmt.Errorf("%s entered a failed state — %s", target.Kind, FailureDetail(status))
 	}
 
 	// Not a failure, so the operation is most likely still running: nothing
-	// upstream sets a drain timeout, which means an unsatisfiable
-	// PodDisruptionBudget blocks a roll indefinitely and this timeout is the
-	// only bound. The work resumes on the next apply, so say so rather than
-	// leaving a bare deadline that reads like a broken resource.
-	if detail, reported := target.lastReported(value); reported {
-		return value, fmt.Errorf(
+	// upstream sets a drain timeout, so an unsatisfiable PodDisruptionBudget
+	// blocks a roll indefinitely and this timeout is the only bound. The work
+	// resumes on the next apply, so say so rather than leaving a bare deadline
+	// that reads like a broken resource.
+	if detail, reported := target.lastReported(last); reported {
+		return last, fmt.Errorf(
 			"waiting for %s to be provisioned: %w — last reported %s; "+
 				"the operation may still be in progress remotely, in which case the next apply resumes it",
 			target.Kind, err, detail,
 		)
 	}
 
-	return value, fmt.Errorf("waiting for %s to be provisioned: %w", target.Kind, err)
+	return last, fmt.Errorf("waiting for %s to be provisioned: %w", target.Kind, err)
 }
 
 // Deleted blocks until the resource is gone.

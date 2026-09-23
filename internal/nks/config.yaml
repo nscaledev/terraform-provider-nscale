@@ -1,7 +1,0 @@
-package: nks
-output: nks.gen.go
-generate:
-  client: true
-  models: true
-output-options:
-  skip-prune: true

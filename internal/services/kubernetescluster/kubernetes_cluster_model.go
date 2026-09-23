@@ -24,7 +24,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
@@ -134,7 +135,7 @@ func apiServerEndpointAttrTypes() map[string]attr.Type {
 }
 
 // NewKubernetesClusterModel maps an API read object into the Terraform model.
-func NewKubernetesClusterModel(source *nks.ClusterV1Read) KubernetesClusterModel {
+func NewKubernetesClusterModel(source *kubernetesapi.ClusterV1Read) KubernetesClusterModel {
 	metadata := source.Metadata
 	spec := source.Spec
 	status := source.Status
@@ -173,7 +174,7 @@ func NewKubernetesClusterModel(source *nks.ClusterV1Read) KubernetesClusterModel
 	}
 }
 
-func apiServerObjectValue(source *nks.ClusterApiServerAccessV1) types.Object {
+func apiServerObjectValue(source *kubernetesapi.ClusterApiServerAccessV1) types.Object {
 	if source == nil {
 		return types.ObjectNull(apiServerAttrTypes())
 	}
@@ -193,7 +194,7 @@ func apiServerObjectValue(source *nks.ClusterApiServerAccessV1) types.Object {
 	})
 }
 
-func clusterNetworkObjectValue(source *nks.ClusterNetworkV1) types.Object {
+func clusterNetworkObjectValue(source *kubernetesapi.ClusterNetworkV1) types.Object {
 	if source == nil {
 		return types.ObjectNull(clusterNetworkAttrTypes())
 	}
@@ -204,7 +205,7 @@ func clusterNetworkObjectValue(source *nks.ClusterNetworkV1) types.Object {
 	})
 }
 
-func addonsObjectValue(source *nks.ClusterAddonsV1) types.Object {
+func addonsObjectValue(source *kubernetesapi.ClusterAddonsV1) types.Object {
 	if source == nil {
 		return types.ObjectNull(addonsAttrTypes())
 	}
@@ -217,7 +218,7 @@ func addonsObjectValue(source *nks.ClusterAddonsV1) types.Object {
 // addonProfileObjectValue flattens one clusterAddonProfileV1. A nil profile is
 // the API omitting it entirely, which is distinct from a profile present with
 // `enabled: false` — so it maps to a null object rather than `{enabled: false}`.
-func addonProfileObjectValue(source *nks.ClusterAddonProfileV1) types.Object {
+func addonProfileObjectValue(source *kubernetesapi.ClusterAddonProfileV1) types.Object {
 	if source == nil {
 		return types.ObjectNull(addonProfileAttrTypes())
 	}
@@ -227,7 +228,7 @@ func addonProfileObjectValue(source *nks.ClusterAddonProfileV1) types.Object {
 	})
 }
 
-func apiServerEndpointObjectValue(source *nks.ClusterApiServerStatusV1) types.Object {
+func apiServerEndpointObjectValue(source *kubernetesapi.ClusterApiServerStatusV1) types.Object {
 	// status.apiServer is absent until the control plane is reachable, so a null
 	// object here is the normal pre-provisioned state, not an error.
 	if source == nil {
@@ -257,7 +258,7 @@ const (
 	versionObserved
 )
 
-func kubernetesVersionValue(source *nks.ClusterKubernetesVersionStatusV1, field versionField) types.String {
+func kubernetesVersionValue(source *kubernetesapi.ClusterKubernetesVersionStatusV1, field versionField) types.String {
 	if source == nil {
 		return types.StringNull()
 	}
@@ -277,7 +278,7 @@ const (
 	releaseUpgradeAvailable
 )
 
-func releaseBoolValue(source *nks.ClusterReleaseStatusV1, field releaseField) types.Bool {
+func releaseBoolValue(source *kubernetesapi.ClusterReleaseStatusV1, field releaseField) types.Bool {
 	if source == nil {
 		return types.BoolNull()
 	}
@@ -294,7 +295,7 @@ func releaseBoolValue(source *nks.ClusterReleaseStatusV1, field releaseField) ty
 	return types.BoolNull()
 }
 
-func appliedReleaseIDValue(source *nks.ClusterReleaseStatusV1) types.String {
+func appliedReleaseIDValue(source *kubernetesapi.ClusterReleaseStatusV1) types.String {
 	if source == nil {
 		return types.StringNull()
 	}
@@ -302,7 +303,7 @@ func appliedReleaseIDValue(source *nks.ClusterReleaseStatusV1) types.String {
 	return types.StringValue(source.AppliedId)
 }
 
-func eligibleTargetsValue(source *nks.ClusterReleaseStatusV1) types.List {
+func eligibleTargetsValue(source *kubernetesapi.ClusterReleaseStatusV1) types.List {
 	if source == nil {
 		return types.ListNull(types.StringType)
 	}
@@ -317,9 +318,9 @@ func eligibleTargetsValue(source *nks.ClusterReleaseStatusV1) types.List {
 type writeSpec struct {
 	networkID         string
 	platformReleaseID string
-	apiServer         *nks.ClusterApiServerAccessV1
-	clusterNetwork    *nks.ClusterNetworkV1
-	addons            *nks.ClusterAddonsCreateV1
+	apiServer         *kubernetesapi.ClusterApiServerAccessV1
+	clusterNetwork    *kubernetesapi.ClusterNetworkV1
+	addons            *kubernetesapi.ClusterAddonsCreateV1
 }
 
 func (m *KubernetesClusterModel) writeSpec(ctx context.Context) (writeSpec, diag.Diagnostics) {
@@ -347,37 +348,37 @@ func (m *KubernetesClusterModel) writeSpec(ctx context.Context) (writeSpec, diag
 	}, diagnostics
 }
 
-func (m *KubernetesClusterModel) metadataRequest() (nks.ResourceMetadata, diag.Diagnostics) {
+func (m *KubernetesClusterModel) metadataRequest() (kubernetesapi.ResourceMetadata, diag.Diagnostics) {
 	tagList, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
-		return nks.ResourceMetadata{}, diagnostics
+		return kubernetesapi.ResourceMetadata{}, diagnostics
 	}
 
-	return nks.ResourceMetadata{
+	return kubernetesapi.ResourceMetadata{
 		Name:        m.Name.ValueString(),
 		Description: m.Description.ValueStringPointer(),
-		Tags:        nscale.TagsToAPI[nks.Tag](tagList),
+		Tags:        nscale.TagsToAPI[kubernetesapi.Tag](tagList),
 	}, diagnostics
 }
 
 // NscaleClusterCreateParams builds the POST body.
 func (m *KubernetesClusterModel) NscaleClusterCreateParams(
 	ctx context.Context,
-) (nks.ClusterV1Create, diag.Diagnostics) {
+) (kubernetesapi.ClusterV1Create, diag.Diagnostics) {
 	metadata, diagnostics := m.metadataRequest()
 	if diagnostics.HasError() {
-		return nks.ClusterV1Create{}, diagnostics
+		return kubernetesapi.ClusterV1Create{}, diagnostics
 	}
 
 	spec, specDiagnostics := m.writeSpec(ctx)
 	diagnostics.Append(specDiagnostics...)
 	if diagnostics.HasError() {
-		return nks.ClusterV1Create{}, diagnostics
+		return kubernetesapi.ClusterV1Create{}, diagnostics
 	}
 
-	return nks.ClusterV1Create{
+	return kubernetesapi.ClusterV1Create{
 		Metadata: metadata,
-		Spec: nks.ClusterCreateSpecV1{
+		Spec: kubernetesapi.ClusterCreateSpecV1{
 			NetworkId:         spec.networkID,
 			PlatformReleaseId: spec.platformReleaseID,
 			ApiServer:         spec.apiServer,
@@ -405,21 +406,21 @@ func (m *KubernetesClusterModel) NscaleClusterCreateParams(
 // rather than ever reaching this path.
 func (m *KubernetesClusterModel) NscaleClusterUpdateParams(
 	ctx context.Context,
-) (nks.ClusterV1Update, diag.Diagnostics) {
+) (kubernetesapi.ClusterV1Update, diag.Diagnostics) {
 	metadata, diagnostics := m.metadataRequest()
 	if diagnostics.HasError() {
-		return nks.ClusterV1Update{}, diagnostics
+		return kubernetesapi.ClusterV1Update{}, diagnostics
 	}
 
 	spec, specDiagnostics := m.writeSpec(ctx)
 	diagnostics.Append(specDiagnostics...)
 	if diagnostics.HasError() {
-		return nks.ClusterV1Update{}, diagnostics
+		return kubernetesapi.ClusterV1Update{}, diagnostics
 	}
 
-	return nks.ClusterV1Update{
+	return kubernetesapi.ClusterV1Update{
 		Metadata: metadata,
-		Spec: nks.ClusterUpdateSpecV1{
+		Spec: kubernetesapi.ClusterUpdateSpecV1{
 			NetworkId:         spec.networkID,
 			PlatformReleaseId: spec.platformReleaseID,
 			ApiServer:         spec.apiServer,
@@ -434,7 +435,7 @@ func (m *KubernetesClusterModel) NscaleClusterUpdateParams(
 
 func (m *KubernetesClusterModel) apiServerRequest(
 	ctx context.Context,
-) (*nks.ClusterApiServerAccessV1, diag.Diagnostics) {
+) (*kubernetesapi.ClusterApiServerAccessV1, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	// Unknown means Terraform has not resolved the value yet (a computed
@@ -459,7 +460,7 @@ func (m *KubernetesClusterModel) apiServerRequest(
 		allowedCIDRs = &cidrs
 	}
 
-	return &nks.ClusterApiServerAccessV1{
+	return &kubernetesapi.ClusterApiServerAccessV1{
 		// ValueBoolPointer yields a non-nil *bool for a configured false, which is
 		// what keeps `public_ip = false` on the wire. The generated field is
 		// already *bool, so encoding/json emits it explicitly.
@@ -477,7 +478,7 @@ func (m *KubernetesClusterModel) apiServerRequest(
 
 func (m *KubernetesClusterModel) clusterNetworkRequest(
 	ctx context.Context,
-) (*nks.ClusterNetworkV1, diag.Diagnostics) {
+) (*kubernetesapi.ClusterNetworkV1, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	if m.ClusterNetwork.IsNull() || m.ClusterNetwork.IsUnknown() {
@@ -489,13 +490,15 @@ func (m *KubernetesClusterModel) clusterNetworkRequest(
 		return nil, diagnostics
 	}
 
-	return &nks.ClusterNetworkV1{
+	return &kubernetesapi.ClusterNetworkV1{
 		PodCidr:     model.PodCIDR.ValueStringPointer(),
 		ServiceCidr: model.ServiceCIDR.ValueStringPointer(),
 	}, diagnostics
 }
 
-func (m *KubernetesClusterModel) addonsRequest(ctx context.Context) (*nks.ClusterAddonsCreateV1, diag.Diagnostics) {
+func (m *KubernetesClusterModel) addonsRequest(
+	ctx context.Context,
+) (*kubernetesapi.ClusterAddonsCreateV1, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	if m.Addons.IsNull() || m.Addons.IsUnknown() {
@@ -512,7 +515,7 @@ func (m *KubernetesClusterModel) addonsRequest(ctx context.Context) (*nks.Cluste
 		return nil, diagnostics
 	}
 
-	return &nks.ClusterAddonsCreateV1{
+	return &kubernetesapi.ClusterAddonsCreateV1{
 		Hardware: hardware,
 	}, diagnostics
 }
@@ -523,7 +526,7 @@ func (m *KubernetesClusterModel) addonsRequest(ctx context.Context) (*nks.Cluste
 func addonProfileRequest(
 	ctx context.Context,
 	profile types.Object,
-) (*nks.ClusterAddonProfileCreateV1, diag.Diagnostics) {
+) (*kubernetesapi.ClusterAddonProfileCreateV1, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	if profile.IsNull() || profile.IsUnknown() {
@@ -535,7 +538,7 @@ func addonProfileRequest(
 		return nil, diagnostics
 	}
 
-	return &nks.ClusterAddonProfileCreateV1{
+	return &kubernetesapi.ClusterAddonProfileCreateV1{
 		// ValueBoolPointer yields a non-nil *bool for a configured false, so
 		// `enabled = false` stays on the wire rather than being dropped by
 		// omitempty and silently re-defaulted to true by the API.

@@ -33,7 +33,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nkswait"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -194,7 +195,10 @@ func (r *KubernetesNodePoolResource) Schema(
 					stringplanmodifier.RequiresReplace(),
 				},
 				Validators: []validator.String{
-					stringvalidator.OneOf(string(nks.Compute), string(nks.Reservation)),
+					stringvalidator.OneOf(
+						string(kubernetesapi.NodePoolProvisioningModeV1Compute),
+						string(kubernetesapi.NodePoolProvisioningModeV1Reservation),
+					),
 				},
 			},
 			"replicas": schema.Int64Attribute{
@@ -286,9 +290,9 @@ func (r *KubernetesNodePoolResource) Schema(
 							Required:            true,
 							Validators: []validator.String{
 								stringvalidator.OneOf(
-									string(nks.NoSchedule),
-									string(nks.PreferNoSchedule),
-									string(nks.NoExecute),
+									string(kubernetesapi.NodePoolTaintV1EffectNoSchedule),
+									string(kubernetesapi.NodePoolTaintV1EffectPreferNoSchedule),
+									string(kubernetesapi.NodePoolTaintV1EffectNoExecute),
 								),
 							},
 						},
@@ -445,7 +449,7 @@ func (r *KubernetesNodePoolResource) Create(
 	}
 	defer createResponse.Body.Close()
 
-	pool, err := nscale.ReadJSONResponsePointer[nks.NodePoolV1Read](createResponse)
+	pool, err := nscale.ReadJSONResponsePointer[kubernetesapi.NodePoolV1Read](createResponse)
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
@@ -560,7 +564,7 @@ func (r *KubernetesNodePoolResource) Update(
 	}
 	defer updateResponse.Body.Close()
 
-	if _, readErr := nscale.ReadJSONResponsePointer[nks.NodePoolV1Read](updateResponse); readErr != nil {
+	if _, readErr := nscale.ReadJSONResponsePointer[kubernetesapi.NodePoolV1Read](updateResponse); readErr != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
 		response.Diagnostics.AddError(
 			"Failed to Update Kubernetes Node Pool",

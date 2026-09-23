@@ -33,7 +33,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nkswait"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
@@ -483,7 +484,7 @@ func (r *KubernetesClusterResource) Create(
 	}
 	defer createResponse.Body.Close()
 
-	cluster, err := nscale.ReadJSONResponsePointer[nks.ClusterV1Read](createResponse)
+	cluster, err := nscale.ReadJSONResponsePointer[kubernetesapi.ClusterV1Read](createResponse)
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(
@@ -604,7 +605,7 @@ func (r *KubernetesClusterResource) Update(
 	}
 	defer updateResponse.Body.Close()
 
-	cluster, readErr := nscale.ReadJSONResponsePointer[nks.ClusterV1Read](updateResponse)
+	cluster, readErr := nscale.ReadJSONResponsePointer[kubernetesapi.ClusterV1Read](updateResponse)
 	if readErr != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, readErr)
 		response.Diagnostics.AddError(

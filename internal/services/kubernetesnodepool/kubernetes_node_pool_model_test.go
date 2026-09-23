@@ -26,7 +26,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
 )
 
 func testCreationTime(t *testing.T) time.Time {
@@ -55,11 +55,11 @@ func objectValue(t *testing.T, attrTypes map[string]attr.Type, values map[string
 
 // fullComputePool is a compute pool read with every optional field populated —
 // the shape a provisioned, healthy pool comes back as.
-func fullComputePool(t *testing.T) *nks.NodePoolV1Read {
+func fullComputePool(t *testing.T) *kubernetesapi.NodePoolV1Read {
 	t.Helper()
 
-	return &nks.NodePoolV1Read{
-		Metadata: nks.ProjectScopedResourceReadMetadataV1{
+	return &kubernetesapi.NodePoolV1Read{
+		Metadata: kubernetesapi.ProjectScopedResourceReadMetadataV1{
 			Id:                 "pool-abc",
 			Name:               "workers",
 			Description:        new("general purpose workers"),
@@ -67,24 +67,24 @@ func fullComputePool(t *testing.T) *nks.NodePoolV1Read {
 			ProjectId:          "proj-1",
 			Generation:         3,
 			CreationTime:       testCreationTime(t),
-			ProvisioningStatus: nks.ResourceProvisioningStatusProvisioned,
-			HealthStatus:       nks.ResourceHealthStatusHealthy,
-			Tags:               &nks.TagList{{Name: "env", Value: "prod"}},
+			ProvisioningStatus: kubernetesapi.ResourceProvisioningStatusProvisioned,
+			HealthStatus:       kubernetesapi.ResourceHealthStatusHealthy,
+			Tags:               &kubernetesapi.TagList{{Name: "env", Value: "prod"}},
 		},
-		Spec: nks.NodePoolSpecV1{
+		Spec: kubernetesapi.NodePoolSpecV1{
 			ClusterId:        "cluster-1",
-			ProvisioningMode: nks.Compute,
+			ProvisioningMode: kubernetesapi.NodePoolProvisioningModeV1Compute,
 			Replicas:         3,
-			Compute:          &nks.NodePoolComputeV1{FlavorId: new("flavor-1")},
-			Taints: &[]nks.NodePoolTaintV1{
-				{Key: "workload", Value: new("general"), Effect: nks.PreferNoSchedule},
+			Compute:          &kubernetesapi.NodePoolComputeV1{FlavorId: new("flavor-1")},
+			Taints: &[]kubernetesapi.NodePoolTaintV1{
+				{Key: "workload", Value: new("general"), Effect: kubernetesapi.NodePoolTaintV1EffectPreferNoSchedule},
 				// A taint with no value is legal, and is the row that catches a
 				// converter treating the empty string and absent as the same.
-				{Key: "dedicated", Effect: nks.NoSchedule},
+				{Key: "dedicated", Effect: kubernetesapi.NodePoolTaintV1EffectNoSchedule},
 			},
-			Labels: &nks.NodePoolLabelsV1{"tier": "standard", "blank": ""},
+			Labels: &kubernetesapi.NodePoolLabelsV1{"tier": "standard", "blank": ""},
 		},
-		Status: nks.NodePoolStatusV1{
+		Status: kubernetesapi.NodePoolStatusV1{
 			RegionId:           "region-1",
 			ObservedGeneration: new(int64(3)),
 			KubernetesVersion:  new("v1.33.1"),
@@ -92,7 +92,7 @@ func fullComputePool(t *testing.T) *nks.NodePoolV1Read {
 			CurrentReplicas:    new(3),
 			ReadyReplicas:      new(3),
 			UpToDateReplicas:   new(3),
-			Release: &nks.NodePoolReleaseStatusV1{
+			Release: &kubernetesapi.NodePoolReleaseStatusV1{
 				AppliedId:         "rel-2",
 				KubernetesVersion: "v1.33.1",
 				Deprecated:        new(false),
@@ -245,23 +245,23 @@ func TestNewKubernetesNodePoolModelLabels(t *testing.T) {
 func TestNewKubernetesNodePoolModelReservation(t *testing.T) {
 	t.Parallel()
 
-	pool := &nks.NodePoolV1Read{
-		Metadata: nks.ProjectScopedResourceReadMetadataV1{
+	pool := &kubernetesapi.NodePoolV1Read{
+		Metadata: kubernetesapi.ProjectScopedResourceReadMetadataV1{
 			Id:                 "pool-gpu",
 			Name:               "gpu",
 			CreationTime:       testCreationTime(t),
-			ProvisioningStatus: nks.ResourceProvisioningStatusProvisioned,
-			HealthStatus:       nks.ResourceHealthStatusHealthy,
+			ProvisioningStatus: kubernetesapi.ResourceProvisioningStatusProvisioned,
+			HealthStatus:       kubernetesapi.ResourceHealthStatusHealthy,
 		},
-		Spec: nks.NodePoolSpecV1{
+		Spec: kubernetesapi.NodePoolSpecV1{
 			ClusterId:        "cluster-1",
-			ProvisioningMode: nks.Reservation,
+			ProvisioningMode: kubernetesapi.NodePoolProvisioningModeV1Reservation,
 			Replicas:         2,
-			Reservation:      &nks.NodePoolReservationV1{ReservationId: new("res-1")},
+			Reservation:      &kubernetesapi.NodePoolReservationV1{ReservationId: new("res-1")},
 		},
-		Status: nks.NodePoolStatusV1{
+		Status: kubernetesapi.NodePoolStatusV1{
 			RegionId: "region-1",
-			Reservation: &nks.NodePoolReservationStatusV1{
+			Reservation: &kubernetesapi.NodePoolReservationStatusV1{
 				ReservationId: new("res-1"),
 				PlacementId:   new("place-1"),
 			},
@@ -296,21 +296,21 @@ func TestNewKubernetesNodePoolModelReservation(t *testing.T) {
 func TestNewKubernetesNodePoolModelMinimal(t *testing.T) {
 	t.Parallel()
 
-	pool := &nks.NodePoolV1Read{
-		Metadata: nks.ProjectScopedResourceReadMetadataV1{
+	pool := &kubernetesapi.NodePoolV1Read{
+		Metadata: kubernetesapi.ProjectScopedResourceReadMetadataV1{
 			Id:                 "pool-new",
 			Name:               "workers",
 			CreationTime:       testCreationTime(t),
-			ProvisioningStatus: nks.ResourceProvisioningStatusPending,
-			HealthStatus:       nks.ResourceHealthStatusUnknown,
+			ProvisioningStatus: kubernetesapi.ResourceProvisioningStatusPending,
+			HealthStatus:       kubernetesapi.ResourceHealthStatusUnknown,
 		},
-		Spec: nks.NodePoolSpecV1{
+		Spec: kubernetesapi.NodePoolSpecV1{
 			ClusterId:        "cluster-1",
-			ProvisioningMode: nks.Compute,
+			ProvisioningMode: kubernetesapi.NodePoolProvisioningModeV1Compute,
 			Replicas:         0,
-			Compute:          &nks.NodePoolComputeV1{FlavorId: new("flavor-1")},
+			Compute:          &kubernetesapi.NodePoolComputeV1{FlavorId: new("flavor-1")},
 		},
-		Status: nks.NodePoolStatusV1{RegionId: "region-1"},
+		Status: kubernetesapi.NodePoolStatusV1{RegionId: "region-1"},
 	}
 
 	model := NewKubernetesNodePoolModel(pool)
@@ -486,7 +486,7 @@ func TestUpdateParamsResendsTaintsAndLabels(t *testing.T) {
 		t.Fatalf("taints were dropped from the update payload: %+v", params.Spec.Taints)
 	}
 	taint := (*params.Spec.Taints)[0]
-	if taint.Key != "workload" || taint.Effect != nks.NoExecute {
+	if taint.Key != "workload" || taint.Effect != kubernetesapi.NodePoolTaintV1EffectNoExecute {
 		t.Errorf("taint = %+v, want the configured workload/NoExecute taint", taint)
 	}
 	// A null value must not become a pointer to the empty string: that would
@@ -531,7 +531,7 @@ func TestWriteSpecOmitsAbsentCapacityBlock(t *testing.T) {
 	if params.Spec.Reservation == nil || *params.Spec.Reservation.ReservationId != "res-1" {
 		t.Errorf("reservation = %+v, want res-1", params.Spec.Reservation)
 	}
-	if params.Spec.ProvisioningMode != nks.Reservation {
+	if params.Spec.ProvisioningMode != kubernetesapi.NodePoolProvisioningModeV1Reservation {
 		t.Errorf("ProvisioningMode = %q, want reservation", params.Spec.ProvisioningMode)
 	}
 

@@ -24,7 +24,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
 )
@@ -122,7 +123,7 @@ func taintObjectType() types.ObjectType {
 }
 
 // NewKubernetesNodePoolModel maps an API read object into the Terraform model.
-func NewKubernetesNodePoolModel(source *nks.NodePoolV1Read) KubernetesNodePoolModel {
+func NewKubernetesNodePoolModel(source *kubernetesapi.NodePoolV1Read) KubernetesNodePoolModel {
 	metadata := source.Metadata
 	spec := source.Spec
 	status := source.Status
@@ -164,7 +165,7 @@ func NewKubernetesNodePoolModel(source *nks.NodePoolV1Read) KubernetesNodePoolMo
 	}
 }
 
-func computeObjectValue(source *nks.NodePoolComputeV1) types.Object {
+func computeObjectValue(source *kubernetesapi.NodePoolComputeV1) types.Object {
 	if source == nil {
 		return types.ObjectNull(computeAttrTypes())
 	}
@@ -174,7 +175,7 @@ func computeObjectValue(source *nks.NodePoolComputeV1) types.Object {
 	})
 }
 
-func reservationObjectValue(source *nks.NodePoolReservationV1) types.Object {
+func reservationObjectValue(source *kubernetesapi.NodePoolReservationV1) types.Object {
 	if source == nil {
 		return types.ObjectNull(reservationAttrTypes())
 	}
@@ -191,7 +192,7 @@ func reservationObjectValue(source *nks.NodePoolReservationV1) types.Object {
 // reordering diffs. Absent stays null rather than becoming an empty list —
 // "this pool has no taints configured" and "the API did not report taints" are
 // the same fact here, but only null matches a config that omits the attribute.
-func taintsListValue(source *[]nks.NodePoolTaintV1) types.List {
+func taintsListValue(source *[]kubernetesapi.NodePoolTaintV1) types.List {
 	if source == nil {
 		return types.ListNull(taintObjectType())
 	}
@@ -211,7 +212,7 @@ func taintsListValue(source *[]nks.NodePoolTaintV1) types.List {
 // labelsMapValue flattens the labels object. An empty label value is legal in
 // Kubernetes and meaningful — the label is still applied — so it maps to an
 // empty string rather than being dropped.
-func labelsMapValue(source *nks.NodePoolLabelsV1) types.Map {
+func labelsMapValue(source *kubernetesapi.NodePoolLabelsV1) types.Map {
 	if source == nil {
 		return types.MapNull(types.StringType)
 	}
@@ -237,7 +238,7 @@ func int64PointerValue(value *int) types.Int64 {
 
 // placementIDValue reads the placement the pool created inside its reservation.
 // Null on a compute pool, and on a reservation pool until the placement exists.
-func placementIDValue(source *nks.NodePoolReservationStatusV1) types.String {
+func placementIDValue(source *kubernetesapi.NodePoolReservationStatusV1) types.String {
 	if source == nil {
 		return types.StringNull()
 	}
@@ -255,7 +256,7 @@ const (
 // releaseStringValue reads one required string off the pinned release status. A
 // nil release is the API not having reported one yet, which is distinct from an
 // empty value.
-func releaseStringValue(source *nks.NodePoolReleaseStatusV1, field releaseStringField) types.String {
+func releaseStringValue(source *kubernetesapi.NodePoolReleaseStatusV1, field releaseStringField) types.String {
 	if source == nil {
 		return types.StringNull()
 	}
@@ -274,7 +275,7 @@ const (
 	releaseWithdrawn
 )
 
-func releaseBoolValue(source *nks.NodePoolReleaseStatusV1, field releaseBoolField) types.Bool {
+func releaseBoolValue(source *kubernetesapi.NodePoolReleaseStatusV1, field releaseBoolField) types.Bool {
 	if source == nil {
 		return types.BoolNull()
 	}
@@ -292,19 +293,19 @@ func releaseBoolValue(source *nks.NodePoolReleaseStatusV1, field releaseBoolFiel
 // NscaleNodePoolCreateParams builds the POST body.
 func (m *KubernetesNodePoolModel) NscaleNodePoolCreateParams(
 	ctx context.Context,
-) (nks.NodePoolV1Create, diag.Diagnostics) {
+) (kubernetesapi.NodePoolV1Create, diag.Diagnostics) {
 	metadata, diagnostics := m.metadataRequest()
 	if diagnostics.HasError() {
-		return nks.NodePoolV1Create{}, diagnostics
+		return kubernetesapi.NodePoolV1Create{}, diagnostics
 	}
 
 	spec, specDiagnostics := m.writeSpec(ctx)
 	diagnostics.Append(specDiagnostics...)
 	if diagnostics.HasError() {
-		return nks.NodePoolV1Create{}, diagnostics
+		return kubernetesapi.NodePoolV1Create{}, diagnostics
 	}
 
-	return nks.NodePoolV1Create{Metadata: metadata, Spec: spec}, diagnostics
+	return kubernetesapi.NodePoolV1Create{Metadata: metadata, Spec: spec}, diagnostics
 }
 
 // NscaleNodePoolUpdateParams builds the PUT body.
@@ -321,36 +322,38 @@ func (m *KubernetesNodePoolModel) NscaleNodePoolCreateParams(
 // request bodies drifting apart.
 func (m *KubernetesNodePoolModel) NscaleNodePoolUpdateParams(
 	ctx context.Context,
-) (nks.NodePoolV1Update, diag.Diagnostics) {
+) (kubernetesapi.NodePoolV1Update, diag.Diagnostics) {
 	metadata, diagnostics := m.metadataRequest()
 	if diagnostics.HasError() {
-		return nks.NodePoolV1Update{}, diagnostics
+		return kubernetesapi.NodePoolV1Update{}, diagnostics
 	}
 
 	spec, specDiagnostics := m.writeSpec(ctx)
 	diagnostics.Append(specDiagnostics...)
 	if diagnostics.HasError() {
-		return nks.NodePoolV1Update{}, diagnostics
+		return kubernetesapi.NodePoolV1Update{}, diagnostics
 	}
 
-	return nks.NodePoolV1Update{Metadata: metadata, Spec: spec}, diagnostics
+	return kubernetesapi.NodePoolV1Update{Metadata: metadata, Spec: spec}, diagnostics
 }
 
-func (m *KubernetesNodePoolModel) metadataRequest() (nks.ResourceMetadata, diag.Diagnostics) {
+func (m *KubernetesNodePoolModel) metadataRequest() (kubernetesapi.ResourceMetadata, diag.Diagnostics) {
 	tagList, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
-		return nks.ResourceMetadata{}, diagnostics
+		return kubernetesapi.ResourceMetadata{}, diagnostics
 	}
 
-	return nks.ResourceMetadata{
+	return kubernetesapi.ResourceMetadata{
 		Name:        m.Name.ValueString(),
 		Description: m.Description.ValueStringPointer(),
-		Tags:        nscale.TagsToAPI[nks.Tag](tagList),
+		Tags:        nscale.TagsToAPI[kubernetesapi.Tag](tagList),
 	}, diagnostics
 }
 
 // writeSpec builds the request spec shared by create and update.
-func (m *KubernetesNodePoolModel) writeSpec(ctx context.Context) (nks.NodePoolRequestSpecV1, diag.Diagnostics) {
+func (m *KubernetesNodePoolModel) writeSpec(
+	ctx context.Context,
+) (kubernetesapi.NodePoolRequestSpecV1, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	compute, computeDiagnostics := m.computeRequest(ctx)
@@ -366,12 +369,12 @@ func (m *KubernetesNodePoolModel) writeSpec(ctx context.Context) (nks.NodePoolRe
 	diagnostics.Append(labelsDiagnostics...)
 
 	if diagnostics.HasError() {
-		return nks.NodePoolRequestSpecV1{}, diagnostics
+		return kubernetesapi.NodePoolRequestSpecV1{}, diagnostics
 	}
 
-	return nks.NodePoolRequestSpecV1{
+	return kubernetesapi.NodePoolRequestSpecV1{
 		ClusterId:        m.ClusterID.ValueString(),
-		ProvisioningMode: nks.NodePoolProvisioningModeV1(m.ProvisioningMode.ValueString()),
+		ProvisioningMode: kubernetesapi.NodePoolProvisioningModeV1(m.ProvisioningMode.ValueString()),
 		// Replicas is a plain int with no omitempty in the generated client, so a
 		// zero serialises explicitly and scale-to-zero reaches the API. The
 		// schema bounds the value to the API's 0..2147483647, so the narrowing
@@ -387,7 +390,7 @@ func (m *KubernetesNodePoolModel) writeSpec(ctx context.Context) (nks.NodePoolRe
 
 func (m *KubernetesNodePoolModel) computeRequest(
 	ctx context.Context,
-) (*nks.NodePoolComputeV1, diag.Diagnostics) {
+) (*kubernetesapi.NodePoolComputeV1, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	// Unknown means Terraform has not resolved the value yet; null means the
@@ -402,14 +405,14 @@ func (m *KubernetesNodePoolModel) computeRequest(
 		return nil, diagnostics
 	}
 
-	return &nks.NodePoolComputeV1{
+	return &kubernetesapi.NodePoolComputeV1{
 		FlavorId: model.FlavorID.ValueStringPointer(),
 	}, diagnostics
 }
 
 func (m *KubernetesNodePoolModel) reservationRequest(
 	ctx context.Context,
-) (*nks.NodePoolReservationV1, diag.Diagnostics) {
+) (*kubernetesapi.NodePoolReservationV1, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	if m.Reservation.IsNull() || m.Reservation.IsUnknown() {
@@ -421,7 +424,7 @@ func (m *KubernetesNodePoolModel) reservationRequest(
 		return nil, diagnostics
 	}
 
-	return &nks.NodePoolReservationV1{
+	return &kubernetesapi.NodePoolReservationV1{
 		ReservationId: model.ReservationID.ValueStringPointer(),
 	}, diagnostics
 }
@@ -431,7 +434,7 @@ func (m *KubernetesNodePoolModel) reservationRequest(
 // clearing taints is expressible.
 func (m *KubernetesNodePoolModel) taintsRequest(
 	ctx context.Context,
-) (*[]nks.NodePoolTaintV1, diag.Diagnostics) {
+) (*[]kubernetesapi.NodePoolTaintV1, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	if m.Taints.IsNull() || m.Taints.IsUnknown() {
@@ -443,12 +446,12 @@ func (m *KubernetesNodePoolModel) taintsRequest(
 		return nil, diagnostics
 	}
 
-	taints := make([]nks.NodePoolTaintV1, 0, len(models))
+	taints := make([]kubernetesapi.NodePoolTaintV1, 0, len(models))
 	for _, model := range models {
-		taints = append(taints, nks.NodePoolTaintV1{
+		taints = append(taints, kubernetesapi.NodePoolTaintV1{
 			Key:    model.Key.ValueString(),
 			Value:  model.Value.ValueStringPointer(),
-			Effect: nks.NodePoolTaintV1Effect(model.Effect.ValueString()),
+			Effect: kubernetesapi.NodePoolTaintV1Effect(model.Effect.ValueString()),
 		})
 	}
 
@@ -459,7 +462,7 @@ func (m *KubernetesNodePoolModel) taintsRequest(
 // terms as taintsRequest.
 func (m *KubernetesNodePoolModel) labelsRequest(
 	ctx context.Context,
-) (*nks.NodePoolLabelsV1, diag.Diagnostics) {
+) (*kubernetesapi.NodePoolLabelsV1, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	if m.Labels.IsNull() || m.Labels.IsUnknown() {
@@ -471,7 +474,7 @@ func (m *KubernetesNodePoolModel) labelsRequest(
 		return nil, diagnostics
 	}
 
-	labels := nks.NodePoolLabelsV1(data)
+	labels := kubernetesapi.NodePoolLabelsV1(data)
 
 	return &labels, diagnostics
 }

@@ -29,7 +29,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
 )
 
 // provisioning_mode does double duty: it gates which capacity block is valid,
@@ -62,7 +62,7 @@ func configuredMode(ctx context.Context, config tfsdk.Config) (string, diag.Diag
 func isReservationMode(ctx context.Context, config tfsdk.Config) (bool, diag.Diagnostics) {
 	mode, diagnostics := configuredMode(ctx, config)
 
-	return mode == string(nks.Reservation), diagnostics
+	return mode == string(kubernetesapi.NodePoolProvisioningModeV1Reservation), diagnostics
 }
 
 // A reservation pool is backed by a placement, and a placement never rolls:
@@ -162,10 +162,10 @@ func checkCapacityMode(mode string, computeSet, reservationSet bool) []capacityM
 	var requiredSet, forbiddenSet bool
 
 	switch mode {
-	case string(nks.Compute):
+	case string(kubernetesapi.NodePoolProvisioningModeV1Compute):
 		required, requiredSet = computeAttribute, computeSet
 		forbidden, forbiddenSet = reservationAttribute, reservationSet
-	case string(nks.Reservation):
+	case string(kubernetesapi.NodePoolProvisioningModeV1Reservation):
 		required, requiredSet = reservationAttribute, reservationSet
 		forbidden, forbiddenSet = computeAttribute, computeSet
 	default:

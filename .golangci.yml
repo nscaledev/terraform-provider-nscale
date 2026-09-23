@@ -493,6 +493,12 @@ linters:
         linters: [gochecknoglobals]
       - path: 'version/version\.go$'
         linters: [gochecknoglobals]
+      # nkswait's poll timing is package-level so the tests can wind it down:
+      # pollDelay gates the first read, so a test timeout shorter than it never
+      # polls at all and the timeout-error path cannot be exercised.
+      - path: 'internal/nkswait/nkswait\.go$'
+        text: '^poll\w+ is a global variable'
+        linters: [gochecknoglobals]
 
       # Schema(...) functions are flat attribute declarations — long but not complex.
       - source: 'func \(.+\) Schema\('

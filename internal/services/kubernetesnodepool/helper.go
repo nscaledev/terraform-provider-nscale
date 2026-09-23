@@ -21,7 +21,8 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
@@ -43,7 +44,7 @@ func getNodePool(
 	ctx context.Context,
 	client *nscale.Client,
 	id string,
-) (*nks.NodePoolV1Read, error) {
+) (*kubernetesapi.NodePoolV1Read, error) {
 	nksClient, diagnostics := client.RequireNKS()
 	if diagnostics.HasError() {
 		return nil, nscale.DiagnosticsError(diagnostics)
@@ -55,5 +56,5 @@ func getNodePool(
 	}
 	defer response.Body.Close()
 
-	return nscale.ReadJSONResponsePointer[nks.NodePoolV1Read](response)
+	return nscale.ReadJSONResponsePointer[kubernetesapi.NodePoolV1Read](response)
 }

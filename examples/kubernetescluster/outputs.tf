@@ -3,8 +3,8 @@ output "nscale_kubernetes_cluster_id" {
   value       = nscale_kubernetes_cluster.main.id
 }
 
-# project_id and region_id are inherited from the attached network rather than
-# configured, so echoing them back shows which scope the cluster landed in.
+# project_id and region_id are inherited from the network, not configured, so
+# echoing them back shows which scope the cluster landed in.
 output "nscale_kubernetes_cluster_project_id" {
   description = "The project the cluster landed in, inherited from its network."
   value       = nscale_kubernetes_cluster.main.project_id
@@ -64,7 +64,6 @@ output "nscale_kubernetes_node_pool_workers_id" {
   value       = one(nscale_kubernetes_node_pool.workers[*].id)
 }
 
-# ready_replicas against replicas is the useful health read on a pool.
 # up_to_date_replicas is the one to watch during a roll: it drops below replicas
 # while workers are being replaced and recovers when the roll completes.
 output "nscale_kubernetes_node_pool_workers_ready" {

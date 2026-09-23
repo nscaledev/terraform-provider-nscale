@@ -20,7 +20,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nkswait"
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
@@ -57,13 +58,13 @@ func clusterTarget(
 	client *nscale.Client,
 	id string,
 	timeout time.Duration,
-) nkswait.Target[nks.ClusterV1Read] {
-	return nkswait.Target[nks.ClusterV1Read]{
+) nkswait.Target[kubernetesapi.ClusterV1Read] {
+	return nkswait.Target[kubernetesapi.ClusterV1Read]{
 		Kind: "cluster",
-		Get: func(ctx context.Context) (*nks.ClusterV1Read, error) {
+		Get: func(ctx context.Context) (*kubernetesapi.ClusterV1Read, error) {
 			return getCluster(ctx, client, id)
 		},
-		Inspect: func(cluster *nks.ClusterV1Read) nkswait.Status {
+		Inspect: func(cluster *kubernetesapi.ClusterV1Read) nkswait.Status {
 			return nkswait.Status{
 				Metadata:           &cluster.Metadata,
 				ObservedGeneration: cluster.Status.ObservedGeneration,
@@ -74,14 +75,15 @@ func clusterTarget(
 }
 
 // waitClusterProvisioned blocks until the cluster's status has caught up with
-// its spec AND reports provisioned + healthy. Used by both create and update:
-// the settledness rule makes them the same problem.
+// its spec and reports provisioned. Health is not consulted — see
+// nkswait.Classify. Used by both create and update: the settledness rule makes
+// them the same problem.
 func waitClusterProvisioned(
 	ctx context.Context,
 	client *nscale.Client,
 	id string,
 	timeout time.Duration,
-) (*nks.ClusterV1Read, error) {
+) (*kubernetesapi.ClusterV1Read, error) {
 	return nkswait.Provisioned(ctx, clusterTarget(client, id, timeout))
 }
 

@@ -12,8 +12,7 @@ require (
 	github.com/hashicorp/terraform-plugin-log v0.10.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.38.2
 	github.com/hashicorp/terraform-plugin-testing v1.14.1
-	github.com/nscaledev/nscale-sdk-go v0.3.0
-	github.com/oapi-codegen/runtime v1.4.1
+	github.com/nscaledev/nscale-sdk-go v0.4.0
 	github.com/unikorn-cloud/compute v1.16.0-rc3
 	github.com/unikorn-cloud/core v1.17.1
 )
@@ -58,6 +57,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/oapi-codegen/oapi-codegen/v2 v2.8.0 // indirect
+	github.com/oapi-codegen/runtime v1.4.1 // indirect
 	github.com/oasdiff/yaml v0.1.1 // indirect
 	github.com/oasdiff/yaml3 v0.0.14 // indirect
 	github.com/oklog/run v1.1.0 // indirect

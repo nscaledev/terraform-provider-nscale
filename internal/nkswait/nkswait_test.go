@@ -17,9 +17,12 @@ limitations under the License.
 package nkswait
 
 import (
+	"context"
+	"strings"
 	"testing"
+	"time"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
 )
 
 // TestIsSettled covers the observedGeneration comparison that gates every other
@@ -76,7 +79,7 @@ func TestIsSettled(t *testing.T) {
 			t.Parallel()
 
 			status := Status{
-				Metadata:           &nks.ProjectScopedResourceReadMetadataV1{Generation: test.generation},
+				Metadata:           &kubernetesapi.ProjectScopedResourceReadMetadataV1{Generation: test.generation},
 				ObservedGeneration: test.observedGeneration,
 			}
 
@@ -93,7 +96,7 @@ func TestIsSettledNilSafe(t *testing.T) {
 	if IsSettled(Status{ObservedGeneration: new(int64(1))}) {
 		t.Error("nil metadata should not be settled")
 	}
-	if IsSettled(Status{Metadata: &nks.ProjectScopedResourceReadMetadataV1{}}) {
+	if IsSettled(Status{Metadata: &kubernetesapi.ProjectScopedResourceReadMetadataV1{}}) {
 		t.Error("absent observedGeneration should not be settled")
 	}
 }
@@ -109,32 +112,32 @@ func TestClassify(t *testing.T) {
 		name               string
 		generation         int64
 		observedGeneration *int64
-		provisioning       nks.ResourceProvisioningStatus
-		health             nks.ResourceHealthStatus
+		provisioning       kubernetesapi.ResourceProvisioningStatus
+		health             kubernetesapi.ResourceHealthStatus
 		want               string
 	}{
 		{
 			name:               "unsettled provisioned is not ready",
 			generation:         2,
 			observedGeneration: new(int64(1)),
-			provisioning:       nks.ResourceProvisioningStatusProvisioned,
-			health:             nks.ResourceHealthStatusHealthy,
+			provisioning:       kubernetesapi.ResourceProvisioningStatusProvisioned,
+			health:             kubernetesapi.ResourceHealthStatusHealthy,
 			want:               StateSettling,
 		},
 		{
 			name:               "unsettled error is not a failure",
 			generation:         2,
 			observedGeneration: new(int64(1)),
-			provisioning:       nks.ResourceProvisioningStatusError,
-			health:             nks.ResourceHealthStatusError,
+			provisioning:       kubernetesapi.ResourceProvisioningStatusError,
+			health:             kubernetesapi.ResourceHealthStatusError,
 			want:               StateSettling,
 		},
 		{
 			name:               "settled provisioned and healthy is ready",
 			generation:         2,
 			observedGeneration: new(int64(2)),
-			provisioning:       nks.ResourceProvisioningStatusProvisioned,
-			health:             nks.ResourceHealthStatusHealthy,
+			provisioning:       kubernetesapi.ResourceProvisioningStatusProvisioned,
+			health:             kubernetesapi.ResourceHealthStatusHealthy,
 			want:               StateReady,
 		},
 		{
@@ -145,56 +148,56 @@ func TestClassify(t *testing.T) {
 			name:               "provisioned and degraded is ready",
 			generation:         2,
 			observedGeneration: new(int64(2)),
-			provisioning:       nks.ResourceProvisioningStatusProvisioned,
-			health:             nks.ResourceHealthStatusDegraded,
+			provisioning:       kubernetesapi.ResourceProvisioningStatusProvisioned,
+			health:             kubernetesapi.ResourceHealthStatusDegraded,
 			want:               StateReady,
 		},
 		{
 			name:               "provisioned with unknown health is ready",
 			generation:         2,
 			observedGeneration: new(int64(2)),
-			provisioning:       nks.ResourceProvisioningStatusProvisioned,
-			health:             nks.ResourceHealthStatusUnknown,
+			provisioning:       kubernetesapi.ResourceProvisioningStatusProvisioned,
+			health:             kubernetesapi.ResourceHealthStatusUnknown,
 			want:               StateReady,
 		},
 		{
 			name:               "provisioned with error health is still ready",
 			generation:         2,
 			observedGeneration: new(int64(2)),
-			provisioning:       nks.ResourceProvisioningStatusProvisioned,
-			health:             nks.ResourceHealthStatusError,
+			provisioning:       kubernetesapi.ResourceProvisioningStatusProvisioned,
+			health:             kubernetesapi.ResourceHealthStatusError,
 			want:               StateReady,
 		},
 		{
 			name:               "settled error is a failure",
 			generation:         2,
 			observedGeneration: new(int64(2)),
-			provisioning:       nks.ResourceProvisioningStatusError,
-			health:             nks.ResourceHealthStatusHealthy,
+			provisioning:       kubernetesapi.ResourceProvisioningStatusError,
+			health:             kubernetesapi.ResourceHealthStatusHealthy,
 			want:               StateFailed,
 		},
 		{
 			name:               "deprovisioning is deleting",
 			generation:         2,
 			observedGeneration: new(int64(2)),
-			provisioning:       nks.ResourceProvisioningStatusDeprovisioning,
-			health:             nks.ResourceHealthStatusHealthy,
+			provisioning:       kubernetesapi.ResourceProvisioningStatusDeprovisioning,
+			health:             kubernetesapi.ResourceHealthStatusHealthy,
 			want:               StateDeleting,
 		},
 		{
 			name:               "pending is provisioning",
 			generation:         1,
 			observedGeneration: new(int64(1)),
-			provisioning:       nks.ResourceProvisioningStatusPending,
-			health:             nks.ResourceHealthStatusUnknown,
+			provisioning:       kubernetesapi.ResourceProvisioningStatusPending,
+			health:             kubernetesapi.ResourceHealthStatusUnknown,
 			want:               StateProvisioning,
 		},
 		{
 			name:               "provisioning is provisioning",
 			generation:         1,
 			observedGeneration: new(int64(1)),
-			provisioning:       nks.ResourceProvisioningStatusProvisioning,
-			health:             nks.ResourceHealthStatusUnknown,
+			provisioning:       kubernetesapi.ResourceProvisioningStatusProvisioning,
+			health:             kubernetesapi.ResourceHealthStatusUnknown,
 			want:               StateProvisioning,
 		},
 	}
@@ -204,7 +207,7 @@ func TestClassify(t *testing.T) {
 			t.Parallel()
 
 			status := Status{
-				Metadata: &nks.ProjectScopedResourceReadMetadataV1{
+				Metadata: &kubernetesapi.ProjectScopedResourceReadMetadataV1{
 					Generation:         test.generation,
 					ProvisioningStatus: test.provisioning,
 					HealthStatus:       test.health,
@@ -226,10 +229,10 @@ func TestFailureDetail(t *testing.T) {
 	t.Parallel()
 
 	provisioningDetail := Status{
-		Metadata: &nks.ProjectScopedResourceReadMetadataV1{
-			ProvisioningStatus: nks.ResourceProvisioningStatusError,
-			ProvisioningStatusDetail: &nks.ProvisioningStatusDetail{
-				Reason:  nks.ProvisioningStatusReasonDependencyNotFound,
+		Metadata: &kubernetesapi.ProjectScopedResourceReadMetadataV1{
+			ProvisioningStatus: kubernetesapi.ResourceProvisioningStatusError,
+			ProvisioningStatusDetail: &kubernetesapi.ProvisioningStatusDetail{
+				Reason:  kubernetesapi.ProvisioningStatusReasonDependencyNotFound,
 				Message: "network not found",
 			},
 		},
@@ -239,10 +242,10 @@ func TestFailureDetail(t *testing.T) {
 	}
 
 	healthDetail := Status{
-		Metadata: &nks.ProjectScopedResourceReadMetadataV1{
-			HealthStatus: nks.ResourceHealthStatusError,
-			HealthStatusDetail: &nks.HealthStatusDetail{
-				Reason:  nks.HealthStatusReasonDegraded,
+		Metadata: &kubernetesapi.ProjectScopedResourceReadMetadataV1{
+			HealthStatus: kubernetesapi.ResourceHealthStatusError,
+			HealthStatusDetail: &kubernetesapi.HealthStatusDetail{
+				Reason:  kubernetesapi.HealthStatusReasonDegraded,
 				Message: "2/12 nodes are down",
 			},
 		},
@@ -256,15 +259,15 @@ func TestFailureDetail(t *testing.T) {
 	// health is the thing that is wrong. Quoting the provisioning detail here
 	// tells the user the pool is fine in the middle of a failed wait.
 	provisionedButDegraded := Status{
-		Metadata: &nks.ProjectScopedResourceReadMetadataV1{
-			ProvisioningStatus: nks.ResourceProvisioningStatusProvisioned,
-			HealthStatus:       nks.ResourceHealthStatusDegraded,
-			ProvisioningStatusDetail: &nks.ProvisioningStatusDetail{
-				Reason:  nks.ProvisioningStatusReasonProvisioned,
+		Metadata: &kubernetesapi.ProjectScopedResourceReadMetadataV1{
+			ProvisioningStatus: kubernetesapi.ResourceProvisioningStatusProvisioned,
+			HealthStatus:       kubernetesapi.ResourceHealthStatusDegraded,
+			ProvisioningStatusDetail: &kubernetesapi.ProvisioningStatusDetail{
+				Reason:  kubernetesapi.ProvisioningStatusReasonProvisioned,
 				Message: "node pool is available",
 			},
-			HealthStatusDetail: &nks.HealthStatusDetail{
-				Reason:  nks.HealthStatusReasonDegraded,
+			HealthStatusDetail: &kubernetesapi.HealthStatusDetail{
+				Reason:  kubernetesapi.HealthStatusReasonDegraded,
 				Message: "one or more node pool workers are not ready; inspect Kubernetes node conditions",
 			},
 		},
@@ -275,9 +278,9 @@ func TestFailureDetail(t *testing.T) {
 	}
 
 	bare := Status{
-		Metadata: &nks.ProjectScopedResourceReadMetadataV1{
-			ProvisioningStatus: nks.ResourceProvisioningStatusError,
-			HealthStatus:       nks.ResourceHealthStatusUnknown,
+		Metadata: &kubernetesapi.ProjectScopedResourceReadMetadataV1{
+			ProvisioningStatus: kubernetesapi.ResourceProvisioningStatusError,
+			HealthStatus:       kubernetesapi.ResourceHealthStatusUnknown,
 		},
 	}
 	if got := FailureDetail(bare); got != `provisioning status "error", health status "unknown"` {
@@ -336,21 +339,21 @@ func TestWaiterStatePartitions(t *testing.T) {
 func TestLastReported(t *testing.T) {
 	t.Parallel()
 
-	target := Target[nks.NodePoolV1Read]{
-		Inspect: func(pool *nks.NodePoolV1Read) Status {
+	target := Target[kubernetesapi.NodePoolV1Read]{
+		Inspect: func(pool *kubernetesapi.NodePoolV1Read) Status {
 			return Status{Metadata: &pool.Metadata, ObservedGeneration: pool.Status.ObservedGeneration}
 		},
 	}
 
-	if _, reported := target.lastReported(&nks.NodePoolV1Read{}); reported {
+	if _, reported := target.lastReported(&kubernetesapi.NodePoolV1Read{}); reported {
 		t.Error("a never-read resource should not report a last-observed status")
 	}
 
-	read := &nks.NodePoolV1Read{
-		Metadata: nks.ProjectScopedResourceReadMetadataV1{
+	read := &kubernetesapi.NodePoolV1Read{
+		Metadata: kubernetesapi.ProjectScopedResourceReadMetadataV1{
 			Id:                 "pool-1",
-			ProvisioningStatus: nks.ResourceProvisioningStatusProvisioning,
-			HealthStatus:       nks.ResourceHealthStatusUnknown,
+			ProvisioningStatus: kubernetesapi.ResourceProvisioningStatusProvisioning,
+			HealthStatus:       kubernetesapi.ResourceHealthStatusUnknown,
 		},
 	}
 
@@ -360,5 +363,55 @@ func TestLastReported(t *testing.T) {
 	}
 	if detail != `provisioning status "provisioning", health status "unknown"` {
 		t.Errorf("lastReported() = %q, want the bare-enum fallback", detail)
+	}
+}
+
+// TestProvisionedTimeoutQuotesLastRead is the regression guard for the timeout
+// path. WaitForStateContext throws its last result away on timeout and returns
+// a bare (nil, err), so Provisioned has to remember the read itself — without
+// that, the PodDisruptionBudget case this wait exists to explain degrades to an
+// unhelpful "timeout while waiting for state to become 'ready'".
+// Not parallel: it winds the package's poll timing down so the wait finishes in
+// milliseconds rather than the 15s that gates the first real poll.
+func TestProvisionedTimeoutQuotesLastRead(t *testing.T) {
+	restoreDelay, restoreMinTimeout := pollDelay, pollMinTimeout
+	pollDelay, pollMinTimeout = time.Millisecond, time.Millisecond
+	t.Cleanup(func() { pollDelay, pollMinTimeout = restoreDelay, restoreMinTimeout })
+
+	generation := int64(1)
+
+	// Settled, but stuck short of provisioned — a pool mid-roll behind a drain
+	// that never completes.
+	target := Target[kubernetesapi.NodePoolV1Read]{
+		Kind: "node pool",
+		Get: func(_ context.Context) (*kubernetesapi.NodePoolV1Read, error) {
+			return &kubernetesapi.NodePoolV1Read{
+				Metadata: kubernetesapi.ProjectScopedResourceReadMetadataV1{
+					Id:                 "pool-1",
+					Generation:         generation,
+					ProvisioningStatus: kubernetesapi.ResourceProvisioningStatusProvisioning,
+					HealthStatus:       kubernetesapi.ResourceHealthStatusDegraded,
+				},
+				Status: kubernetesapi.NodePoolStatusV1{ObservedGeneration: &generation},
+			}, nil
+		},
+		Inspect: func(pool *kubernetesapi.NodePoolV1Read) Status {
+			return Status{Metadata: &pool.Metadata, ObservedGeneration: pool.Status.ObservedGeneration}
+		},
+		Timeout: 50 * time.Millisecond,
+	}
+
+	pool, err := Provisioned(t.Context(), target)
+	if err == nil {
+		t.Fatal("Provisioned() should have timed out")
+	}
+	if pool == nil {
+		t.Error("Provisioned() should hand back the last read alongside the timeout")
+	}
+
+	for _, want := range []string{"last reported", `provisioning status "provisioning"`, "next apply resumes it"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Provisioned() error = %q, want it to contain %q", err, want)
+		}
 	}
 }

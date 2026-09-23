@@ -23,13 +23,14 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
 // Tags go through the shared generic helpers in internal/utils/tftypes and
 // internal/nscale rather than NKS-local copies. tags.SDKTag is a structural
-// constraint, so nks.Tag satisfies it on its shape alone and needs no
+// constraint, so kubernetesapi.Tag satisfies it on its shape alone and needs no
 // per-service conversion of its own — the same route every other service takes.
 
 // basetypesObjectOptions is the conversion policy for unpacking the nested
@@ -76,7 +77,7 @@ func getCluster(
 	ctx context.Context,
 	client *nscale.Client,
 	id string,
-) (*nks.ClusterV1Read, error) {
+) (*kubernetesapi.ClusterV1Read, error) {
 	nksClient, diagnostics := client.RequireNKS()
 	if diagnostics.HasError() {
 		return nil, nscale.DiagnosticsError(diagnostics)
@@ -88,5 +89,5 @@ func getCluster(
 	}
 	defer response.Body.Close()
 
-	return nscale.ReadJSONResponsePointer[nks.ClusterV1Read](response)
+	return nscale.ReadJSONResponsePointer[kubernetesapi.ClusterV1Read](response)
 }

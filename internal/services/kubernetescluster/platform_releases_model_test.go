@@ -24,17 +24,17 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
 )
 
 // queryFor builds the request the generated client would send and returns its
 // encoded query string. Asserting on the wire format rather than the params
 // struct is the point: the requirement is that unset filters produce NO query
 // key at all, and only the encoder can prove that.
-func queryFor(t *testing.T, params *nks.ListPlatformReleasesParams) string {
+func queryFor(t *testing.T, params *kubernetesapi.ListPlatformReleasesParams) string {
 	t.Helper()
 
-	request, err := nks.NewListPlatformReleasesRequest("https://nks.example.com", params)
+	request, err := kubernetesapi.NewListPlatformReleasesRequest("https://kubernetesapi.example.com", params)
 	if err != nil {
 		t.Fatalf("building list request: %s", err)
 	}
@@ -164,20 +164,23 @@ func TestNewPlatformReleaseModel(t *testing.T) {
 		t.Fatalf("parsing fixture time: %s", err)
 	}
 
-	source := &nks.PlatformReleaseV1Read{
-		Metadata: nks.StaticResourceMetadata{
+	source := &kubernetesapi.PlatformReleaseV1Read{
+		Metadata: kubernetesapi.StaticResourceMetadata{
 			Id:           "rel-1",
 			Name:         "nks-1.33",
 			CreationTime: created,
 		},
-		Status: nks.PlatformReleaseStatusV1{
-			KubernetesVersion:      "v1.33.1",
-			AvailableRegionIds:     []string{"region-1", "region-2"},
-			UsableOrganizationIds:  []string{"org-1"},
-			SupportedArchitectures: []nks.PlatformReleaseArchitectureV1{nks.X8664, nks.Aarch64},
-			Prerelease:             false,
-			Deprecated:             false,
-			Withdrawn:              false,
+		Status: kubernetesapi.PlatformReleaseStatusV1{
+			KubernetesVersion:     "v1.33.1",
+			AvailableRegionIds:    []string{"region-1", "region-2"},
+			UsableOrganizationIds: []string{"org-1"},
+			SupportedArchitectures: []kubernetesapi.PlatformReleaseArchitectureV1{
+				kubernetesapi.PlatformReleaseArchitectureV1X8664,
+				kubernetesapi.PlatformReleaseArchitectureV1Aarch64,
+			},
+			Prerelease: false,
+			Deprecated: false,
+			Withdrawn:  false,
 		},
 	}
 
@@ -223,16 +226,16 @@ func TestNewPlatformReleaseModel(t *testing.T) {
 func TestNewPlatformReleaseModelWithdrawn(t *testing.T) {
 	t.Parallel()
 
-	source := &nks.PlatformReleaseV1Read{
-		Metadata: nks.StaticResourceMetadata{Id: "rel-old", Name: "nks-1.30"},
-		Status: nks.PlatformReleaseStatusV1{
+	source := &kubernetesapi.PlatformReleaseV1Read{
+		Metadata: kubernetesapi.StaticResourceMetadata{Id: "rel-old", Name: "nks-1.30"},
+		Status: kubernetesapi.PlatformReleaseStatusV1{
 			KubernetesVersion:      "v1.30.0",
 			AvailableRegionIds:     []string{},
 			UsableOrganizationIds:  []string{},
-			SupportedArchitectures: []nks.PlatformReleaseArchitectureV1{},
+			SupportedArchitectures: []kubernetesapi.PlatformReleaseArchitectureV1{},
 			Deprecated:             true,
 			Withdrawn:              true,
-			WithdrawalReason:       new(nks.SecurityIssue),
+			WithdrawalReason:       new(kubernetesapi.PlatformReleaseWithdrawalReasonV1SecurityIssue),
 			WithdrawalMessage:      new("CVE-2026-0001"),
 		},
 	}
