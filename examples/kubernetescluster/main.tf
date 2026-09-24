@@ -140,14 +140,18 @@ resource "nscale_kubernetes_cluster" "main" {
   # covers the control plane, since workers cannot reach ready before the API
   # server is up. What this resource loses is status freshness, which is why the
   # outputs read the data source at the bottom of this file instead.
+  #
+  # NOTE THIS MOVES THE BUILD ONTO THE POOLS' CREATE TIMEOUT. Setting a
+  # `timeouts { create }` here would do nothing — Create returns before it is
+  # read — so the 90m override lives on each pool below instead.
   wait_for_provisioned = false
 
-  # `timeouts` is a block, so no `=`. Defaults are 60m/90m/60m, sized from a
-  # measured 32-minute build. Override only to raise them: a create timeout
-  # shorter than the real build leaves a running, billing cluster that Terraform
-  # is no longer tracking.
+  # `timeouts` is a block, so no `=`. Defaults are 60m create / 90m update /
+  # 30m delete. Override only to raise them: a timeout shorter than the real
+  # operation leaves a running, billing cluster that Terraform is no longer
+  # tracking.
   timeouts {
-    create = "90m"
+    update = "120m"
   }
 }
 
@@ -230,12 +234,17 @@ resource "nscale_kubernetes_node_pool" "workers" {
     environment = "example"
   }
 
-  # Defaults are 30m/60m/60m. Update and delete are double create because both
-  # walk the pool one worker at a time; cost is roughly replicas x per-node. No
-  # timeout is safe against an unsatisfiable PodDisruptionBudget — there is no
-  # drain timeout upstream — but a timeout mid-roll does not mean the roll
-  # failed, and the next apply resumes it.
+  # Defaults are 30m create / 60m update / 60m delete. Update and delete are
+  # double create because both walk the pool one worker at a time; cost is
+  # roughly replicas x per-node. No timeout is safe against an unsatisfiable
+  # PodDisruptionBudget — there is no drain timeout upstream — but a timeout
+  # mid-roll does not mean the roll failed, and the next apply resumes it.
+  #
+  # create is raised past its 30m default because the cluster above sets
+  # wait_for_provisioned = false: this wait is what covers the control-plane
+  # build, measured at 32m18s, as well as the workers joining.
   timeouts {
+    create = "90m"
     update = "90m"
   }
 }
@@ -269,6 +278,12 @@ resource "nscale_kubernetes_node_pool" "gpu" {
 
   tags = {
     environment = "example"
+  }
+
+  # Same reasoning as the on-demand pool: with wait_for_provisioned = false on
+  # the cluster, this create wait is what covers the control-plane build.
+  timeouts {
+    create = "90m"
   }
 }
 

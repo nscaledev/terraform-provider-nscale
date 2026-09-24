@@ -18,12 +18,21 @@ package nkswait
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
+
+// notFoundError builds the 404 the generated client's wrapper returns, which is
+// what IsNotFound keys off.
+func notFoundError() error {
+	return &nscale.APIError{StatusCode: http.StatusNotFound}
+}
 
 // TestIsSettled covers the observedGeneration comparison that gates every other
 // status read. Getting this wrong is the difference between an apply that
@@ -292,12 +301,46 @@ func TestFailureDetail(t *testing.T) {
 	}
 }
 
-// TestWaiterStatePartitions guards the StateChangeConf wiring: a state that is
-// in neither Pending nor Target is treated by the SDK as an unexpected-state
-// error, so the create/update partition must cover every value Classify can
-// return except the terminal failure.
+// TestWaiterStatePartitions guards the StateChangeConf wiring. It asserts
+// against the very slices the waiters pass in, not a copy of them, so dropping
+// a state from provisionedPending fails here rather than silently turning a
+// transient state into an unexpected-state error at runtime.
 func TestWaiterStatePartitions(t *testing.T) {
 	t.Parallel()
+
+	tests := []struct {
+		name    string
+		pending []string
+		target  []string
+		// uncovered is the one state deliberately left out, so the waiter falls
+		// out of the machine and can replace the SDK's generic error with the
+		// API's own failure detail.
+		uncovered string
+	}{
+		{"provisioning", provisionedPending(), provisionedTarget(), StateFailed},
+		{"deleting", deletedPending(), deletedTarget(), StateFailed},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			assertPartitionCovers(t, test.pending, test.target, test.uncovered)
+		})
+	}
+}
+
+// assertPartitionCovers checks that Pending and Target between them account for
+// every waiter state except the one named.
+func assertPartitionCovers(t *testing.T, pending, target []string, uncovered string) {
+	t.Helper()
+
+	covered := make(map[string]bool, len(pending)+len(target))
+	for _, state := range pending {
+		covered[state] = true
+	}
+	for _, state := range target {
+		covered[state] = true
+	}
 
 	all := []string{
 		StateSettling,
@@ -308,28 +351,102 @@ func TestWaiterStatePartitions(t *testing.T) {
 		StateGone,
 	}
 
-	provisionPending := map[string]bool{
-		StateSettling:     true,
-		StateProvisioning: true,
-		StateDeleting:     true,
-		StateGone:         true,
-	}
-	provisionTarget := map[string]bool{StateReady: true}
-
 	for _, state := range all {
-		covered := provisionPending[state] || provisionTarget[state]
-		// StateFailed is deliberately uncovered: falling out of the state machine
-		// is how the waiter surfaces the API's failure detail.
-		if state == StateFailed {
-			if covered {
-				t.Errorf("%q should not be in the provisioning partition", state)
-			}
-			continue
-		}
-		if !covered {
-			t.Errorf("%q is in neither Pending nor Target for provisioning", state)
+		want := state != uncovered
+		if covered[state] != want {
+			t.Errorf("state %q covered = %v, want %v", state, covered[state], want)
 		}
 	}
+}
+
+// TestDeletedErrorBeforeDeprovisioning is the rule that makes Deleted differ
+// from the shared DeleteStateWatcher: a resource already sitting in error when
+// the destroy starts must still be allowed to deprovision, so an error is only
+// terminal once deprovisioning has actually been observed. Both resources share
+// this function, and nothing covered it.
+func TestDeletedErrorBeforeDeprovisioning(t *testing.T) {
+	restoreDelay, restoreMinTimeout := pollDelay, pollMinTimeout
+	pollDelay, pollMinTimeout = time.Millisecond, time.Millisecond
+	t.Cleanup(func() { pollDelay, pollMinTimeout = restoreDelay, restoreMinTimeout })
+
+	generation := int64(1)
+
+	read := func(status kubernetesapi.ResourceProvisioningStatus) *kubernetesapi.NodePoolV1Read {
+		return &kubernetesapi.NodePoolV1Read{
+			Metadata: kubernetesapi.ProjectScopedResourceReadMetadataV1{
+				Id:                 "pool-1",
+				Generation:         generation,
+				ProvisioningStatus: status,
+			},
+			Status: kubernetesapi.NodePoolStatusV1{ObservedGeneration: &generation},
+		}
+	}
+
+	inspect := func(pool *kubernetesapi.NodePoolV1Read) Status {
+		return Status{Metadata: &pool.Metadata, ObservedGeneration: pool.Status.ObservedGeneration}
+	}
+
+	t.Run("error before deprovisioning is not terminal", func(t *testing.T) {
+		// Error on every poll, deprovisioning never seen. The wait must run to
+		// its own deadline rather than failing fast.
+		err := Deleted(t.Context(), Target[kubernetesapi.NodePoolV1Read]{
+			Kind: "node pool",
+			Get: func(_ context.Context) (*kubernetesapi.NodePoolV1Read, error) {
+				return read(kubernetesapi.ResourceProvisioningStatusError), nil
+			},
+			Inspect: inspect,
+			Timeout: 50 * time.Millisecond,
+		})
+		if err == nil {
+			t.Fatal("Deleted() should have timed out")
+		}
+		if strings.Contains(err.Error(), "failed to deprovision") {
+			t.Errorf("an error predating deprovisioning must not be terminal, got %q", err)
+		}
+	})
+
+	t.Run("error after deprovisioning is terminal", func(t *testing.T) {
+		// Deprovisioning first, then error: that is a failed delete, and it must
+		// surface immediately rather than burning the timeout.
+		var calls int
+		start := time.Now()
+		err := Deleted(t.Context(), Target[kubernetesapi.NodePoolV1Read]{
+			Kind: "node pool",
+			Get: func(_ context.Context) (*kubernetesapi.NodePoolV1Read, error) {
+				calls++
+				if calls == 1 {
+					return read(kubernetesapi.ResourceProvisioningStatusDeprovisioning), nil
+				}
+
+				return read(kubernetesapi.ResourceProvisioningStatusError), nil
+			},
+			Inspect: inspect,
+			Timeout: time.Minute,
+		})
+		if err == nil {
+			t.Fatal("Deleted() should have failed")
+		}
+		if !strings.Contains(err.Error(), "failed to deprovision") {
+			t.Errorf("want a failed-deprovision error, got %q", err)
+		}
+		if elapsed := time.Since(start); elapsed > 10*time.Second {
+			t.Errorf("should fail fast, took %s", elapsed)
+		}
+	})
+
+	t.Run("a 404 is success", func(t *testing.T) {
+		err := Deleted(t.Context(), Target[kubernetesapi.NodePoolV1Read]{
+			Kind: "node pool",
+			Get: func(_ context.Context) (*kubernetesapi.NodePoolV1Read, error) {
+				return nil, notFoundError()
+			},
+			Inspect: inspect,
+			Timeout: time.Minute,
+		})
+		if err != nil {
+			t.Errorf("Deleted() on a 404 = %v, want nil", err)
+		}
+	})
 }
 
 // TestLastReported pins the guard that keeps a never-read resource from being

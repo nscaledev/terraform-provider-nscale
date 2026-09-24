@@ -113,6 +113,7 @@ resource "nscale_kubernetes_cluster" "main" {
 - `description` (String) The description of the cluster.
 - `tags` (Map of String) A map of tags assigned to the cluster.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
+- `wait_for_provisioned` (Boolean) Whether `terraform apply` blocks until the cluster reports `provisioned`. Defaults to `true`. Set to `false` to return as soon as the cluster exists, so node pools in the same apply are created while it is still provisioning rather than afterwards. When `false` this resource's status attributes and `api_server_endpoint` describe the moment of creation and stay stale until the next refresh — read them back through the `nscale_kubernetes_cluster` data source, with `depends_on` set to a node pool. **When `false`, `timeouts.create` on this resource is never used** — Create returns before it is read, so the control-plane build is covered by the create timeout of whichever node pool follows it, which must be long enough for both.
 
 ### Read-Only
 
@@ -220,7 +221,7 @@ The `timeouts` block supports:
 
 * `create` - (Default `60m`)
 * `update` - (Default `90m`)
-* `delete` - (Default `60m`)
+* `delete` - (Default `30m`)
 
 These defaults are deliberately generous. A cluster measured on a development environment took **32 minutes** to reach
 `provisioned`; the defaults allow roughly twice that, because build time varies with region and load.
@@ -229,6 +230,10 @@ configuration write.
 
 Prefer raising these over lowering them. A timeout that fires on a cluster which was simply slow leaves Terraform's
 state and reality disagreeing, and the cluster still exists and still bills.
+
+!> **With `wait_for_provisioned = false`, `timeouts.create` here is never read.** Create returns straight after the
+POST, so the control-plane build is covered by the create timeout of whichever `nscale_kubernetes_node_pool` follows
+it — which defaults to `30m`, against a measured 32-minute build. Raise the *pool's* `timeouts.create`, not this one.
 
 ~> **A PodDisruptionBudget can stall a destroy indefinitely.** An empty cluster deletes in about two minutes, but
 deleting a cluster that has node pools cordons and drains every worker through the Eviction API first, which honours

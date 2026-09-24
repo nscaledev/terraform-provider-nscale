@@ -41,7 +41,9 @@ import (
 )
 
 // Bounds mirrored from the NKS spec so a bad value is rejected at plan time
-// rather than by the API.
+// rather than by the API. The spec's patterns are enforced alongside these —
+// see validators.KubernetesQualifiedNameValidator and
+// validators.KubernetesLabelValueValidator.
 const (
 	minReplicas = 0
 	maxReplicas = 2147483647
@@ -276,6 +278,7 @@ func (r *KubernetesNodePoolResource) Schema(
 							Required:            true,
 							Validators: []validator.String{
 								stringvalidator.LengthBetween(minTaintKeyLength, maxTaintKeyLength),
+								validators.KubernetesQualifiedNameValidator(),
 							},
 						},
 						"value": schema.StringAttribute{
@@ -283,6 +286,7 @@ func (r *KubernetesNodePoolResource) Schema(
 							Optional:            true,
 							Validators: []validator.String{
 								stringvalidator.LengthAtMost(maxTaintValueLength),
+								validators.KubernetesLabelValueValidator(),
 							},
 						},
 						"effect": schema.StringAttribute{
@@ -313,7 +317,10 @@ func (r *KubernetesNodePoolResource) Schema(
 				},
 				Validators: []validator.Map{
 					mapvalidator.SizeAtMost(maxLabels),
-					mapvalidator.ValueStringsAre(stringvalidator.LengthAtMost(maxLabelValueLength)),
+					mapvalidator.ValueStringsAre(
+						stringvalidator.LengthAtMost(maxLabelValueLength),
+						validators.KubernetesLabelValueValidator(),
+					),
 				},
 			},
 			"project_id": schema.StringAttribute{

@@ -209,6 +209,10 @@ Creating a pool is a set of workers joining an existing cluster, and is quicker 
 and `delete` get longer because both walk the pool one worker at a time: an update may roll every worker, and a delete
 drains every worker on the way out.
 
+!> **Raise `create` when the cluster sets `wait_for_provisioned = false`.** That makes the cluster's own create return
+immediately, so this pool's create wait is what covers the control-plane build as well as the workers. A build was
+measured at 32 minutes against the `30m` default here.
+
 ## Import
 
 Node pools can be imported using the node pool ID:

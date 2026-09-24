@@ -19,25 +19,10 @@ package kubernetesnodepool
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-
 	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
-
-// basetypesObjectOptions is the conversion policy for unpacking the nested
-// capacity objects. Both flags stay false deliberately: a null or unknown
-// nested object must stay distinguishable from an empty one, because "omitted"
-// is what tells the converters to send nothing. Coercing either to an empty
-// struct would send an explicit empty selector instead, which the API rejects
-// for the mode that requires it.
-func basetypesObjectOptions() basetypes.ObjectAsOptions {
-	return basetypes.ObjectAsOptions{
-		UnhandledNullAsEmpty:    false,
-		UnhandledUnknownAsEmpty: false,
-	}
-}
 
 // getNodePool reads one node pool by ID.
 func getNodePool(

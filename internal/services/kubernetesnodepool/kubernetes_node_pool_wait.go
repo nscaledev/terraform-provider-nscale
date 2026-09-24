@@ -42,6 +42,11 @@ const (
 	// No default is safe against an unsatisfiable PodDisruptionBudget: nothing
 	// upstream sets a nodeDrainTimeout, so the block is indefinite and this is
 	// the only bound.
+	//
+	// delete is UNMEASURED and deliberately generous: the two attempts to time
+	// it were blocked by an environment where workers came up but never reached
+	// Ready, which is the undrainable case 60m exists for. Keep it until a clean
+	// delete can be timed.
 	defaultCreateTimeout = 30 * time.Minute
 	defaultUpdateTimeout = 60 * time.Minute
 	defaultDeleteTimeout = 60 * time.Minute

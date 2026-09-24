@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
 
@@ -446,7 +447,7 @@ func (m *KubernetesClusterModel) apiServerRequest(
 	}
 
 	var model apiServerModel
-	if diagnostics = m.APIServer.As(ctx, &model, basetypesObjectOptions()); diagnostics.HasError() {
+	if diagnostics = m.APIServer.As(ctx, &model, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
 		return nil, diagnostics
 	}
 
@@ -486,7 +487,7 @@ func (m *KubernetesClusterModel) clusterNetworkRequest(
 	}
 
 	var model clusterNetworkModel
-	if diagnostics = m.ClusterNetwork.As(ctx, &model, basetypesObjectOptions()); diagnostics.HasError() {
+	if diagnostics = m.ClusterNetwork.As(ctx, &model, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
 		return nil, diagnostics
 	}
 
@@ -506,7 +507,7 @@ func (m *KubernetesClusterModel) addonsRequest(
 	}
 
 	var model addonsModel
-	if diagnostics = m.Addons.As(ctx, &model, basetypesObjectOptions()); diagnostics.HasError() {
+	if diagnostics = m.Addons.As(ctx, &model, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
 		return nil, diagnostics
 	}
 
@@ -534,7 +535,7 @@ func addonProfileRequest(
 	}
 
 	var model addonProfileModel
-	if diagnostics = profile.As(ctx, &model, basetypesObjectOptions()); diagnostics.HasError() {
+	if diagnostics = profile.As(ctx, &model, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
 		return nil, diagnostics
 	}
 

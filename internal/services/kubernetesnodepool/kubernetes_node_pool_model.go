@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 
 	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
 
@@ -401,7 +402,7 @@ func (m *KubernetesNodePoolModel) computeRequest(
 	}
 
 	var model computeModel
-	if diagnostics = m.Compute.As(ctx, &model, basetypesObjectOptions()); diagnostics.HasError() {
+	if diagnostics = m.Compute.As(ctx, &model, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
 		return nil, diagnostics
 	}
 
@@ -420,7 +421,7 @@ func (m *KubernetesNodePoolModel) reservationRequest(
 	}
 
 	var model reservationModel
-	if diagnostics = m.Reservation.As(ctx, &model, basetypesObjectOptions()); diagnostics.HasError() {
+	if diagnostics = m.Reservation.As(ctx, &model, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
 		return nil, diagnostics
 	}
 

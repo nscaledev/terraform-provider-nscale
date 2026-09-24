@@ -3363,7 +3363,7 @@
               },
               "wait_for_provisioned": {
                 "computed": true,
-                "description": "Whether `terraform apply` blocks until the cluster reports `provisioned`. Defaults to `true`. Set to `false` to return as soon as the cluster exists, so node pools in the same apply are created while it is still provisioning rather than afterwards. When `false` this resource's status attributes and `api_server_endpoint` describe the moment of creation and stay stale until the next refresh — read them back through the `nscale_kubernetes_cluster` data source, with `depends_on` set to a node pool.",
+                "description": "Whether `terraform apply` blocks until the cluster reports `provisioned`. Defaults to `true`. Set to `false` to return as soon as the cluster exists, so node pools in the same apply are created while it is still provisioning rather than afterwards. When `false` this resource's status attributes and `api_server_endpoint` describe the moment of creation and stay stale until the next refresh — read them back through the `nscale_kubernetes_cluster` data source, with `depends_on` set to a node pool. **When `false`, `timeouts.create` on this resource is never used** — Create returns before it is read, so the control-plane build is covered by the create timeout of whichever node pool follows it, which must be long enough for both.",
                 "description_kind": "markdown",
                 "optional": true,
                 "type": "bool"

@@ -33,19 +33,6 @@ import (
 // constraint, so kubernetesapi.Tag satisfies it on its shape alone and needs no
 // per-service conversion of its own — the same route every other service takes.
 
-// basetypesObjectOptions is the conversion policy for unpacking the nested
-// config objects. Both flags stay false deliberately: a null or unknown nested
-// object must stay distinguishable from an empty one, because "omitted" is what
-// tells the converters to send nothing and let the API apply its own defaults.
-// Coercing either to an empty struct would send explicit zero values instead
-// and silently override those defaults.
-func basetypesObjectOptions() basetypes.ObjectAsOptions {
-	return basetypes.ObjectAsOptions{
-		UnhandledNullAsEmpty:    false,
-		UnhandledUnknownAsEmpty: false,
-	}
-}
-
 // stringSliceValue maps an API string slice onto a Terraform list, preserving
 // the API's ordering. An empty-but-present slice becomes an empty list rather
 // than null: for eligibleTargets the API documents empty as "eligibility was

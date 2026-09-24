@@ -121,14 +121,9 @@ func (r *KubernetesClusterResource) ImportState(
 
 	// Provider-side only, so the API cannot tell us what it was. Seed the schema
 	// default rather than leaving it null, which would show as a null -> true
-	// diff on the first plan after an import.
-	//
-	// A config that sets wait_for_provisioned = false still shows one diff after
-	// import (true -> false). That is unavoidable for an attribute the API never
-	// returns — the same reason `timeouts` does it — so it belongs in
-	// ImportStateVerifyIgnore next to timeouts rather than being worked around.
-	// Seeding the default is still the better of the two options, because it
-	// makes the common case (config omits it, or sets true) import cleanly.
+	// diff on the first plan after an import. A config that sets it false still
+	// shows one diff after import; put it in ImportStateVerifyIgnore alongside
+	// timeouts.
 	response.Diagnostics.Append(
 		response.State.SetAttribute(ctx, path.Root("wait_for_provisioned"), true)...,
 	)
@@ -400,27 +395,9 @@ func (r *KubernetesClusterResource) Schema(
 				MarkdownDescription: "Whether at least one eligible platform release upgrade target was observed.",
 				Computed:            true,
 			},
-			// Opt out of the readiness wait, so a node pool in the same apply is
-			// created while the cluster is still provisioning rather than after
-			// it. The API permits that — the console POSTs both in the same
-			// breath — but Terraform orders the pool behind this resource
-			// because it references the cluster ID, and there is no way to
-			// depend on a resource existing without also depending on its
-			// Create having finished.
-			//
-			// Default true, which keeps the safe contract: a finished apply
-			// means a usable cluster with every status attribute populated.
-			//
-			// Setting this false moves the waiting elsewhere, and something must
-			// pick it up. A node pool does so implicitly — workers cannot reach
-			// ready before the control plane is up, so a failed control plane
-			// still fails the apply. For the cluster's own observed status, read
-			// it back through the nscale_kubernetes_cluster DATA SOURCE with
-			// depends_on set to the pool; the resource's status attributes are
-			// whatever the create response said and stay stale until the next
-			// refresh. Scaleway is the only other provider that splits the wait
-			// this way, and it documents the missing re-read as a footgun — the
-			// data source is how this provider avoids it.
+			// Exists because Terraform orders a pool behind this resource whenever
+			// it references the cluster ID, and there is no way to depend on a
+			// resource existing without also depending on its Create finishing.
 			"wait_for_provisioned": schema.BoolAttribute{
 				MarkdownDescription: "Whether `terraform apply` blocks until the cluster reports " +
 					"`provisioned`. Defaults to `true`. " +
@@ -428,7 +405,10 @@ func (r *KubernetesClusterResource) Schema(
 					"are created while it is still provisioning rather than afterwards. " +
 					"When `false` this resource's status attributes and `api_server_endpoint` describe the " +
 					"moment of creation and stay stale until the next refresh — read them back through the " +
-					"`nscale_kubernetes_cluster` data source, with `depends_on` set to a node pool.",
+					"`nscale_kubernetes_cluster` data source, with `depends_on` set to a node pool. " +
+					"**When `false`, `timeouts.create` on this resource is never used** — Create returns " +
+					"before it is read, so the control-plane build is covered by the create timeout of " +
+					"whichever node pool follows it, which must be long enough for both.",
 				Optional: true,
 				Computed: true,
 				Default:  booldefault.StaticBool(true),
@@ -615,16 +595,11 @@ func (r *KubernetesClusterResource) Update(
 		return
 	}
 
-	// Not waiting, so the update response is the only concrete read available —
-	// use it rather than the plan.
-	//
-	// Writing the plan here would be a bug: nine computed status attributes
-	// deliberately carry no UseStateForUnknown (see the schema), so the
-	// framework marks every one of them unknown in an update plan. Persisting
-	// those unknowns makes Terraform reject the apply with "Provider produced
-	// invalid result object after apply", on exactly the path this flag exists
-	// for. The response's status describes the pre-update generation, which is
-	// the trade already accepted by not waiting.
+	// Not waiting, so the update response is the only concrete read available.
+	// Writing the plan instead would be a bug: the computed status attributes
+	// carry no UseStateForUnknown, so the framework marks them unknown in an
+	// update plan and persisting that fails with "Provider produced invalid
+	// result object after apply".
 	if !data.WaitForProvisioned.ValueBool() {
 		data.KubernetesClusterModel = NewKubernetesClusterModel(cluster)
 		response.Diagnostics.Append(response.State.Set(ctx, &data)...)

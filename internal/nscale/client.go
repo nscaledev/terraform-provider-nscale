@@ -131,7 +131,9 @@ func NewClient(
 // The generated NKS client only exposes an interface (ClientInterface) as its
 // mockable surface, and Client stores it as one; returning the concrete type
 // here would defeat that.
-func (c *Client) RequireNKS() (kubernetesapi.ClientInterface, diag.Diagnostics) { //nolint:ireturn // the generated client's only public surface is an interface
+//
+//nolint:ireturn // the generated client's only public surface is an interface
+func (c *Client) RequireNKS() (kubernetesapi.ClientInterface, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	if c.NKS == nil {

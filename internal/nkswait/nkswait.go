@@ -68,6 +68,34 @@ const (
 	StateGone         = "gone"
 )
 
+// The state partitions handed to StateChangeConf. They are functions rather
+// than package-level slices so nothing can mutate a shared one, and so the
+// tests assert against the very values the waiters use — a test with its own
+// copy would still pass if a state were dropped from here.
+//
+// Any state in neither Pending nor Target is treated by the SDK as an
+// unexpected-state error. StateFailed is deliberately left out of the
+// provisioning partition: falling out of the machine is how the waiter gets to
+// replace a generic error with the API's own failure detail.
+
+func provisionedPending() []string {
+	// StateGone is pending, not an error: immediately after create the resource
+	// may not yet be readable through the API's cache.
+	return []string{StateSettling, StateProvisioning, StateDeleting, StateGone}
+}
+
+func provisionedTarget() []string {
+	return []string{StateReady}
+}
+
+func deletedPending() []string {
+	return []string{StateSettling, StateProvisioning, StateDeleting, StateReady}
+}
+
+func deletedTarget() []string {
+	return []string{StateGone}
+}
+
 // Status is the freshness and health view of one NKS read.
 //
 // NKS resources have a common read metadata type but a per-resource status
@@ -211,10 +239,8 @@ func Provisioned[T any](ctx context.Context, target Target[T]) (*T, error) {
 	refresh := target.refresh(ctx, StateGone)
 
 	stateChange := &retry.StateChangeConf{
-		// StateGone is pending, not an error: immediately after create the
-		// resource may not yet be readable through the API's cache.
-		Pending: []string{StateSettling, StateProvisioning, StateDeleting, StateGone},
-		Target:  []string{StateReady},
+		Pending: provisionedPending(),
+		Target:  provisionedTarget(),
 		Refresh: func() (any, string, error) {
 			raw, state, err := refresh()
 			if value, ok := raw.(*T); ok {
@@ -282,23 +308,25 @@ func Provisioned[T any](ctx context.Context, target Target[T]) (*T, error) {
 func Deleted[T any](ctx context.Context, target Target[T]) error {
 	var deprovisioningObserved bool
 
+	refresh := target.refresh(ctx, StateGone)
+
 	stateChange := &retry.StateChangeConf{
-		Pending: []string{StateSettling, StateProvisioning, StateDeleting, StateReady},
-		Target:  []string{StateGone},
+		Pending: deletedPending(),
+		Target:  deletedTarget(),
 		Refresh: func() (any, string, error) {
-			value, err := target.Get(ctx)
-			if err != nil {
-				if IsNotFound(err) {
-					var zero T
+			raw, state, err := refresh()
+			if err != nil || state == StateGone {
+				// Gone is the target, and its zero value carries no status to
+				// reason about. Either way there is nothing more to decide.
+				return raw, state, err
+			}
 
-					return &zero, StateGone, nil
-				}
-
-				return nil, "", err
+			value, ok := raw.(*T)
+			if !ok {
+				return raw, state, err
 			}
 
 			status := target.Inspect(value)
-			state := Classify(status)
 
 			if state == StateDeleting {
 				deprovisioningObserved = true
