@@ -25,13 +25,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 	identityapi "github.com/nscaledev/nscale-sdk-go/identity"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
 	regionapi "github.com/nscaledev/nscale-sdk-go/region"
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 	storageapi "github.com/nscaledev/nscale-sdk-go/storage"
-
-	// nks is generated in-tree rather than taken from nscale-sdk-go; see
-	// internal/nks/gen.go for the reasoning and the migration path.
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
 
 	// legacycomputeapi is the still-on-unikorn-cloud client used solely by the
 	// deprecated nscale_compute_cluster resource. The cluster surface was
@@ -54,7 +51,7 @@ type Client struct {
 	// NKS is nil when nks_service_api_endpoint is unset. Reach it through
 	// RequireNKS, never directly, so an unconfigured endpoint surfaces as a
 	// resource-level diagnostic rather than a nil dereference.
-	NKS nks.ClientInterface
+	NKS kubernetesapi.ClientInterface
 }
 
 func NewClient(
@@ -103,9 +100,9 @@ func NewClient(
 	// client and let RequireNKS explain the omission if an NKS-backed resource is
 	// actually used — otherwise every existing configuration would have to set an
 	// endpoint it does not need.
-	var nksClient nks.ClientInterface
+	var nksClient kubernetesapi.ClientInterface
 	if nksServiceBaseURL != "" {
-		nksClient, err = nks.NewClient(nksServiceBaseURL, nks.WithHTTPClient(httpClient))
+		nksClient, err = kubernetesapi.NewClient(nksServiceBaseURL, kubernetesapi.WithHTTPClient(httpClient))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create Nscale NKS API client: %w", err)
 		}
@@ -134,7 +131,9 @@ func NewClient(
 // The generated NKS client only exposes an interface (ClientInterface) as its
 // mockable surface, and Client stores it as one; returning the concrete type
 // here would defeat that.
-func (c *Client) RequireNKS() (nks.ClientInterface, diag.Diagnostics) { //nolint:ireturn // the generated client's only public surface is an interface
+//
+//nolint:ireturn // the generated client's only public surface is an interface
+func (c *Client) RequireNKS() (kubernetesapi.ClientInterface, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	if c.NKS == nil {
@@ -149,6 +148,20 @@ func (c *Client) RequireNKS() (nks.ClientInterface, diag.Diagnostics) { //nolint
 	}
 
 	return c.NKS, diagnostics
+}
+
+// DiagnosticsError flattens diagnostics into an error, for the paths that must
+// return the (value, error) shape the shared readers and watchers expect. Only
+// used for the RequireNKS guard above, which is a configuration error rather
+// than an API failure — hence its home next to it.
+func DiagnosticsError(diagnostics diag.Diagnostics) error {
+	if !diagnostics.HasError() {
+		return nil
+	}
+
+	first := diagnostics.Errors()[0]
+
+	return fmt.Errorf("%s: %s", first.Summary(), first.Detail())
 }
 
 // ResolveProjectID returns the project ID a project-scoped resource should use:

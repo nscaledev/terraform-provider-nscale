@@ -33,6 +33,7 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/identity"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/instance"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/kubernetescluster"
+	"github.com/nscaledev/terraform-provider-nscale/internal/services/kubernetesnodepool"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/network"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/objectstorage"
 	"github.com/nscaledev/terraform-provider-nscale/internal/services/region"
@@ -302,6 +303,7 @@ func (p NscaleProvider) DataSources(ctx context.Context) []func() datasource.Dat
 		reservation.NewPlacementDataSource,
 		kubernetescluster.NewKubernetesClusterDataSource,
 		kubernetescluster.NewKubernetesPlatformReleasesDataSource,
+		kubernetesnodepool.NewKubernetesNodePoolDataSource,
 	}
 }
 
@@ -320,5 +322,6 @@ func (p NscaleProvider) Resources(ctx context.Context) []func() resource.Resourc
 		reservation.NewReservationResource,
 		reservation.NewPlacementResource,
 		kubernetescluster.NewKubernetesClusterResource,
+		kubernetesnodepool.NewKubernetesNodePoolResource,
 	}
 }

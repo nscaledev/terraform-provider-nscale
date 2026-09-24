@@ -202,6 +202,7 @@ Per service, additional `NSCALE_TEST_*` vars:
 | `identity` | `NSCALE_TEST_ROLE_ID` |
 | `instance` | `NSCALE_TEST_IMAGE_ID`, `NSCALE_TEST_FLAVOR_ID` |
 | `kubernetescluster` | `NSCALE_NKS_SERVICE_API_ENDPOINT`, `NSCALE_TEST_NKS_NETWORK_ID`; optionally `NSCALE_TEST_NKS_NETWORK_ID_ALT`, `NSCALE_TEST_NKS_PLATFORM_RELEASE_ID`, `NSCALE_TEST_NKS_PLATFORM_RELEASE_UPGRADE_ID` |
+| `kubernetesnodepool` | `NSCALE_NKS_SERVICE_API_ENDPOINT`, `NSCALE_TEST_NKS_CLUSTER_ID`, `NSCALE_TEST_NKS_FLAVOR_ID`; optionally `NSCALE_TEST_NKS_FLAVOR_ID_ALT`, `NSCALE_TEST_NKS_CLUSTER_ID_ALT`, `NSCALE_TEST_NKS_RESERVATION_ID` |
 | `objectstorage` | `NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID` |
 | `reservation` | `NSCALE_TEST_RESERVATION_ACCELERATOR`, `NSCALE_TEST_RESERVATION_UNIT`; placement tests also need `NSCALE_TEST_IMAGE_ID` |
 
@@ -229,6 +230,39 @@ The upgrade pair is given explicitly rather than derived from the
 `nscale_kubernetes_platform_releases` data source because whether two catalogue
 entries form a valid upgrade pair is a property of the catalogue, not of list
 order.
+
+### `kubernetesnodepool` variables in detail
+
+> **COST WARNING.** This package provisions real worker nodes. A pool is
+> cheaper than a control plane, but it is still billable compute, and the
+> replacement tests each pay for a full pool rebuild. Several tests also roll
+> every worker one node at a time, so wall-clock scales with replica count.
+> Scope it with
+> `make testacc PKG=./internal/services/kubernetesnodepool/`.
+
+| Variable | Required | What it selects |
+|---|---|---|
+| `NSCALE_NKS_SERVICE_API_ENDPOINT` | yes | NKS base URL. No default exists provider-side. |
+| `NSCALE_TEST_NKS_CLUSTER_ID` | yes | An existing **provisioned and healthy** cluster to attach pools to. Its project, organization and region become the pool's. |
+| `NSCALE_TEST_NKS_FLAVOR_ID` | yes | Compute flavor for the worker pool. Must exist in the cluster's region. |
+| `NSCALE_TEST_NKS_FLAVOR_ID_ALT` | no | A second flavor in the same region, for the test that proves `compute.flavor_id` forces replacement. Unset skips that one test. |
+| `NSCALE_TEST_NKS_CLUSTER_ID_ALT` | no | A second cluster, for the test that proves `cluster_id` forces replacement. Unset skips that one test. |
+| `NSCALE_TEST_NKS_RESERVATION_ID` | no | A reservation with spare capacity, for the reservation-backed pool tests. Unset skips all of them. |
+
+Unlike the cluster package, these tests attach to a **pre-existing cluster**
+rather than creating one. A control plane took a measured 32 minutes to build,
+so creating one per test case would put this package into the hours for
+coverage the `kubernetescluster` package already provides.
+
+`NSCALE_TEST_NKS_FLAVOR_ID` is given explicitly rather than discovered because
+`nscale_instance_flavor` looks up by ID only — there is no "any small flavor in
+this region" query to write.
+
+The reservation tests are the expensive ones: `_reservationImmutable` pays for
+three pool rebuilds, because proving that `replicas`, `taints` and `labels` each
+force *replacement* rather than an update needs a real apply per edit. They are
+gated behind `NSCALE_TEST_NKS_RESERVATION_ID` so they only run where reservation
+capacity has been deliberately supplied.
 
 Running it via a gitignored tfvars profile (see the `testacc-profile` comments
 in the `Makefile`) — always scope with `PKG`:

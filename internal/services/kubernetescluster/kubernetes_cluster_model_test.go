@@ -25,7 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
 )
 
 func testCreationTime(t *testing.T) time.Time {
@@ -41,11 +41,11 @@ func testCreationTime(t *testing.T) time.Time {
 
 // fullCluster is a cluster read with every optional field populated — the shape
 // a provisioned, healthy cluster comes back as.
-func fullCluster(t *testing.T) *nks.ClusterV1Read {
+func fullCluster(t *testing.T) *kubernetesapi.ClusterV1Read {
 	t.Helper()
 
-	return &nks.ClusterV1Read{
-		Metadata: nks.ProjectScopedResourceReadMetadataV1{
+	return &kubernetesapi.ClusterV1Read{
+		Metadata: kubernetesapi.ProjectScopedResourceReadMetadataV1{
 			Id:                 "cluster-abc",
 			Name:               "production",
 			Description:        new("primary cluster"),
@@ -53,40 +53,40 @@ func fullCluster(t *testing.T) *nks.ClusterV1Read {
 			ProjectId:          "proj-1",
 			Generation:         4,
 			CreationTime:       testCreationTime(t),
-			ProvisioningStatus: nks.ResourceProvisioningStatusProvisioned,
-			HealthStatus:       nks.ResourceHealthStatusHealthy,
-			Tags:               &nks.TagList{{Name: "env", Value: "prod"}},
+			ProvisioningStatus: kubernetesapi.ResourceProvisioningStatusProvisioned,
+			HealthStatus:       kubernetesapi.ResourceHealthStatusHealthy,
+			Tags:               &kubernetesapi.TagList{{Name: "env", Value: "prod"}},
 		},
-		Spec: nks.ClusterSpecV1{
+		Spec: kubernetesapi.ClusterSpecV1{
 			NetworkId:         "net-1",
 			PlatformReleaseId: "rel-2",
-			ApiServer: &nks.ClusterApiServerAccessV1{
+			ApiServer: &kubernetesapi.ClusterApiServerAccessV1{
 				PublicIP:     new(true),
 				AllowedCidrs: &[]string{"203.0.113.0/24"},
 			},
-			ClusterNetwork: &nks.ClusterNetworkV1{
+			ClusterNetwork: &kubernetesapi.ClusterNetworkV1{
 				PodCidr:     new("10.240.0.0/12"),
 				ServiceCidr: new("10.96.0.0/16"),
 			},
-			Addons: &nks.ClusterAddonsV1{
-				Hardware: &nks.ClusterAddonProfileV1{Enabled: new(true)},
+			Addons: &kubernetesapi.ClusterAddonsV1{
+				Hardware: &kubernetesapi.ClusterAddonProfileV1{Enabled: new(true)},
 			},
 		},
-		Status: nks.ClusterStatusV1{
+		Status: kubernetesapi.ClusterStatusV1{
 			RegionId:           "region-1",
 			ObservedGeneration: new(int64(4)),
-			KubernetesVersion: &nks.ClusterKubernetesVersionStatusV1{
+			KubernetesVersion: &kubernetesapi.ClusterKubernetesVersionStatusV1{
 				Target:   new("v1.33.1"),
 				Observed: new("v1.33.1"),
 			},
-			ApiServer: &nks.ClusterApiServerStatusV1{
+			ApiServer: &kubernetesapi.ClusterApiServerStatusV1{
 				CertificateAuthorityData: "Y2E=",
-				Endpoints: nks.ClusterApiServerEndpointsStatusV1{
-					Private: nks.ClusterApiServerEndpointStatusV1{Address: "10.0.0.1", Port: 6443},
-					Public:  &nks.ClusterApiServerEndpointStatusV1{Address: "198.51.100.7", Port: 6443},
+				Endpoints: kubernetesapi.ClusterApiServerEndpointsStatusV1{
+					Private: kubernetesapi.ClusterApiServerEndpointStatusV1{Address: "10.0.0.1", Port: 6443},
+					Public:  &kubernetesapi.ClusterApiServerEndpointStatusV1{Address: "198.51.100.7", Port: 6443},
 				},
 			},
-			Release: &nks.ClusterReleaseStatusV1{
+			Release: &kubernetesapi.ClusterReleaseStatusV1{
 				AppliedId:        "rel-2",
 				Deprecated:       new(false),
 				Withdrawn:        new(false),
@@ -100,25 +100,25 @@ func fullCluster(t *testing.T) *nks.ClusterV1Read {
 // minimalCluster is a cluster read taken before any status projection has
 // happened: everything optional is absent. Every converter has to survive this,
 // because it is what the create response looks like.
-func minimalCluster(t *testing.T) *nks.ClusterV1Read {
+func minimalCluster(t *testing.T) *kubernetesapi.ClusterV1Read {
 	t.Helper()
 
-	return &nks.ClusterV1Read{
-		Metadata: nks.ProjectScopedResourceReadMetadataV1{
+	return &kubernetesapi.ClusterV1Read{
+		Metadata: kubernetesapi.ProjectScopedResourceReadMetadataV1{
 			Id:                 "cluster-new",
 			Name:               "fresh",
 			OrganizationId:     "org-1",
 			ProjectId:          "proj-1",
 			Generation:         1,
 			CreationTime:       testCreationTime(t),
-			ProvisioningStatus: nks.ResourceProvisioningStatusPending,
-			HealthStatus:       nks.ResourceHealthStatusUnknown,
+			ProvisioningStatus: kubernetesapi.ResourceProvisioningStatusPending,
+			HealthStatus:       kubernetesapi.ResourceHealthStatusUnknown,
 		},
-		Spec: nks.ClusterSpecV1{
+		Spec: kubernetesapi.ClusterSpecV1{
 			NetworkId:         "net-1",
 			PlatformReleaseId: "rel-1",
 		},
-		Status: nks.ClusterStatusV1{
+		Status: kubernetesapi.ClusterStatusV1{
 			RegionId: "region-1",
 		},
 	}

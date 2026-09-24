@@ -26,7 +26,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
+
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 )
 
@@ -95,8 +96,8 @@ func (s *KubernetesPlatformReleasesDataSource) Schema(
 				Optional: true,
 				Validators: []validator.String{
 					stringvalidator.OneOf(
-						string(nks.X8664),
-						string(nks.Aarch64),
+						string(kubernetesapi.PlatformReleaseArchitectureV1X8664),
+						string(kubernetesapi.PlatformReleaseArchitectureV1Aarch64),
 					),
 				},
 			},
@@ -205,7 +206,7 @@ func (s *KubernetesPlatformReleasesDataSource) Read(
 	}
 	defer listResponse.Body.Close()
 
-	releases, err := nscale.ReadJSONResponseValue[nks.PlatformReleasesV1Read](listResponse)
+	releases, err := nscale.ReadJSONResponseValue[kubernetesapi.PlatformReleasesV1Read](listResponse)
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		response.Diagnostics.AddError(

@@ -19,7 +19,7 @@ package kubernetescluster
 import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"github.com/nscaledev/terraform-provider-nscale/internal/nks"
+	kubernetesapi "github.com/nscaledev/nscale-sdk-go/kubernetes"
 )
 
 // PlatformReleasesModel is the Terraform view of a platform release query.
@@ -55,7 +55,7 @@ type PlatformReleaseModel struct {
 	UsableOrganizationIDs  types.List `tfsdk:"usable_organization_ids"`
 }
 
-func NewPlatformReleaseModel(source *nks.PlatformReleaseV1Read) PlatformReleaseModel {
+func NewPlatformReleaseModel(source *kubernetesapi.PlatformReleaseV1Read) PlatformReleaseModel {
 	architectures := make([]string, 0, len(source.Status.SupportedArchitectures))
 	for _, architecture := range source.Status.SupportedArchitectures {
 		architectures = append(architectures, string(architecture))
@@ -93,7 +93,7 @@ func NewPlatformReleaseModel(source *nks.PlatformReleaseV1Read) PlatformReleaseM
 // value to nil is what achieves this; never substitute a zero value.
 func (m *PlatformReleasesModel) NscalePlatformReleasesListParams(
 	defaultOrganizationID string,
-) *nks.ListPlatformReleasesParams {
+) *kubernetesapi.ListPlatformReleasesParams {
 	// Scope to the provider-configured organization unless overridden, so the
 	// common case does not have to restate it.
 	organizationID := m.OrganizationID.ValueString()
@@ -101,24 +101,24 @@ func (m *PlatformReleasesModel) NscalePlatformReleasesListParams(
 		organizationID = defaultOrganizationID
 	}
 
-	var organizationIDs *nks.OrganizationIDQueryParameter
+	var organizationIDs *kubernetesapi.OrganizationIDQueryParameter
 	if organizationID != "" {
-		organizationIDs = &nks.OrganizationIDQueryParameter{organizationID}
+		organizationIDs = &kubernetesapi.OrganizationIDQueryParameter{organizationID}
 	}
 
-	var regionIDs *nks.RegionIDQueryParameter
+	var regionIDs *kubernetesapi.RegionIDQueryParameter
 	if regionID := m.RegionID.ValueString(); regionID != "" {
-		regionIDs = &nks.RegionIDQueryParameter{regionID}
+		regionIDs = &kubernetesapi.RegionIDQueryParameter{regionID}
 	}
 
-	var architectures *nks.PlatformReleaseArchitectureQueryParameter
+	var architectures *kubernetesapi.PlatformReleaseArchitectureQueryParameter
 	if architecture := m.Architecture.ValueString(); architecture != "" {
-		architectures = &nks.PlatformReleaseArchitectureQueryParameter{
-			nks.PlatformReleaseArchitectureV1(architecture),
+		architectures = &kubernetesapi.PlatformReleaseArchitectureQueryParameter{
+			kubernetesapi.PlatformReleaseArchitectureV1(architecture),
 		}
 	}
 
-	return &nks.ListPlatformReleasesParams{
+	return &kubernetesapi.ListPlatformReleasesParams{
 		OrganizationID: organizationIDs,
 		RegionID:       regionIDs,
 		Architecture:   architectures,

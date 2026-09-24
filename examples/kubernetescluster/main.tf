@@ -8,12 +8,7 @@ terraform {
 
 # NKS is the only service with no default endpoint baked into the provider, so
 # it must be set explicitly — here, or via NSCALE_NKS_SERVICE_API_ENDPOINT.
-# Leaving it unset is not a provider error on its own; it only fails when a
-# nscale_kubernetes_* type is actually used.
-#
-# Everything else comes from the standard NSCALE_* environment variables
-# (NSCALE_SERVICE_TOKEN, NSCALE_ORGANIZATION_ID, NSCALE_PROJECT_ID,
-# NSCALE_REGION_ID).
+# Everything else comes from the standard NSCALE_* environment variables.
 provider "nscale" {
   nks_service_api_endpoint = var.nks_service_api_endpoint
 }
@@ -30,9 +25,6 @@ variable "name" {
   default     = "kubernetes-example"
 }
 
-# Set this to attach to an existing network instead of creating one. The
-# cluster's project, organization and region are all inherited from whichever
-# network it attaches to — a cluster takes no project_id of its own.
 variable "network_id" {
   type        = string
   description = "Existing region network to attach to. Leave null to create one."
@@ -64,18 +56,11 @@ variable "api_server_public_ip" {
 }
 
 # The API's own default is ["0.0.0.0/0"], so an omitted allowlist on a public
-# API server is reachable from anywhere — hence an explicit, deliberately narrow
-# default here. Widen it deliberately, not by accident.
+# API server is reachable from anywhere — hence a deliberately narrow default.
 variable "api_server_allowed_cidrs" {
   type        = list(string)
   description = "Source IPv4 CIDR allowlist for the API server endpoint (1-32 entries)."
   default     = ["10.0.0.0/8"]
-}
-
-variable "hardware_addon_enabled" {
-  type        = bool
-  description = "Enable the optional hardware addon profile."
-  default     = true
 }
 
 locals {
@@ -100,23 +85,20 @@ data "nscale_network" "existing" {
 }
 
 # Pick a release eligible for a NEW cluster rather than hardcoding an ID, which
-# goes stale as the catalogue moves. Creating on a deprecated release fails with
-# HTTP 422.
+# goes stale as the catalogue moves. Creating on a deprecated release fails 422.
+# When upgrading rather than creating, filter only on `withdrawn` — you may need
+# to re-state a release your cluster is on which has since been deprecated.
 #
-# An omitted filter is not the same as false: omitting `deprecated` returns
-# current AND deprecated releases. When upgrading rather than creating, filter
-# only on `withdrawn` — you may need to re-state a release your cluster is
-# already on which has since been deprecated.
-#
-# The region comes off the network, not from NSCALE_REGION_ID: the cluster's
-# region is whatever the network says it is, and a release from any other region
-# fails at apply with a 422.
+# The region comes off the network, not NSCALE_REGION_ID: a release from any
+# other region fails at apply with a 422.
 data "nscale_kubernetes_platform_releases" "eligible" {
   region_id  = local.region_id
   deprecated = false
   withdrawn  = false
 }
 
+# The cluster's project, organization and region are all inherited from the
+# network it attaches to — it takes no project_id of its own.
 resource "nscale_kubernetes_cluster" "main" {
   # name, network_id and both cluster_network CIDRs are immutable: the API
   # rejects a change to any of them, so Terraform replaces the cluster instead.
@@ -128,9 +110,8 @@ resource "nscale_kubernetes_cluster" "main" {
 
   # Nested attributes, not blocks — note the `=`.
   #
-  # Pod and service addresses stay clear of the attached network's own prefix.
-  # Omit the block to take the API defaults (10.240.0.0/12 and 10.96.0.0/16);
-  # either way the values are fixed for the life of the cluster, so a collision
+  # Omit the block to take the API defaults (10.240.0.0/12 and 10.96.0.0/16).
+  # Either way the values are fixed for the life of the cluster, so a collision
   # discovered later means a rebuild rather than an update.
   cluster_network = {
     pod_cidr     = var.pod_cidr
@@ -138,7 +119,7 @@ resource "nscale_kubernetes_cluster" "main" {
   }
 
   # allowed_cidrs is always set, never left null. It is Optional+Computed, so
-  # omitting it inside a block that is present leaves it unknown on every plan
+  # omitting it inside a block that IS present leaves it unknown on every plan
   # and the example would never reach a clean "No changes." The allowlist
   # applies to the private endpoint as well as the public one.
   api_server = {
@@ -146,28 +127,175 @@ resource "nscale_kubernetes_cluster" "main" {
     allowed_cidrs = var.api_server_allowed_cidrs
   }
 
-  # A profile is an object, not a bool — the wrapper leaves room for per-profile
-  # settings beyond `enabled`.
-  addons = {
-    hardware = {
-      enabled = var.hardware_addon_enabled
-    }
+  # `addons` is omitted so the API applies its own defaults (hardware enabled on
+  # create) and they are read back into state.
+
+  tags = {
+    environment = "example"
+  }
+
+  # Return as soon as the cluster exists, so the node pools below are POSTed
+  # while it is still provisioning rather than after — which is what the console
+  # does and what the API permits. Nothing goes unwaited-for: a pool's own wait
+  # covers the control plane, since workers cannot reach ready before the API
+  # server is up. What this resource loses is status freshness, which is why the
+  # outputs read the data source at the bottom of this file instead.
+  #
+  # NOTE THIS MOVES THE BUILD ONTO THE POOLS' CREATE TIMEOUT. Setting a
+  # `timeouts { create }` here would do nothing — Create returns before it is
+  # read — so the 90m override lives on each pool below instead.
+  wait_for_provisioned = false
+
+  # `timeouts` is a block, so no `=`. Defaults are 60m create / 90m update /
+  # 30m delete. Override only to raise them: a timeout shorter than the real
+  # operation leaves a running, billing cluster that Terraform is no longer
+  # tracking.
+  timeouts {
+    update = "120m"
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Node pools. NKS models these as a separate top-level resource, so they
+# reference the cluster by ID rather than being a block on it — which is what
+# makes Terraform create the cluster first and destroy the pools first.
+# ---------------------------------------------------------------------------
+
+# Left null the pool is skipped: a cluster with no node pools is permitted by
+# the API, so the example does not force one. Flavor IDs are region-specific
+# UUIDs, so there is no honest default — use `nscale flavor list`.
+variable "worker_flavor_id" {
+  type        = string
+  description = "Compute flavor each worker runs on. Must exist in the cluster's region. Null skips the pool."
+  default     = null
+}
+
+variable "worker_replicas" {
+  type        = number
+  description = "Workers in the on-demand pool. 0 is valid and keeps the pool definition without running workers."
+  default     = 2
+
+  validation {
+    condition     = var.worker_replicas >= 0
+    error_message = "worker_replicas cannot be negative."
+  }
+}
+
+variable "gpu_reservation_id" {
+  type        = string
+  description = "Reservation to draw GPU capacity from. Leave null to skip the reservation-backed pool."
+  default     = null
+}
+
+variable "gpu_replicas" {
+  type        = number
+  description = "Workers in the reservation-backed pool. Changing this REBUILDS the pool — see the comment below."
+  default     = 1
+}
+
+# An on-demand pool. This is the one that behaves the way a Terraform user
+# expects: replicas, taints and labels are all in-place updates.
+resource "nscale_kubernetes_node_pool" "workers" {
+  count = var.worker_flavor_id == null ? 0 : 1
+
+  # name, cluster_id, provisioning_mode and compute.flavor_id are all immutable,
+  # so Terraform replaces the pool instead. To move a workload onto a different
+  # flavour without an outage, add a second pool and drain this one.
+  name        = "${var.name}-workers"
+  description = "On-demand workers managed by Terraform"
+
+  cluster_id        = nscale_kubernetes_cluster.main.id
+  provisioning_mode = "compute"
+  replicas          = var.worker_replicas
+
+  # Exactly the block matching provisioning_mode must be present; supplying the
+  # other one, or both, fails at plan time rather than at apply.
+  compute = {
+    flavor_id = var.worker_flavor_id
+  }
+
+  # Editing taints or labels ROLLS THE POOL. NKS applies both during node
+  # registration and never reconciles them onto running nodes, so the only way a
+  # change takes effect is by replacing every worker — one at a time, draining
+  # each through the Eviction API. Terraform shows it as an ordinary in-place
+  # update, because at the API level that is exactly what it is. Watch
+  # up_to_date_replicas to follow the roll.
+  taints = [{
+    key    = "workload"
+    value  = "general"
+    effect = "PreferNoSchedule"
+  }]
+
+  labels = {
+    tier = "standard"
   }
 
   tags = {
     environment = "example"
   }
 
-  # `timeouts` is a block, so no `=`. Defaults are 60m create / 90m update /
-  # 60m delete, sized from a measured 32-minute build. Override only to raise
-  # them — a create timeout shorter than the real build time fails an apply on
-  # a cluster that was going to come up fine, and leaves it running and billing
-  # with Terraform no longer tracking it.
+  # Defaults are 30m create / 60m update / 60m delete. Update and delete are
+  # double create because both walk the pool one worker at a time; cost is
+  # roughly replicas x per-node. No timeout is safe against an unsatisfiable
+  # PodDisruptionBudget — there is no drain timeout upstream — but a timeout
+  # mid-roll does not mean the roll failed, and the next apply resumes it.
   #
-  # Destroying a cluster that has node pools drains every worker first and
-  # honours PodDisruptionBudgets, and an unsatisfiable PDB blocks that with no
-  # deadline. If a destroy times out, fix the PDB rather than raise this.
+  # create is raised past its 30m default because the cluster above sets
+  # wait_for_provisioned = false: this wait is what covers the control-plane
+  # build, measured at 32m18s, as well as the workers joining.
+  timeouts {
+    create = "90m"
+    update = "90m"
+  }
+}
+
+# A reservation-backed pool, drawing on capacity reserved through
+# nscale_reservation.
+resource "nscale_kubernetes_node_pool" "gpu" {
+  count = var.gpu_reservation_id == null ? 0 : 1
+
+  name        = "${var.name}-gpu"
+  description = "Reservation-backed GPU workers managed by Terraform"
+
+  cluster_id        = nscale_kubernetes_cluster.main.id
+  provisioning_mode = "reservation"
+  replicas          = var.gpu_replicas
+
+  reservation = {
+    reservation_id = var.gpu_reservation_id
+  }
+
+  # The placement backing this pool NEVER ROLLS, so the API refuses any edit
+  # that could only take effect by recycling workers. replicas, taints and
+  # labels therefore all force REPLACEMENT here — `replicas 1 -> 2` is a rebuild
+  # that releases and re-claims the placement, not a scale. Only description and
+  # tags change in place. The plan does show the replacement.
+  taints = [{
+    key    = "nvidia.com/gpu"
+    value  = "true"
+    effect = "NoSchedule"
+  }]
+
+  tags = {
+    environment = "example"
+  }
+
+  # Same reasoning as the on-demand pool: with wait_for_provisioned = false on
+  # the cluster, this create wait is what covers the control-plane build.
   timeouts {
     create = "90m"
   }
+}
+
+# Read the cluster back once the pools exist. By then the control plane is
+# necessarily up, so this returns settled values the resource above does not yet
+# have. depends_on is what forces it to run last — without it Terraform is free
+# to read the cluster while the pools are still being created.
+data "nscale_kubernetes_cluster" "ready" {
+  id = nscale_kubernetes_cluster.main.id
+
+  depends_on = [
+    nscale_kubernetes_node_pool.workers,
+    nscale_kubernetes_node_pool.gpu,
+  ]
 }
