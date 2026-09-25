@@ -398,8 +398,13 @@ func (m *KubernetesClusterModel) NscaleClusterCreateParams(
 //
 // NKS update is a full object replacement — there is no PATCH endpoint, and the
 // team has deliberately not added one because merge semantics are ambiguous. So
-// this is built entirely from the plan, with no read-modify-write merging of
-// computed fields: any field omitted here is cleared, not left alone.
+// every modelled field comes from the plan: any field omitted here is cleared,
+// not left alone.
+//
+// The exception is the immutable fields this resource does not model, which
+// are copied from current (the live spec). Sending them as nil would ask the
+// API to clear them, which it rejects, so without this every update to an
+// imported cluster that has any of them set would fail.
 //
 // networkId must be present and must match the value the cluster was created
 // with; a different one is rejected. That holds automatically because
@@ -407,6 +412,7 @@ func (m *KubernetesClusterModel) NscaleClusterCreateParams(
 // rather than ever reaching this path.
 func (m *KubernetesClusterModel) NscaleClusterUpdateParams(
 	ctx context.Context,
+	current kubernetesapi.ClusterSpecV1,
 ) (kubernetesapi.ClusterV1Update, diag.Diagnostics) {
 	metadata, diagnostics := m.metadataRequest()
 	if diagnostics.HasError() {
@@ -422,16 +428,39 @@ func (m *KubernetesClusterModel) NscaleClusterUpdateParams(
 	return kubernetesapi.ClusterV1Update{
 		Metadata: metadata,
 		Spec: kubernetesapi.ClusterUpdateSpecV1{
-			NetworkId:         spec.networkID,
-			PlatformReleaseId: spec.platformReleaseID,
-			ApiServer:         spec.apiServer,
-			ClusterNetwork:    spec.clusterNetwork,
-			Addons:            spec.addons,
-			// See NscaleClusterCreateParams: not exposed, and immutable
-			// server-side anyway, so an update must not try to set it.
-			SshCertificateAuthorityId: nil,
+			NetworkId:                 spec.networkID,
+			PlatformReleaseId:         spec.platformReleaseID,
+			ApiServer:                 preserveAPIServerAuth(spec.apiServer, current.ApiServer),
+			ClusterNetwork:            spec.clusterNetwork,
+			Addons:                    spec.addons,
+			SshCertificateAuthorityId: current.SshCertificateAuthorityId,
 		},
 	}, diagnostics
+}
+
+// preserveAPIServerAuth copies the live authorization and authentication onto
+// the planned api_server. Both are immutable and unmodelled, so the live value
+// is the only one the API will accept.
+func preserveAPIServerAuth(
+	planned *kubernetesapi.ClusterApiServerAccessV1,
+	current *kubernetesapi.ClusterApiServerAccessV1,
+) *kubernetesapi.ClusterApiServerAccessV1 {
+	if current == nil || (current.Authorization == nil && current.Authentication == nil) {
+		return planned
+	}
+
+	preserved := kubernetesapi.ClusterApiServerAccessV1{
+		PublicIP:       nil,
+		AllowedCidrs:   nil,
+		Authorization:  current.Authorization,
+		Authentication: current.Authentication,
+	}
+	if planned != nil {
+		preserved.PublicIP = planned.PublicIP
+		preserved.AllowedCidrs = planned.AllowedCidrs
+	}
+
+	return &preserved
 }
 
 func (m *KubernetesClusterModel) apiServerRequest(
@@ -470,8 +499,9 @@ func (m *KubernetesClusterModel) apiServerRequest(
 		// API server RBAC bindings and external JWT/OIDC issuers are not
 		// exposed by this resource yet. Both are immutable after creation
 		// (including whether they are set at all), so they need their own
-		// design rather than being inferred from anything here — and sending
-		// nil leaves the cluster on the cell-wide defaults.
+		// design rather than being inferred from anything here. Create sends
+		// nil, leaving the cluster on the cell-wide defaults; update carries
+		// the live values through (see preserveAPIServerAuth).
 		Authorization:  nil,
 		Authentication: nil,
 	}, diagnostics

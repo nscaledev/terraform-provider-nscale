@@ -147,7 +147,7 @@ resource "nscale_kubernetes_cluster" "main" {
   wait_for_provisioned = false
 
   # `timeouts` is a block, so no `=`. Defaults are 60m create / 90m update /
-  # 30m delete. Override only to raise them: a timeout shorter than the real
+  # 60m delete. Override only to raise them: a timeout shorter than the real
   # operation leaves a running, billing cluster that Terraform is no longer
   # tracking.
   timeouts {

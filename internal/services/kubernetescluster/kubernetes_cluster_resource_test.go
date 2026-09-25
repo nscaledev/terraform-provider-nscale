@@ -83,7 +83,7 @@ resource "nscale_kubernetes_cluster" "test" {
 // testAccClusterConfigBoolZeroValues is the bool-zero-value guard from playbook
 // §1.6: an explicitly-configured false must survive the round trip. hardware in
 // particular defaults to TRUE server-side, so a dropped field flips the value.
-func testAccClusterConfigBoolZeroValues(name string) string {
+func testAccClusterConfigBoolZeroValues(name string, hardwareEnabled bool) string {
 	return testAccPlatformReleaseConfig() + fmt.Sprintf(`
 resource "nscale_kubernetes_cluster" "test" {
   name                = %[1]q
@@ -101,11 +101,11 @@ resource "nscale_kubernetes_cluster" "test" {
 
   addons = {
     hardware = {
-      enabled = false
+      enabled = %[2]t
     }
   }
 }
-`, name)
+`, name, hardwareEnabled)
 }
 
 // testAccClusterConfigClusterNetwork sets BOTH CIDRs explicitly. Configuring
@@ -211,23 +211,44 @@ func TestAccKubernetesClusterResource_basic(t *testing.T) {
 // counterpart of TestCreateParamsBoolZeroValues. If either bool is dropped on
 // the wire the API applies its own default, and the plan-only step fails with
 // "Provider produced inconsistent result after apply".
+//
+// The later steps toggle the hardware addon on and back off, proving it is
+// mutable in place. They reuse this cluster because a second build would add
+// half an hour to the suite.
 func TestAccKubernetesClusterResource_boolZeroValues(t *testing.T) {
 	name := acctest.RandomWithPrefix("tf-acc-test")
+
+	var clusterID string
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheckNKS(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccClusterConfigBoolZeroValues(name),
+				Config: testAccClusterConfigBoolZeroValues(name, false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(clusterResourceName, "api_server.public_ip", "false"),
 					resource.TestCheckResourceAttr(clusterResourceName, "addons.hardware.enabled", "false"),
+					captureClusterID(&clusterID),
 				),
 			},
 			{
-				Config:   testAccClusterConfigBoolZeroValues(name),
+				Config:   testAccClusterConfigBoolZeroValues(name, false),
 				PlanOnly: true,
+			},
+			{
+				Config: testAccClusterConfigBoolZeroValues(name, true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(clusterResourceName, "addons.hardware.enabled", "true"),
+					expectClusterID(&clusterID, true),
+				),
+			},
+			{
+				Config: testAccClusterConfigBoolZeroValues(name, false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(clusterResourceName, "addons.hardware.enabled", "false"),
+					expectClusterID(&clusterID, true),
+				),
 			},
 		},
 	})

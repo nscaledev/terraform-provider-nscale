@@ -477,7 +477,7 @@ func TestUpdateParamsMatchCreateParams(t *testing.T) {
 		t.Fatalf("building create params: %v", diagnostics)
 	}
 
-	updateParams, diagnostics := model.NscaleClusterUpdateParams(context.Background())
+	updateParams, diagnostics := model.NscaleClusterUpdateParams(context.Background(), fullCluster(t).Spec)
 	if diagnostics.HasError() {
 		t.Fatalf("building update params: %v", diagnostics)
 	}
@@ -507,7 +507,7 @@ func TestUpdateParamsRoundTripsTags(t *testing.T) {
 
 	model := NewKubernetesClusterModel(fullCluster(t))
 
-	params, diagnostics := model.NscaleClusterUpdateParams(context.Background())
+	params, diagnostics := model.NscaleClusterUpdateParams(context.Background(), fullCluster(t).Spec)
 	if diagnostics.HasError() {
 		t.Fatalf("building update params: %v", diagnostics)
 	}
@@ -519,5 +519,77 @@ func TestUpdateParamsRoundTripsTags(t *testing.T) {
 	tags := *params.Metadata.Tags
 	if len(tags) != 1 || tags[0].Name != "env" || tags[0].Value != "prod" {
 		t.Errorf("tags = %v, want [{env prod}]", tags)
+	}
+}
+
+// TestUpdateParamsPreserveUnmodelledImmutableFields covers a cluster imported
+// with fields this resource does not model. They are immutable, so a PUT that
+// omits them is rejected; the update must carry the live values through.
+func TestUpdateParamsPreserveUnmodelledImmutableFields(t *testing.T) {
+	t.Parallel()
+
+	current := fullCluster(t).Spec
+	current.SshCertificateAuthorityId = new("ssh-ca-1")
+	current.ApiServer.Authorization = &kubernetesapi.ClusterApiServerAuthorizationV1{
+		ClusterRoleBindings: []kubernetesapi.ClusterRoleBindingV1{},
+	}
+	current.ApiServer.Authentication = &kubernetesapi.ClusterApiServerAuthenticationV1{}
+
+	tests := map[string]types.Object{
+		"api_server planned": NewKubernetesClusterModel(fullCluster(t)).APIServer,
+		"api_server omitted": types.ObjectNull(apiServerAttrTypes()),
+		"api_server unknown": types.ObjectUnknown(apiServerAttrTypes()),
+	}
+
+	for name, apiServer := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			model := NewKubernetesClusterModel(fullCluster(t))
+			model.APIServer = apiServer
+
+			params, diagnostics := model.NscaleClusterUpdateParams(context.Background(), current)
+			if diagnostics.HasError() {
+				t.Fatalf("building update params: %v", diagnostics)
+			}
+
+			spec := params.Spec
+			if spec.SshCertificateAuthorityId == nil || *spec.SshCertificateAuthorityId != "ssh-ca-1" {
+				t.Errorf("sshCertificateAuthorityId = %v, want ssh-ca-1", spec.SshCertificateAuthorityId)
+			}
+			if spec.ApiServer == nil {
+				t.Fatal("apiServer must be sent to carry authorization and authentication")
+			}
+			if spec.ApiServer.Authorization != current.ApiServer.Authorization {
+				t.Error("apiServer.authorization was not carried through from the live spec")
+			}
+			if spec.ApiServer.Authentication != current.ApiServer.Authentication {
+				t.Error("apiServer.authentication was not carried through from the live spec")
+			}
+		})
+	}
+}
+
+// TestUpdateParamsOmitAbsentUnmodelledFields is the counterpart: a cluster
+// without the unmodelled fields must not grow an apiServer object on update.
+func TestUpdateParamsOmitAbsentUnmodelledFields(t *testing.T) {
+	t.Parallel()
+
+	model := NewKubernetesClusterModel(fullCluster(t))
+	model.APIServer = types.ObjectNull(apiServerAttrTypes())
+
+	current := fullCluster(t).Spec
+	current.ApiServer = nil
+
+	params, diagnostics := model.NscaleClusterUpdateParams(context.Background(), current)
+	if diagnostics.HasError() {
+		t.Fatalf("building update params: %v", diagnostics)
+	}
+
+	if params.Spec.ApiServer != nil {
+		t.Errorf("apiServer = %+v, want nil", params.Spec.ApiServer)
+	}
+	if params.Spec.SshCertificateAuthorityId != nil {
+		t.Errorf("sshCertificateAuthorityId = %q, want nil", *params.Spec.SshCertificateAuthorityId)
 	}
 }

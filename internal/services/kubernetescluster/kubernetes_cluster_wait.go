@@ -44,13 +44,17 @@ const (
 	// Update is longer still: changing platform_release_id is a rolling
 	// control-plane upgrade rather than a configuration write.
 	//
+	// Delete was measured at 2m11s, but on a cluster with no node pools. With
+	// pools it drains every worker first, and nothing upstream bounds a drain
+	// blocked by a PodDisruptionBudget. See the spec's "Why delete goes to 60m".
+	//
 	// Raise these rather than lower them. The cost of an over-long default is a
 	// slow failure on a cluster that was never coming up; the cost of a short
 	// one is a failed apply on a cluster that was fine, which leaves state and
 	// reality disagreeing.
 	defaultCreateTimeout = 60 * time.Minute
 	defaultUpdateTimeout = 90 * time.Minute
-	defaultDeleteTimeout = 30 * time.Minute
+	defaultDeleteTimeout = 60 * time.Minute
 )
 
 // clusterTarget describes a cluster to the shared waiter.

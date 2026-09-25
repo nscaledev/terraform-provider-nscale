@@ -290,9 +290,10 @@ func (r *KubernetesClusterResource) Schema(
 							// profile itself is present, making omit-the-block and
 							// omit-just-the-field behave differently for no good reason.
 							"enabled": schema.BoolAttribute{
-								MarkdownDescription: "Whether the addon profile is enabled. Defaults to `true`.",
-								Optional:            true,
-								Computed:            true,
+								MarkdownDescription: "Whether the addon profile is enabled. Defaults to `true`. " +
+									"Can be changed in place without replacing the cluster.",
+								Optional: true,
+								Computed: true,
 							},
 						},
 					},
@@ -569,7 +570,19 @@ func (r *KubernetesClusterResource) Update(
 
 	id := data.ID.ValueString()
 
-	params, diagnostics := data.NscaleClusterUpdateParams(ctx)
+	// Read the live spec so the PUT can carry the immutable fields this
+	// resource does not model. See NscaleClusterUpdateParams.
+	current, err := getCluster(ctx, r.client, id)
+	if err != nil {
+		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
+		response.Diagnostics.AddError(
+			"Failed to Update Kubernetes Cluster",
+			fmt.Sprintf("An error occurred while reading the cluster before updating it: %s", err),
+		)
+		return
+	}
+
+	params, diagnostics := data.NscaleClusterUpdateParams(ctx, current.Spec)
 	response.Diagnostics.Append(diagnostics...)
 	if response.Diagnostics.HasError() {
 		return

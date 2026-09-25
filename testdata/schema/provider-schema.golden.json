@@ -3132,7 +3132,7 @@
                         "attributes": {
                           "enabled": {
                             "computed": true,
-                            "description": "Whether the addon profile is enabled. Defaults to `true`.",
+                            "description": "Whether the addon profile is enabled. Defaults to `true`. Can be changed in place without replacing the cluster.",
                             "description_kind": "markdown",
                             "optional": true,
                             "type": "bool"

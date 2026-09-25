@@ -145,7 +145,7 @@ Optional:
 
 Optional:
 
-- `enabled` (Boolean) Whether the addon profile is enabled. Defaults to `true`.
+- `enabled` (Boolean) Whether the addon profile is enabled. Defaults to `true`. Can be changed in place without replacing the cluster.
 
 
 <a id="nestedatt--api_server"></a>
@@ -221,7 +221,7 @@ The `timeouts` block supports:
 
 * `create` - (Default `60m`)
 * `update` - (Default `90m`)
-* `delete` - (Default `30m`)
+* `delete` - (Default `60m`)
 
 These defaults are deliberately generous. A cluster measured on a development environment took **32 minutes** to reach
 `provisioned`; the defaults allow roughly twice that, because build time varies with region and load.

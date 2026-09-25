@@ -630,7 +630,9 @@ check that proves the Optional+Computed defaults (`api_server`, `cluster_network
   written** — `spec.sshCertificateAuthorityId` ("Immutable after creation,
   including whether it is set"), `apiServer.authorization` and
   `apiServer.authentication` (both fixed at creation). None are modelled here;
-  see open question 7.
+  see open question 7. Because update is a full replacement, Update reads the
+  live cluster first and copies all three into the PUT unchanged — otherwise an
+  imported cluster with any of them set could never be updated.
 - `409 Conflict` on `updateCluster` — concurrent modification. Surface unmodified
   per [playbook §3.1](../.claude/skills/tf-provider-feature/reference/playbook.md);
   do not auto-retry (it is not transient, it means someone else wrote).
