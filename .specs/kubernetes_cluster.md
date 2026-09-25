@@ -19,15 +19,24 @@ Named `kubernetescluster` (not `kubernetes`) to sit alongside the existing
 
 ## ✅ Resolved: how we get the NKS Go client
 
-> **Decided 2026-08-25: option (B).** Kept as a decision record; the analysis
-> below is the state of the world at the time. Since then the SDK-wide migration
-> landed independently (PR #74), so the provider's `main` is on
-> `nscale-sdk-go v0.3.0` and option (A) is no longer hypothetical. The in-tree
-> client stays for now because the SDK's *released* `kubernetes` package still
-> vendors the older 66,291-byte spec, which has neither the `organizationID`
-> filter nor `usableOrganizationIds` that the platform-releases data source
-> below depends on. `nscale-sdk-go` `main` does carry the current spec, so the
-> swap becomes safe as soon as a tag containing it exists.
+> **Decided 2026-08-25: option (B). Superseded 2026-09-24 — the follow-up
+> landed, and the provider is now on option (A).** Everything below is kept as a
+> decision record of the state of the world at the time; it no longer describes
+> the code.
+>
+> The sequence was: the SDK-wide migration landed independently (PR #74), which
+> put the provider on `nscale-sdk-go v0.3.0` and removed `common`. The in-tree
+> client still had to stay, because the *released* `kubernetes` package vendored
+> an older spec with neither the `organizationID` filter nor
+> `usableOrganizationIds`, and its `clusterAddons.hardware` was a bare bool
+> rather than an addon-profile object — adopting it would have been a breaking
+> change to shipped schema. `v0.4.0` shipped the current spec, so PR #89 deleted
+> the in-tree package and swapped the import to `nscale-sdk-go/kubernetes`. The
+> provider schema baseline was unchanged by that swap.
+>
+> One wrinkle worth recording: `v0.4.0` also enabled `always-prefix-enum-values`
+> across every SDK package, so bare enum constants stopped resolving
+> repo-wide — `internal/services/reservation` needed renames too.
 
 The ticket says "generate the NKS Go client in `nscale-sdk-go` (new `nks`
 package)". **That work is already done** — but not in a version we can consume
@@ -68,7 +77,7 @@ costs real money to run. Not deliverable safely by Friday.
 **(B) Generate the NKS client locally into this repo. ← recommended**
 `oapi-codegen` is already a declared tool in `go.mod`
 (`tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen`). Generate from
-the ticket's spec URL into `internal/nks/nks.gen.go` with a `//go:generate`
+the ticket's spec URL into an in-tree client with a `//go:generate`
 directive, exactly as `nscale-sdk-go` does. Blast radius: zero — nothing
 existing changes. The NKS spec is self-contained (it inlines its own `Error`,
 `ResourceMetadata`, `Tag`, `StaticResourceMetadata`), so it needs no `common`.
@@ -84,7 +93,7 @@ against a Friday deadline.
 **(B) now, (A) as a tracked follow-up.** Ship NKS behind a locally-generated
 client this week; do the SDK-wide `v0.2.0` migration as a dedicated PR with the
 full acceptance suite behind it. When that lands, swapping
-`internal/nks` → `nscale-sdk-go/kubernetes` is an import-path change, because
+the in-tree client → `nscale-sdk-go/kubernetes` is an import-path change, because
 the generated types are identical (same spec, same generator).
 
 Cost of the follow-up: one import rewrite in one package. Cost of getting (A)
@@ -375,14 +384,21 @@ status.observedGeneration != nil && *status.observedGeneration >= metadata.gener
 
 | Phase | Pending | Target | Hard failure |
 | --- | --- | --- | --- |
-| Create / Update | not settled; `pending`; `provisioning`; `provisioned` ∧ (`degraded` ∨ `unknown`) | settled ∧ `provisioned` ∧ `healthy` | `error` provisioning, or settled ∧ `provisioned` ∧ `healthStatus == error` |
+| Create / Update | not settled; `pending`; `provisioning` | settled ∧ `provisioned` | settled ∧ `error` provisioning |
 | Delete | `deprovisioning`, or any still-readable state | 404 | `provisioningStatus == error` **after deprovisioning has been observed** → terminal, fail immediately rather than waiting out the timeout |
 
-Success is all three conditions, not merely "not error": `healthy` is required,
-so `degraded` and `unknown` keep polling rather than passing. **Audited
-2026-09-07 — the implemented `classify` does exactly this.** (An earlier draft of
-this table wrote the target as `healthStatus != error`, which would have let a
-`degraded` cluster pass. It never shipped that way.)
+Success is settledness plus `provisioned`. **`healthStatus` is not consulted
+at all** — NKS documents health as an independent signal that "does not
+determine convergence", and gating on it hangs the apply on resources the API
+considers done: a single NotReady worker degrades a converged pool. Observed on
+staging 2026-09-16, where an earlier `Classify` polled a `provisioned`/`degraded`
+pool to the deadline. Callers expose `health_status` as a computed attribute
+instead, so a degraded resource is visible without blocking.
+
+**Revised 2026-09-24** (PR #89). An earlier version of this table required
+`healthy` in Target and made `healthStatus == error` a hard failure, and was
+audited against the code on 2026-09-07 when that was still true. It is not the
+shipped behaviour — see `nkswait.Classify`.
 
 The delete rule is deliberately narrower than the shared `DeleteStateWatcher`,
 which treats `error` as terminal from the first poll. A cluster that was already
@@ -480,8 +496,8 @@ any of them is a plan whose apply always fails.
 | --- | --- | --- |
 | `network_id` | immutable — CEL rule + server 422 *"networkId is immutable"* | **`RequiresReplace`** ✅ already correct |
 | `name` | immutable — server 422 *"cluster names are immutable"* | **`RequiresReplace`** ⚠️ **changed** |
-| `cluster_network.pod_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`RequiresReplace`** ⚠️ **changed** |
-| `cluster_network.service_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`RequiresReplace`** ⚠️ **changed** |
+| `cluster_network.pod_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`UseStateForUnknown` + `RequiresReplace`** ⚠️ **changed** |
+| `cluster_network.service_cidr` | immutable — CEL `self == oldSelf` + server 422 | **`UseStateForUnknown` + `RequiresReplace`** ⚠️ **changed** |
 | `platform_release_id` | mutable — in-place rolling control-plane upgrade | no modifier ✅ already correct |
 | `description`, `tags`, `api_server.*`, `addons.hardware.enabled` | mutable in place | no modifier |
 
@@ -505,6 +521,25 @@ modes are asymmetric: an unnecessary `RequiresReplace` is a needless rebuild the
 user can see coming in the plan, while a missing one is a plan that promises an
 in-place change and then 422s mid-apply. Loosening later is safe; tightening is a
 breaking change ([playbook §6.1](../.claude/skills/tf-provider-feature/reference/playbook.md)).
+
+### `RequiresReplace` on an Optional+Computed field needs `UseStateForUnknown`
+
+The two CIDRs are `Optional+Computed`, so configuring one and omitting the other
+leaves the omitted one **unknown** in the plan. `RequiresReplace` compares the
+*planned* value against state, not the *configured* value — so an unknown
+sibling reads as a change and triggers a replacement nobody asked for. Pairing
+it with `UseStateForUnknown` (declared first, so it runs first) pins the omitted
+value to state and the comparison comes out equal.
+
+That pairing is also correct on the merits rather than just a workaround: the
+field is immutable, so state is exactly what the server will keep reporting.
+
+The same reasoning does **not** extend to `api_server.*` or
+`addons.hardware.enabled`. Those are mutable and carry no `RequiresReplace`, so
+an unknown there costs a `(known after apply)` line in the plan rather than a
+rebuild — and because NKS updates are a full PUT, pinning a mutable field to
+state would risk promising a value the server then re-defaults away. Configure
+those fields explicitly rather than half-specifying the block.
 
 ### Consequence for the update path
 
@@ -595,7 +630,9 @@ check that proves the Optional+Computed defaults (`api_server`, `cluster_network
   written** — `spec.sshCertificateAuthorityId` ("Immutable after creation,
   including whether it is set"), `apiServer.authorization` and
   `apiServer.authentication` (both fixed at creation). None are modelled here;
-  see open question 7.
+  see open question 7. Because update is a full replacement, Update reads the
+  live cluster first and copies all three into the PUT unchanged — otherwise an
+  imported cluster with any of them set could never be updated.
 - `409 Conflict` on `updateCluster` — concurrent modification. Surface unmodified
   per [playbook §3.1](../.claude/skills/tf-provider-feature/reference/playbook.md);
   do not auto-retry (it is not transient, it means someone else wrote).
@@ -621,8 +658,9 @@ Flagging rather than expanding scope — that is the ticket owner's call, and th
 node pool spec (`NodePoolRequestSpecV1`: provisioning modes, taints,
 reservations, flavours, autoscaling) is comparable in size to this one.
 
-Node pools are now specified separately (`.specs/kubernetes_node_pool.md`, PR
-#77). Nothing about their attribute surface belongs here, but two of their
+Node pools shipped separately (PR #89); their attribute surface is documented
+in `website/docs/r/kubernetes_node_pool.html.markdown`. Nothing about it
+belongs here, but two of their
 properties reach back into this resource and are covered above: the cluster's
 `provisioned`/`healthy` aggregate includes every pool
 ([waiter semantics](#what-those-statuses-aggregate-upstream)), and pool node
@@ -830,10 +868,10 @@ median — a 30m default would pass on a fast day and fail on a slow one.
 ## Open questions
 
 1. ~~**SDK strategy?**~~ **Decided 2026-08-25: (B).** The client is generated
-   in-tree at `internal/nks/` from the canonical spec, via the `oapi-codegen`
+   in-tree from the canonical spec, via the `oapi-codegen`
    tool already declared in `go.mod`. `make nks-spec` refreshes it. The SDK-wide
    `v0.2.0` migration is a tracked follow-up; when it lands, delete
-   `internal/nks/` and swap the import path.
+   the in-tree package and swap the import path.
 
    Note this required bumping `oapi-codegen` v2.5.0 → v2.8.0: v2.5.0 no longer
    compiles against the repo's `kin-openapi` v0.144.0 (bumped by dependabot in
@@ -871,7 +909,7 @@ median — a 30m default would pass on a fast day and fail on a slow one.
    **The lesson worth keeping: verify mutability against the CRD and a real
    mutation, not against the OpenAPI annotations.**
 5. **Node pools — separate ticket?** A cluster without them has no workers. See
-   scope note above. Now specified in `.specs/kubernetes_node_pool.md` (PR #77).
+   scope note above. Shipped in PR #89.
 6. **`nscale_kubernetes_cluster_auth` fast-follow — confirm deferred.** This spec
    ships the documented `exec` block only.
 7. **Three new immutable spec fields — model now or defer?** The canonical spec

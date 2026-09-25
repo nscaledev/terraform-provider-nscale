@@ -157,6 +157,65 @@ func TestNameValidator(t *testing.T) {
 	}
 }
 
+func TestKubernetesQualifiedNameValidator(t *testing.T) {
+	testCases := []struct {
+		name    string
+		value   types.String
+		wantErr bool
+	}{
+		{"bare name", types.StringValue("workload"), false},
+		{"prefixed", types.StringValue("nvidia.com/gpu"), false},
+		{"mixed case name", types.StringValue("myKey"), false},
+		{"dots and underscores", types.StringValue("a.b_c-d"), false},
+		{"single character", types.StringValue("a"), false},
+		{"space", types.StringValue("not valid"), true},
+		{"trailing dot", types.StringValue("key."), true},
+		{"uppercase prefix", types.StringValue("Nvidia.com/gpu"), true},
+		{"empty", types.StringValue(""), true},
+		{"null is skipped", types.StringNull(), false},
+		{"unknown is skipped", types.StringUnknown(), false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			response := runStringValidator(KubernetesQualifiedNameValidator(), testCase.value)
+
+			if got := response.Diagnostics.HasError(); got != testCase.wantErr {
+				t.Fatalf("HasError() = %v, want %v (diags: %v)", got, testCase.wantErr, response.Diagnostics)
+			}
+		})
+	}
+}
+
+func TestKubernetesLabelValueValidator(t *testing.T) {
+	testCases := []struct {
+		name    string
+		value   types.String
+		wantErr bool
+	}{
+		// Empty is legal and meaningful: the label is still applied.
+		{"empty", types.StringValue(""), false},
+		{"simple", types.StringValue("standard"), false},
+		{"mixed case with punctuation", types.StringValue("A-b_c.1"), false},
+		{"space", types.StringValue("not valid"), true},
+		{"leading hyphen", types.StringValue("-x"), true},
+		{"trailing dot", types.StringValue("x."), true},
+		{"slash is not allowed in a value", types.StringValue("a/b"), true},
+		{"null is skipped", types.StringNull(), false},
+		{"unknown is skipped", types.StringUnknown(), false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			response := runStringValidator(KubernetesLabelValueValidator(), testCase.value)
+
+			if got := response.Diagnostics.HasError(); got != testCase.wantErr {
+				t.Fatalf("HasError() = %v, want %v (diags: %v)", got, testCase.wantErr, response.Diagnostics)
+			}
+		})
+	}
+}
+
 func TestNoReservedPrefixValidator(t *testing.T) {
 	const prefix = "nscale-"
 

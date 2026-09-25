@@ -59,7 +59,30 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 	identity_service_api_endpoint) emit NSCALE_IDENTITY_SERVICE_API_ENDPOINT "$val" "$key" ;;
 	storage_service_api_endpoint) emit NSCALE_STORAGE_SERVICE_API_ENDPOINT "$val" "$key" ;;
 	reservation_service_api_endpoint) emit NSCALE_RESERVATION_SERVICE_API_ENDPOINT "$val" "$key" ;;
+	# Unlike the endpoints above this one has no provider-side default, so an
+	# omitted key means the kubernetescluster tests skip rather than fall back.
+	nks_service_api_endpoint) emit NSCALE_NKS_SERVICE_API_ENDPOINT "$val" "$key" ;;
 	service_token) emit NSCALE_SERVICE_TOKEN "$val" "$key" ;;
+	# NKS. This block MUST stay above the generic rules below.
+	#
+	# Most of these suffixes are unambiguous, because a glob has to match the
+	# whole suffix: *_nks_network_id_alt cannot be mistaken for
+	# *_nks_network_id, so those stay order-independent.
+	#
+	# *_nks_flavor_id is the exception, and the reason this block moved up: it
+	# also matches the generic *_flavor_id, and `case` takes the FIRST matching
+	# pattern. Below the generic rule, the node pool's worker flavor would be
+	# exported as NSCALE_TEST_FLAVOR_ID and every node pool test would skip —
+	# silently, a long way into an expensive run.
+	*_nks_cluster_id) emit NSCALE_TEST_NKS_CLUSTER_ID "$val" "$key" ;;
+	*_nks_cluster_id_alt) emit NSCALE_TEST_NKS_CLUSTER_ID_ALT "$val" "$key" ;;
+	*_nks_flavor_id) emit NSCALE_TEST_NKS_FLAVOR_ID "$val" "$key" ;;
+	*_nks_flavor_id_alt) emit NSCALE_TEST_NKS_FLAVOR_ID_ALT "$val" "$key" ;;
+	*_nks_network_id) emit NSCALE_TEST_NKS_NETWORK_ID "$val" "$key" ;;
+	*_nks_network_id_alt) emit NSCALE_TEST_NKS_NETWORK_ID_ALT "$val" "$key" ;;
+	*_nks_platform_release_id) emit NSCALE_TEST_NKS_PLATFORM_RELEASE_ID "$val" "$key" ;;
+	*_nks_platform_release_upgrade_id) emit NSCALE_TEST_NKS_PLATFORM_RELEASE_UPGRADE_ID "$val" "$key" ;;
+	*_nks_reservation_id) emit NSCALE_TEST_NKS_RESERVATION_ID "$val" "$key" ;;
 	*_org_id) emit NSCALE_ORGANIZATION_ID "$val" "$key" ;;
 	*_project_id) emit NSCALE_PROJECT_ID "$val" "$key" ;;
 	*_region_id) emit NSCALE_REGION_ID "$val" "$key" ;;

@@ -412,3 +412,15 @@ Terraform.
 
 **A production endpoint default.** Pending the NKS service migration;
 `nks_service_api_endpoint` must be set explicitly until then.
+
+**API server authorization and authentication.** The NKS spec now carries
+`apiServer.authorization` (tenant ClusterRole bindings) and
+`apiServer.authentication` (the Nscale webhook toggle plus external JWT/OIDC
+issuers). Neither is exposed here. Both are immutable after creation —
+*including whether they are set at all* — so they need a deliberate design
+rather than being inferred, and a cluster created without them stays on the
+cell-wide defaults.
+
+**`ssh_certificate_authority_id`.** Also new in the spec, also immutable after
+creation, also not exposed. It nominates a region SSH CA trusted for cluster
+workers, which only becomes useful alongside node pools.
