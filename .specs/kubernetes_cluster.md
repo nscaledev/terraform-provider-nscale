@@ -629,10 +629,15 @@ check that proves the Optional+Computed defaults (`api_server`, `cluster_network
 - **The canonical spec has grown three more immutable fields since this spec was
   written** — `spec.sshCertificateAuthorityId` ("Immutable after creation,
   including whether it is set"), `apiServer.authorization` and
-  `apiServer.authentication` (both fixed at creation). None are modelled here;
-  see open question 7. Because update is a full replacement, Update reads the
-  live cluster first and copies all three into the PUT unchanged — otherwise an
-  imported cluster with any of them set could never be updated.
+  `apiServer.authentication` (both fixed at creation). **All three are now
+  modelled** (2026-09-29): `ssh_certificate_authority_id` and
+  `api_server.{authorization,authentication}`, all RequiresReplace on any
+  change. nks-core main has since relaxed the last two to *removal-only*
+  (bindings, subjects and external issuers removable in place), but production
+  still returns 422 "is immutable" for a removal (verified 2026-09-29). The
+  removal rules are ported and unit-tested in `api_server_access.go` behind
+  `removalsApplyInPlace = false`; flip it, and the `_apiServerAccess` plan check,
+  when that ships.
 - `409 Conflict` on `updateCluster` — concurrent modification. Surface unmodified
   per [playbook §3.1](../.claude/skills/tf-provider-feature/reference/playbook.md);
   do not auto-retry (it is not transient, it means someone else wrote).
@@ -923,6 +928,13 @@ median — a 30m default would pass on a fast day and fail on a slow one.
    `authentication` (webhook override + external OIDC issuers) to their own
    change — both are immutable, so they are `RequiresReplace` blocks that need
    their own acceptance coverage, and neither is on the DX-2007 critical path.
+   **Resolved 2026-09-29: all three modelled.** Choices worth knowing:
+   Optional, not Computed (config is truth, so an omission shows in the plan
+   rather than being silently kept); sets for bindings and subjects (the API
+   compares them as sets); lists for issuers and audiences (the API compares
+   those in order, so a reordering set would turn a removal into a
+   replacement); `username_claim` defaults to `sub` because the server stores
+   and returns that default.
 8. **Networking behaviour with an existing corporate-routed network** — worker
    IPAM, pod-egress SNAT, and how `Service type=LoadBalancer` selects private vs
    public. See

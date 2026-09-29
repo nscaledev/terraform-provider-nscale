@@ -44,8 +44,9 @@ type KubernetesClusterModel struct {
 	Description types.String `tfsdk:"description"`
 	Tags        types.Map    `tfsdk:"tags"`
 
-	NetworkID         types.String `tfsdk:"network_id"`
-	PlatformReleaseID types.String `tfsdk:"platform_release_id"`
+	NetworkID                 types.String `tfsdk:"network_id"`
+	PlatformReleaseID         types.String `tfsdk:"platform_release_id"`
+	SSHCertificateAuthorityID types.String `tfsdk:"ssh_certificate_authority_id"`
 
 	APIServer      types.Object `tfsdk:"api_server"`
 	ClusterNetwork types.Object `tfsdk:"cluster_network"`
@@ -74,8 +75,10 @@ type KubernetesClusterModel struct {
 // apiServerModel mirrors clusterApiServerAccessV1 — the requested API server
 // exposure. Distinct from apiServerEndpointModel, which is the observed result.
 type apiServerModel struct {
-	PublicIP     types.Bool `tfsdk:"public_ip"`
-	AllowedCIDRs types.Set  `tfsdk:"allowed_cidrs"`
+	PublicIP       types.Bool   `tfsdk:"public_ip"`
+	AllowedCIDRs   types.Set    `tfsdk:"allowed_cidrs"`
+	Authorization  types.Object `tfsdk:"authorization"`
+	Authentication types.Object `tfsdk:"authentication"`
 }
 
 type clusterNetworkModel struct {
@@ -98,8 +101,10 @@ type addonProfileModel struct {
 
 func apiServerAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"public_ip":     types.BoolType,
-		"allowed_cidrs": types.SetType{ElemType: types.StringType},
+		"public_ip":      types.BoolType,
+		"allowed_cidrs":  types.SetType{ElemType: types.StringType},
+		"authorization":  types.ObjectType{AttrTypes: authorizationAttrTypes()},
+		"authentication": types.ObjectType{AttrTypes: authenticationAttrTypes()},
 	}
 }
 
@@ -149,8 +154,9 @@ func NewKubernetesClusterModel(source *kubernetesapi.ClusterV1Read) KubernetesCl
 		Description: types.StringPointerValue(metadata.Description),
 		Tags:        tftypes.TagMapValueMust(metadata.Tags),
 
-		NetworkID:         types.StringValue(spec.NetworkId),
-		PlatformReleaseID: types.StringValue(spec.PlatformReleaseId),
+		NetworkID:                 types.StringValue(spec.NetworkId),
+		PlatformReleaseID:         types.StringValue(spec.PlatformReleaseId),
+		SSHCertificateAuthorityID: types.StringPointerValue(spec.SshCertificateAuthorityId),
 
 		APIServer:      apiServerObjectValue(spec.ApiServer),
 		ClusterNetwork: clusterNetworkObjectValue(spec.ClusterNetwork),
@@ -177,23 +183,35 @@ func NewKubernetesClusterModel(source *kubernetesapi.ClusterV1Read) KubernetesCl
 	}
 }
 
+// defaultAllowedCIDR is the API server allowlist NKS applies when none is set.
+const defaultAllowedCIDR = "0.0.0.0/0"
+
 func apiServerObjectValue(source *kubernetesapi.ClusterApiServerAccessV1) types.Object {
 	if source == nil {
 		return types.ObjectNull(apiServerAttrTypes())
 	}
 
-	allowedCIDRs := types.SetNull(types.StringType)
-	if source.AllowedCidrs != nil {
-		elements := make([]attr.Value, 0, len(*source.AllowedCidrs))
-		for _, cidr := range *source.AllowedCidrs {
-			elements = append(elements, types.StringValue(cidr))
-		}
-		allowedCIDRs = types.SetValueMust(types.StringType, elements)
+	// An absent allowlist reads as the documented default. NKS returns none for a
+	// cluster created without one, but fills in 0.0.0.0/0 on a later update
+	// (seen on production 2026-09-29), so a null in state would make that update
+	// fail as an inconsistent result. The two are equivalent: 0.0.0.0/0 admits
+	// every source, as no allowlist does.
+	cidrs := []string{defaultAllowedCIDR}
+	if source.AllowedCidrs != nil && len(*source.AllowedCidrs) > 0 {
+		cidrs = *source.AllowedCidrs
 	}
 
+	elements := make([]attr.Value, 0, len(cidrs))
+	for _, cidr := range cidrs {
+		elements = append(elements, types.StringValue(cidr))
+	}
+	allowedCIDRs := types.SetValueMust(types.StringType, elements)
+
 	return types.ObjectValueMust(apiServerAttrTypes(), map[string]attr.Value{
-		"public_ip":     types.BoolPointerValue(source.PublicIP),
-		"allowed_cidrs": allowedCIDRs,
+		"public_ip":      types.BoolPointerValue(source.PublicIP),
+		"allowed_cidrs":  allowedCIDRs,
+		"authorization":  authorizationObjectValue(source.Authorization),
+		"authentication": authenticationObjectValue(source.Authentication),
 	})
 }
 
@@ -320,11 +338,12 @@ func eligibleTargetsValue(source *kubernetesapi.ClusterReleaseStatusV1) types.Li
 // identical fields, so building this once keeps the two request bodies from
 // drifting apart.
 type writeSpec struct {
-	networkID         string
-	platformReleaseID string
-	apiServer         *kubernetesapi.ClusterApiServerAccessV1
-	clusterNetwork    *kubernetesapi.ClusterNetworkV1
-	addons            *kubernetesapi.ClusterAddonsCreateV1
+	networkID                 string
+	platformReleaseID         string
+	sshCertificateAuthorityID *string
+	apiServer                 *kubernetesapi.ClusterApiServerAccessV1
+	clusterNetwork            *kubernetesapi.ClusterNetworkV1
+	addons                    *kubernetesapi.ClusterAddonsCreateV1
 }
 
 func (m *KubernetesClusterModel) writeSpec(ctx context.Context) (writeSpec, diag.Diagnostics) {
@@ -344,11 +363,12 @@ func (m *KubernetesClusterModel) writeSpec(ctx context.Context) (writeSpec, diag
 	}
 
 	return writeSpec{
-		networkID:         m.NetworkID.ValueString(),
-		platformReleaseID: m.PlatformReleaseID.ValueString(),
-		apiServer:         apiServer,
-		clusterNetwork:    clusterNetwork,
-		addons:            addons,
+		networkID:                 m.NetworkID.ValueString(),
+		platformReleaseID:         m.PlatformReleaseID.ValueString(),
+		sshCertificateAuthorityID: m.SSHCertificateAuthorityID.ValueStringPointer(),
+		apiServer:                 apiServer,
+		clusterNetwork:            clusterNetwork,
+		addons:                    addons,
 	}, diagnostics
 }
 
@@ -383,16 +403,12 @@ func (m *KubernetesClusterModel) NscaleClusterCreateParams(
 	return kubernetesapi.ClusterV1Create{
 		Metadata: metadata,
 		Spec: kubernetesapi.ClusterCreateSpecV1{
-			NetworkId:         spec.networkID,
-			PlatformReleaseId: spec.platformReleaseID,
-			ApiServer:         spec.apiServer,
-			ClusterNetwork:    spec.clusterNetwork,
-			Addons:            spec.addons,
-			// Not exposed by this resource yet, so never sent. Worker SSH CA
-			// trust is immutable after creation, including whether it is set,
-			// which makes it a deliberate follow-up rather than something to
-			// wire up implicitly.
-			SshCertificateAuthorityId: nil,
+			NetworkId:                 spec.networkID,
+			PlatformReleaseId:         spec.platformReleaseID,
+			ApiServer:                 spec.apiServer,
+			ClusterNetwork:            spec.clusterNetwork,
+			Addons:                    spec.addons,
+			SshCertificateAuthorityId: spec.sshCertificateAuthorityID,
 		},
 	}, diagnostics
 }
@@ -401,21 +417,18 @@ func (m *KubernetesClusterModel) NscaleClusterCreateParams(
 //
 // NKS update is a full object replacement — there is no PATCH endpoint, and the
 // team has deliberately not added one because merge semantics are ambiguous. So
-// every modelled field comes from the plan: any field omitted here is cleared,
-// not left alone.
-//
-// The exception is the immutable fields this resource does not model, which
-// are copied from current (the live spec). Sending them as nil would ask the
-// API to clear them, which it rejects, so without this every update to an
-// imported cluster that has any of them set would fail.
+// this is built entirely from the plan: any field omitted here is cleared, not
+// left alone. Every writable field is modelled, so the plan holds the live
+// value of anything the practitioner has not changed.
 //
 // networkId must be present and must match the value the cluster was created
 // with; a different one is rejected. That holds automatically because
 // network_id is RequiresReplace, so a changed network destroys and recreates
-// rather than ever reaching this path.
+// rather than ever reaching this path. The same goes for the other immutable
+// fields, and for the non-removal access changes planned as replacements by
+// requiresReplaceUnlessRemoval.
 func (m *KubernetesClusterModel) NscaleClusterUpdateParams(
 	ctx context.Context,
-	current kubernetesapi.ClusterSpecV1,
 ) (kubernetesapi.ClusterV1Update, diag.Diagnostics) {
 	metadata, diagnostics := m.metadataRequest()
 	if diagnostics.HasError() {
@@ -433,37 +446,12 @@ func (m *KubernetesClusterModel) NscaleClusterUpdateParams(
 		Spec: kubernetesapi.ClusterUpdateSpecV1{
 			NetworkId:                 spec.networkID,
 			PlatformReleaseId:         spec.platformReleaseID,
-			ApiServer:                 preserveAPIServerAuth(spec.apiServer, current.ApiServer),
+			ApiServer:                 spec.apiServer,
 			ClusterNetwork:            spec.clusterNetwork,
 			Addons:                    spec.addons,
-			SshCertificateAuthorityId: current.SshCertificateAuthorityId,
+			SshCertificateAuthorityId: spec.sshCertificateAuthorityID,
 		},
 	}, diagnostics
-}
-
-// preserveAPIServerAuth copies the live authorization and authentication onto
-// the planned api_server. Both are immutable and unmodelled, so the live value
-// is the only one the API will accept.
-func preserveAPIServerAuth(
-	planned *kubernetesapi.ClusterApiServerAccessV1,
-	current *kubernetesapi.ClusterApiServerAccessV1,
-) *kubernetesapi.ClusterApiServerAccessV1 {
-	if current == nil || (current.Authorization == nil && current.Authentication == nil) {
-		return planned
-	}
-
-	preserved := kubernetesapi.ClusterApiServerAccessV1{
-		PublicIP:       nil,
-		AllowedCidrs:   nil,
-		Authorization:  current.Authorization,
-		Authentication: current.Authentication,
-	}
-	if planned != nil {
-		preserved.PublicIP = planned.PublicIP
-		preserved.AllowedCidrs = planned.AllowedCidrs
-	}
-
-	return &preserved
 }
 
 func (m *KubernetesClusterModel) apiServerRequest(
@@ -493,20 +481,24 @@ func (m *KubernetesClusterModel) apiServerRequest(
 		allowedCIDRs = &cidrs
 	}
 
+	authorization, authorizationDiagnostics := authorizationRequest(ctx, model.Authorization)
+	diagnostics.Append(authorizationDiagnostics...)
+
+	authentication, authenticationDiagnostics := authenticationRequest(ctx, model.Authentication)
+	diagnostics.Append(authenticationDiagnostics...)
+
+	if diagnostics.HasError() {
+		return nil, diagnostics
+	}
+
 	return &kubernetesapi.ClusterApiServerAccessV1{
 		// ValueBoolPointer yields a non-nil *bool for a configured false, which is
 		// what keeps `public_ip = false` on the wire. The generated field is
 		// already *bool, so encoding/json emits it explicitly.
-		PublicIP:     model.PublicIP.ValueBoolPointer(),
-		AllowedCidrs: allowedCIDRs,
-		// API server RBAC bindings and external JWT/OIDC issuers are not
-		// exposed by this resource yet. Both are immutable after creation
-		// (including whether they are set at all), so they need their own
-		// design rather than being inferred from anything here. Create sends
-		// nil, leaving the cluster on the cell-wide defaults; update carries
-		// the live values through (see preserveAPIServerAuth).
-		Authorization:  nil,
-		Authentication: nil,
+		PublicIP:       model.PublicIP.ValueBoolPointer(),
+		AllowedCidrs:   allowedCIDRs,
+		Authorization:  authorization,
+		Authentication: authentication,
 	}, diagnostics
 }
 

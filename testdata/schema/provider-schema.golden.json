@@ -876,6 +876,135 @@
                         "string"
                       ]
                     },
+                    "authentication": {
+                      "computed": true,
+                      "description": "How the Kubernetes API server authenticates callers, beyond the Nscale defaults.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "external_issuers": {
+                            "computed": true,
+                            "description": "External JWT/OIDC issuers the API server trusts.",
+                            "description_kind": "markdown",
+                            "nested_type": {
+                              "attributes": {
+                                "audiences": {
+                                  "computed": true,
+                                  "description": "Token audiences accepted from this issuer.",
+                                  "description_kind": "markdown",
+                                  "type": [
+                                    "list",
+                                    "string"
+                                  ]
+                                },
+                                "ca_certificate": {
+                                  "computed": true,
+                                  "description": "PEM-encoded CA certificate for the issuer.",
+                                  "description_kind": "markdown",
+                                  "type": "string"
+                                },
+                                "groups_claim": {
+                                  "computed": true,
+                                  "description": "The JWT claim mapped to the user's groups.",
+                                  "description_kind": "markdown",
+                                  "type": "string"
+                                },
+                                "groups_prefix": {
+                                  "computed": true,
+                                  "description": "Prepended to each group from `groups_claim`.",
+                                  "description_kind": "markdown",
+                                  "type": "string"
+                                },
+                                "issuer_url": {
+                                  "computed": true,
+                                  "description": "The issuer URL clients present tokens from.",
+                                  "description_kind": "markdown",
+                                  "type": "string"
+                                },
+                                "username_claim": {
+                                  "computed": true,
+                                  "description": "The JWT claim mapped to the username.",
+                                  "description_kind": "markdown",
+                                  "type": "string"
+                                },
+                                "username_prefix": {
+                                  "computed": true,
+                                  "description": "Prepended to the username claim.",
+                                  "description_kind": "markdown",
+                                  "type": "string"
+                                }
+                              },
+                              "nesting_mode": "list"
+                            }
+                          },
+                          "nscale_webhook": {
+                            "computed": true,
+                            "description": "Per-cluster override of whether the Nscale authentication webhook is enabled.",
+                            "description_kind": "markdown",
+                            "nested_type": {
+                              "attributes": {
+                                "enabled": {
+                                  "computed": true,
+                                  "description": "Whether the Nscale authentication webhook is enabled for this cluster.",
+                                  "description_kind": "markdown",
+                                  "type": "bool"
+                                }
+                              },
+                              "nesting_mode": "single"
+                            }
+                          }
+                        },
+                        "nesting_mode": "single"
+                      }
+                    },
+                    "authorization": {
+                      "computed": true,
+                      "description": "RBAC bindings granting built-in cluster roles to users and groups.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "cluster_role_bindings": {
+                            "computed": true,
+                            "description": "One binding per cluster role.",
+                            "description_kind": "markdown",
+                            "nested_type": {
+                              "attributes": {
+                                "cluster_role": {
+                                  "computed": true,
+                                  "description": "The built-in cluster role bound.",
+                                  "description_kind": "markdown",
+                                  "type": "string"
+                                },
+                                "subjects": {
+                                  "computed": true,
+                                  "description": "The users and groups granted the role.",
+                                  "description_kind": "markdown",
+                                  "nested_type": {
+                                    "attributes": {
+                                      "kind": {
+                                        "computed": true,
+                                        "description": "`User` or `Group`.",
+                                        "description_kind": "markdown",
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "computed": true,
+                                        "description": "The user or group name.",
+                                        "description_kind": "markdown",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "nesting_mode": "set"
+                                  }
+                                }
+                              },
+                              "nesting_mode": "set"
+                            }
+                          }
+                        },
+                        "nesting_mode": "single"
+                      }
+                    },
                     "public_ip": {
                       "computed": true,
                       "description": "Whether the API server is exposed through a public endpoint.",
@@ -1050,6 +1179,12 @@
               "region_id": {
                 "computed": true,
                 "description": "The identifier of the region the cluster is provisioned in.",
+                "description_kind": "markdown",
+                "type": "string"
+              },
+              "ssh_certificate_authority_id": {
+                "computed": true,
+                "description": "The identifier of the region SSH certificate authority the cluster's workers trust.",
                 "description_kind": "markdown",
                 "type": "string"
               },
@@ -3231,6 +3366,136 @@
                         "string"
                       ]
                     },
+                    "authentication": {
+                      "description": "How the Kubernetes API server authenticates callers, beyond the Nscale defaults. Fixed at creation: any change, including adding or removing this block, forces a new cluster.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "external_issuers": {
+                            "description": "External JWT/OIDC issuers the API server trusts, such as a corporate identity provider.",
+                            "description_kind": "markdown",
+                            "nested_type": {
+                              "attributes": {
+                                "audiences": {
+                                  "description": "Token audiences accepted from this issuer.",
+                                  "description_kind": "markdown",
+                                  "required": true,
+                                  "type": [
+                                    "list",
+                                    "string"
+                                  ]
+                                },
+                                "ca_certificate": {
+                                  "description": "PEM-encoded CA certificate for the issuer, when it is not signed by a well-known CA.",
+                                  "description_kind": "markdown",
+                                  "optional": true,
+                                  "type": "string"
+                                },
+                                "groups_claim": {
+                                  "description": "The JWT claim mapped to the user's groups. Requires `groups_prefix`.",
+                                  "description_kind": "markdown",
+                                  "optional": true,
+                                  "type": "string"
+                                },
+                                "groups_prefix": {
+                                  "description": "Prepended to each group from `groups_claim`. Same reserved-prefix rule as `username_prefix`.",
+                                  "description_kind": "markdown",
+                                  "optional": true,
+                                  "type": "string"
+                                },
+                                "issuer_url": {
+                                  "description": "The issuer URL clients present tokens from.",
+                                  "description_kind": "markdown",
+                                  "required": true,
+                                  "type": "string"
+                                },
+                                "username_claim": {
+                                  "computed": true,
+                                  "description": "The JWT claim mapped to the username. Defaults to `sub`.",
+                                  "description_kind": "markdown",
+                                  "optional": true,
+                                  "type": "string"
+                                },
+                                "username_prefix": {
+                                  "description": "Prepended to the username claim, so issuer users cannot collide with in-cluster ones. Must not start with, or be a prefix of, `system:`, `kubeadm:`, `nks-management:`, `nks:` or `nscale.com/`.",
+                                  "description_kind": "markdown",
+                                  "required": true,
+                                  "type": "string"
+                                }
+                              },
+                              "nesting_mode": "list"
+                            },
+                            "optional": true
+                          },
+                          "nscale_webhook": {
+                            "description": "Per-cluster override of whether the Nscale authentication webhook is enabled. Omit to inherit the cell-wide default.",
+                            "description_kind": "markdown",
+                            "nested_type": {
+                              "attributes": {
+                                "enabled": {
+                                  "description": "Whether the Nscale authentication webhook is enabled for this cluster.",
+                                  "description_kind": "markdown",
+                                  "optional": true,
+                                  "type": "bool"
+                                }
+                              },
+                              "nesting_mode": "single"
+                            },
+                            "optional": true
+                          }
+                        },
+                        "nesting_mode": "single"
+                      },
+                      "optional": true
+                    },
+                    "authorization": {
+                      "description": "RBAC bindings granting built-in cluster roles to users and groups. Fixed at creation: any change, including adding or removing this block, forces a new cluster.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "cluster_role_bindings": {
+                            "description": "One binding per cluster role.",
+                            "description_kind": "markdown",
+                            "nested_type": {
+                              "attributes": {
+                                "cluster_role": {
+                                  "description": "The built-in cluster role to bind: `cluster-admin`, `admin`, `edit` or `view`.",
+                                  "description_kind": "markdown",
+                                  "required": true,
+                                  "type": "string"
+                                },
+                                "subjects": {
+                                  "description": "The users and groups granted the role.",
+                                  "description_kind": "markdown",
+                                  "nested_type": {
+                                    "attributes": {
+                                      "kind": {
+                                        "description": "`User` or `Group`.",
+                                        "description_kind": "markdown",
+                                        "required": true,
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "description": "The user or group name, as the authenticator presents it (including any issuer prefix).",
+                                        "description_kind": "markdown",
+                                        "required": true,
+                                        "type": "string"
+                                      }
+                                    },
+                                    "nesting_mode": "set"
+                                  },
+                                  "required": true
+                                }
+                              },
+                              "nesting_mode": "set"
+                            },
+                            "required": true
+                          }
+                        },
+                        "nesting_mode": "single"
+                      },
+                      "optional": true
+                    },
                     "public_ip": {
                       "computed": true,
                       "description": "Whether to expose the API server through a public endpoint. Defaults to `false`.",
@@ -3411,6 +3676,12 @@
                 "computed": true,
                 "description": "The identifier of the region the cluster is provisioned in. Inherited from `network_id` and cannot be set.",
                 "description_kind": "markdown",
+                "type": "string"
+              },
+              "ssh_certificate_authority_id": {
+                "description": "The identifier of an SSH certificate authority the cluster's workers trust. It must be in the cluster's organization and project, which come from `network_id`. Immutable, including whether it is set: changing, adding or removing it forces a new cluster.",
+                "description_kind": "markdown",
+                "optional": true,
                 "type": "string"
               },
               "tags": {

@@ -24,6 +24,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
@@ -465,6 +466,192 @@ resource "nscale_kubernetes_cluster" "test" {
 `, name),
 				ExpectError: regexp.MustCompile(`(?s)project_id`),
 				PlanOnly:    true,
+			},
+		},
+	})
+}
+
+// testAccClusterConfigAPIServerAccess builds a cluster with RBAC bindings and
+// external issuers. full=false drops one subject, one binding and one issuer.
+func testAccClusterConfigAPIServerAccess(name string, full bool) string {
+	aliceSubject, editBinding, googleIssuer := "", "", ""
+	if full {
+		aliceSubject = `
+          { kind = "User", name = "gha:alice" },`
+		editBinding = `
+      {
+        cluster_role = "edit"
+        subjects     = [{ kind = "Group", name = "gha:editors" }]
+      },`
+		googleIssuer = `
+      {
+        issuer_url      = "https://accounts.google.com"
+        audiences       = ["tf-acc-nks"]
+        username_prefix = "google:"
+      },`
+	}
+
+	return testAccPlatformReleaseConfig() + fmt.Sprintf(`
+resource "nscale_kubernetes_cluster" "test" {
+  name                = %[1]q
+  network_id          = data.nscale_network.test.id
+  platform_release_id = data.nscale_kubernetes_platform_releases.test.releases[0].id
+
+  api_server = {
+    public_ip     = false
+    allowed_cidrs = ["10.0.0.0/8"]
+
+    authorization = {
+      cluster_role_bindings = [
+        {
+          cluster_role = "view"
+          subjects = [%[2]s
+            { kind = "Group", name = "gha:viewers" },
+          ]
+        },%[3]s
+      ]
+    }
+
+    authentication = {
+      external_issuers = [
+        {
+          issuer_url      = "https://token.actions.githubusercontent.com"
+          audiences       = ["tf-acc-nks"]
+          username_prefix = "gha:"
+          groups_claim    = "repository_owner"
+          groups_prefix   = "gha:"
+        },%[4]s
+      ]
+    }
+  }
+}
+`, name, aliceSubject, editBinding, googleIssuer)
+}
+
+// TestAccKubernetesClusterResource_apiServerAccess covers the API server
+// access settings end to end: they round-trip exactly (PlanOnly), a change
+// plans a replacement and the new cluster comes up with the smaller settings,
+// and the result imports cleanly.
+//
+// The change step is a removal: once removalsApplyInPlace is true, flip its
+// plan check to ResourceActionUpdate and expectClusterID to same=true.
+func TestAccKubernetesClusterResource_apiServerAccess(t *testing.T) {
+	name := acctest.RandomWithPrefix("tf-acc-test")
+
+	var clusterID string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckNKS(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccClusterConfigAPIServerAccess(name, true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(
+						clusterResourceName,
+						"api_server.authorization.cluster_role_bindings.#",
+						"2",
+					),
+					resource.TestCheckResourceAttr(
+						clusterResourceName,
+						"api_server.authentication.external_issuers.#",
+						"2",
+					),
+					resource.TestCheckResourceAttr(
+						clusterResourceName, "api_server.authentication.external_issuers.0.username_claim", "sub",
+					),
+					captureClusterID(&clusterID),
+				),
+			},
+			{
+				Config:   testAccClusterConfigAPIServerAccess(name, true),
+				PlanOnly: true,
+			},
+			{
+				Config: testAccClusterConfigAPIServerAccess(name, false),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(clusterResourceName, plancheck.ResourceActionReplace),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					expectClusterID(&clusterID, false),
+					resource.TestCheckResourceAttr(
+						clusterResourceName,
+						"api_server.authorization.cluster_role_bindings.#",
+						"1",
+					),
+					resource.TestCheckResourceAttr(
+						clusterResourceName, "api_server.authorization.cluster_role_bindings.0.subjects.#", "1",
+					),
+					resource.TestCheckResourceAttr(
+						clusterResourceName,
+						"api_server.authentication.external_issuers.#",
+						"1",
+					),
+				),
+			},
+			{
+				Config:   testAccClusterConfigAPIServerAccess(name, false),
+				PlanOnly: true,
+			},
+			{
+				ResourceName:            clusterResourceName,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"timeouts"}, // provider-side only, never returned by the API.
+			},
+		},
+	})
+}
+
+// TestAccKubernetesClusterResource_sshCertificateAuthority creates a cluster
+// whose workers trust an SSH CA, and checks it round-trips and imports.
+//
+// Fails with a 403 on both staging and production as of 2026-09-29: NKS reads
+// the CA while impersonating the caller, and that read is refused for service
+// account callers ("project is not in this principal's accessible set") even
+// though the same token reads the CA directly. Server-side; reported to NKS.
+func TestAccKubernetesClusterResource_sshCertificateAuthority(t *testing.T) {
+	name := acctest.RandomWithPrefix("tf-acc-test")
+
+	config := testAccPlatformReleaseConfig() + fmt.Sprintf(`
+# NKS requires the CA in the cluster's organization and project, which come
+# from the network, not the provider's default project.
+resource "nscale_ssh_certificate_authority" "test" {
+  name       = %[1]q
+  project_id = data.nscale_network.test.project_id
+  public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINLkJ/q3+7KBjGDtMGIORNUv+3eIwIo6o+NoLd8qXENS tf-acc-nks-ca"
+}
+
+resource "nscale_kubernetes_cluster" "test" {
+  name                         = %[1]q
+  network_id                   = data.nscale_network.test.id
+  platform_release_id          = data.nscale_kubernetes_platform_releases.test.releases[0].id
+  ssh_certificate_authority_id = nscale_ssh_certificate_authority.test.id
+}
+`, name)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckNKS(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.TestCheckResourceAttrPair(
+					clusterResourceName, "ssh_certificate_authority_id",
+					"nscale_ssh_certificate_authority.test", "id",
+				),
+			},
+			{
+				Config:   config,
+				PlanOnly: true,
+			},
+			{
+				ResourceName:            clusterResourceName,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"timeouts"}, // provider-side only, never returned by the API.
 			},
 		},
 	})

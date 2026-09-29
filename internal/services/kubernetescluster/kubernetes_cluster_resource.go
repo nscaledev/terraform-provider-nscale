@@ -209,6 +209,17 @@ func (r *KubernetesClusterResource) Schema(
 							setvalidator.ValueStringsAre(validators.CIDRValidator{}),
 						},
 					},
+					"authorization":  authorizationSchema(),
+					"authentication": authenticationSchema(),
+				},
+			},
+			"ssh_certificate_authority_id": schema.StringAttribute{
+				MarkdownDescription: "The identifier of an SSH certificate authority the cluster's workers trust. " +
+					"It must be in the cluster's organization and project, which come from `network_id`. " +
+					"Immutable, including whether it is set: changing, adding or removing it forces a new cluster.",
+				Optional: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			// The pod and service CIDRs are enforced immutable by a CEL
@@ -591,19 +602,7 @@ func (r *KubernetesClusterResource) Update(
 
 	id := data.ID.ValueString()
 
-	// Read the live spec so the PUT can carry the immutable fields this
-	// resource does not model. See NscaleClusterUpdateParams.
-	current, err := getCluster(ctx, r.client, id)
-	if err != nil {
-		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
-		response.Diagnostics.AddError(
-			"Failed to Update Kubernetes Cluster",
-			fmt.Sprintf("An error occurred while reading the cluster before updating it: %s", err),
-		)
-		return
-	}
-
-	params, diagnostics := data.NscaleClusterUpdateParams(ctx, current.Spec)
+	params, diagnostics := data.NscaleClusterUpdateParams(ctx)
 	response.Diagnostics.Append(diagnostics...)
 	if response.Diagnostics.HasError() {
 		return

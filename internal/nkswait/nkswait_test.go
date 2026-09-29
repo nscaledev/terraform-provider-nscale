@@ -532,3 +532,92 @@ func TestProvisionedTimeoutQuotesLastRead(t *testing.T) {
 		}
 	}
 }
+
+// clusterSequence returns a Get that walks through statuses, repeating the
+// last one once exhausted.
+func clusterSequence(
+	statuses ...kubernetesapi.ResourceProvisioningStatus,
+) func(context.Context) (*kubernetesapi.ClusterV1Read, error) {
+	generation := int64(2)
+	calls := 0
+
+	return func(_ context.Context) (*kubernetesapi.ClusterV1Read, error) {
+		status := statuses[min(calls, len(statuses)-1)]
+		calls++
+
+		return &kubernetesapi.ClusterV1Read{
+			Metadata: kubernetesapi.ProjectScopedResourceReadMetadataV1{
+				Id:                 "cluster-1",
+				Generation:         generation,
+				ProvisioningStatus: status,
+				ProvisioningStatusDetail: &kubernetesapi.ProvisioningStatusDetail{
+					Reason:  "Errored",
+					Message: "one or more add-ons are degraded",
+				},
+			},
+			Status: kubernetesapi.ClusterStatusV1{ObservedGeneration: &generation},
+		}, nil
+	}
+}
+
+func clusterTarget(
+	get func(context.Context) (*kubernetesapi.ClusterV1Read, error),
+	timeout time.Duration,
+) Target[kubernetesapi.ClusterV1Read] {
+	return Target[kubernetesapi.ClusterV1Read]{
+		Kind: "cluster",
+		Get:  get,
+		Inspect: func(cluster *kubernetesapi.ClusterV1Read) Status {
+			return Status{Metadata: &cluster.Metadata, ObservedGeneration: cluster.Status.ObservedGeneration}
+		},
+		Timeout: timeout,
+	}
+}
+
+func windDownWaiter(t *testing.T, grace time.Duration) {
+	t.Helper()
+
+	restoreDelay, restoreMinTimeout, restoreGrace := pollDelay, pollMinTimeout, pollFailureGrace
+	pollDelay, pollMinTimeout, pollFailureGrace = time.Millisecond, time.Millisecond, grace
+	t.Cleanup(func() { pollDelay, pollMinTimeout, pollFailureGrace = restoreDelay, restoreMinTimeout, restoreGrace })
+}
+
+// TestProvisionedRidesOutTransientError: a settled error that clears inside
+// pollFailureGrace must not fail the apply. This is the upgrade case, where an
+// add-on profile is briefly Degraded while new versions roll out.
+func TestProvisionedRidesOutTransientError(t *testing.T) {
+	windDownWaiter(t, time.Minute)
+
+	get := clusterSequence(
+		kubernetesapi.ResourceProvisioningStatusError,
+		kubernetesapi.ResourceProvisioningStatusError,
+		kubernetesapi.ResourceProvisioningStatusProvisioning,
+		kubernetesapi.ResourceProvisioningStatusProvisioned,
+	)
+
+	cluster, err := Provisioned(t.Context(), clusterTarget(get, 5*time.Second))
+	if err != nil {
+		t.Fatalf("Provisioned() = %v, want success after the error cleared", err)
+	}
+	if cluster.Metadata.ProvisioningStatus != kubernetesapi.ResourceProvisioningStatusProvisioned {
+		t.Errorf("returned status %q, want provisioned", cluster.Metadata.ProvisioningStatus)
+	}
+}
+
+// TestProvisionedFailsPersistentError: an error that outlasts pollFailureGrace is a
+// real failure, reported with the API's own detail rather than as a timeout.
+func TestProvisionedFailsPersistentError(t *testing.T) {
+	windDownWaiter(t, 20*time.Millisecond)
+
+	get := clusterSequence(kubernetesapi.ResourceProvisioningStatusError)
+
+	_, err := Provisioned(t.Context(), clusterTarget(get, 5*time.Second))
+	if err == nil {
+		t.Fatal("Provisioned() should fail when the error persists")
+	}
+	for _, want := range []string{"entered a failed state", "one or more add-ons are degraded"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("Provisioned() error = %q, want it to contain %q", err, want)
+		}
+	}
+}

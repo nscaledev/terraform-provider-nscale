@@ -115,7 +115,13 @@ func (s *KubernetesClusterDataSource) Schema(
 						ElementType:         types.StringType,
 						Computed:            true,
 					},
+					"authorization":  authorizationDataSourceSchema(),
+					"authentication": authenticationDataSourceSchema(),
 				},
+			},
+			"ssh_certificate_authority_id": schema.StringAttribute{
+				MarkdownDescription: "The identifier of the region SSH certificate authority the cluster's workers trust.",
+				Computed:            true,
 			},
 			"cluster_network": schema.SingleNestedAttribute{
 				MarkdownDescription: "Pod and service network CIDRs for the cluster.",
@@ -266,4 +272,97 @@ func (s *KubernetesClusterDataSource) Read(
 
 	data = NewKubernetesClusterModel(cluster)
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
+}
+
+func authorizationDataSourceSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		MarkdownDescription: "RBAC bindings granting built-in cluster roles to users and groups.",
+		Computed:            true,
+		Attributes: map[string]schema.Attribute{
+			"cluster_role_bindings": schema.SetNestedAttribute{
+				MarkdownDescription: "One binding per cluster role.",
+				Computed:            true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"cluster_role": schema.StringAttribute{
+							MarkdownDescription: "The built-in cluster role bound.",
+							Computed:            true,
+						},
+						"subjects": schema.SetNestedAttribute{
+							MarkdownDescription: "The users and groups granted the role.",
+							Computed:            true,
+							NestedObject: schema.NestedAttributeObject{
+								Attributes: map[string]schema.Attribute{
+									"kind": schema.StringAttribute{
+										MarkdownDescription: "`User` or `Group`.",
+										Computed:            true,
+									},
+									"name": schema.StringAttribute{
+										MarkdownDescription: "The user or group name.",
+										Computed:            true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func authenticationDataSourceSchema() schema.SingleNestedAttribute {
+	return schema.SingleNestedAttribute{
+		MarkdownDescription: "How the Kubernetes API server authenticates callers, beyond the Nscale defaults.",
+		Computed:            true,
+		Attributes: map[string]schema.Attribute{
+			"nscale_webhook": schema.SingleNestedAttribute{
+				MarkdownDescription: "Per-cluster override of whether the Nscale authentication webhook is enabled.",
+				Computed:            true,
+				Attributes: map[string]schema.Attribute{
+					"enabled": schema.BoolAttribute{
+						MarkdownDescription: "Whether the Nscale authentication webhook is enabled for this cluster.",
+						Computed:            true,
+					},
+				},
+			},
+			"external_issuers": schema.ListNestedAttribute{
+				MarkdownDescription: "External JWT/OIDC issuers the API server trusts.",
+				Computed:            true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"issuer_url": schema.StringAttribute{
+							MarkdownDescription: "The issuer URL clients present tokens from.",
+							Computed:            true,
+						},
+						"audiences": schema.ListAttribute{
+							MarkdownDescription: "Token audiences accepted from this issuer.",
+							ElementType:         types.StringType,
+							Computed:            true,
+						},
+						"username_claim": schema.StringAttribute{
+							MarkdownDescription: "The JWT claim mapped to the username.",
+							Computed:            true,
+						},
+						"username_prefix": schema.StringAttribute{
+							MarkdownDescription: "Prepended to the username claim.",
+							Computed:            true,
+						},
+						"groups_claim": schema.StringAttribute{
+							MarkdownDescription: "The JWT claim mapped to the user's groups.",
+							Computed:            true,
+						},
+						"groups_prefix": schema.StringAttribute{
+							MarkdownDescription: "Prepended to each group from `groups_claim`.",
+							Computed:            true,
+						},
+						"ca_certificate": schema.StringAttribute{
+							MarkdownDescription: "PEM-encoded CA certificate for the issuer.",
+							Computed:            true,
+						},
+					},
+				},
+			},
+		},
+	}
 }

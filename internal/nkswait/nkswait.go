@@ -53,6 +53,14 @@ import (
 var (
 	pollDelay      = 15 * time.Second
 	pollMinTimeout = 15 * time.Second
+
+	// pollFailureGrace is how long a settled error must persist before Provisioned
+	// gives up. NKS reports error while an add-on profile is Degraded, and a
+	// release upgrade can briefly degrade a profile as it rolls new versions; the
+	// reconciler keeps going and recovers. Seen on production 2026-09-29: a
+	// cluster upgrade reported "one or more add-ons are degraded" 15s in, where
+	// the same upgrade had completed earlier that day.
+	pollFailureGrace = 5 * time.Minute
 )
 
 // Waiter states. These are internal to the state machine below and
@@ -238,6 +246,11 @@ func Provisioned[T any](ctx context.Context, target Target[T]) (*T, error) {
 
 	refresh := target.refresh(ctx, StateGone)
 
+	// failedSince is when the current unbroken run of failed reads began; zero
+	// while the resource is not failing. Until pollFailureGrace has passed, a failed
+	// read is reported as still provisioning so the waiter keeps polling.
+	var failedSince time.Time
+
 	stateChange := &retry.StateChangeConf{
 		Pending: provisionedPending(),
 		Target:  provisionedTarget(),
@@ -245,6 +258,19 @@ func Provisioned[T any](ctx context.Context, target Target[T]) (*T, error) {
 			raw, state, err := refresh()
 			if value, ok := raw.(*T); ok {
 				last = value
+			}
+
+			if state != StateFailed {
+				failedSince = time.Time{}
+
+				return raw, state, err
+			}
+
+			if failedSince.IsZero() {
+				failedSince = time.Now()
+			}
+			if time.Since(failedSince) < pollFailureGrace {
+				return raw, StateProvisioning, err
 			}
 
 			return raw, state, err

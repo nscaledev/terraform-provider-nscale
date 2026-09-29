@@ -19,6 +19,7 @@ package kubernetescluster
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"testing"
 	"time"
 
@@ -352,8 +353,10 @@ func TestCreateParamsBoolZeroValues(t *testing.T) {
 		PlatformReleaseID: types.StringValue("rel-1"),
 		Tags:              types.MapNull(types.StringType),
 		APIServer: objectValue(t, apiServerAttrTypes(), map[string]attr.Value{
-			"public_ip":     types.BoolValue(false),
-			"allowed_cidrs": types.SetNull(types.StringType),
+			"public_ip":      types.BoolValue(false),
+			"allowed_cidrs":  types.SetNull(types.StringType),
+			"authorization":  types.ObjectNull(authorizationAttrTypes()),
+			"authentication": types.ObjectNull(authenticationAttrTypes()),
 		}),
 		ClusterNetwork: types.ObjectNull(clusterNetworkAttrTypes()),
 		Addons: objectValue(t, addonsAttrTypes(), map[string]attr.Value{
@@ -517,7 +520,7 @@ func TestUpdateParamsMatchCreateParams(t *testing.T) {
 		t.Fatalf("building create params: %v", diagnostics)
 	}
 
-	updateParams, diagnostics := model.NscaleClusterUpdateParams(context.Background(), fullCluster(t).Spec)
+	updateParams, diagnostics := model.NscaleClusterUpdateParams(context.Background())
 	if diagnostics.HasError() {
 		t.Fatalf("building update params: %v", diagnostics)
 	}
@@ -547,7 +550,7 @@ func TestUpdateParamsRoundTripsTags(t *testing.T) {
 
 	model := NewKubernetesClusterModel(fullCluster(t))
 
-	params, diagnostics := model.NscaleClusterUpdateParams(context.Background(), fullCluster(t).Spec)
+	params, diagnostics := model.NscaleClusterUpdateParams(context.Background())
 	if diagnostics.HasError() {
 		t.Fatalf("building update params: %v", diagnostics)
 	}
@@ -562,75 +565,89 @@ func TestUpdateParamsRoundTripsTags(t *testing.T) {
 	}
 }
 
-// TestUpdateParamsPreserveUnmodelledImmutableFields covers a cluster imported
-// with fields this resource does not model. They are immutable, so a PUT that
-// omits them is rejected; the update must carry the live values through.
-func TestUpdateParamsPreserveUnmodelledImmutableFields(t *testing.T) {
-	t.Parallel()
+// accessCluster is fullCluster with every API server access field and the SSH
+// CA set, the shape an imported cluster with RBAC and OIDC comes back as.
+func accessCluster(t *testing.T) *kubernetesapi.ClusterV1Read {
+	t.Helper()
 
-	current := fullCluster(t).Spec
-	current.SshCertificateAuthorityId = new("ssh-ca-1")
-	current.ApiServer.Authorization = &kubernetesapi.ClusterApiServerAuthorizationV1{
-		ClusterRoleBindings: []kubernetesapi.ClusterRoleBindingV1{},
+	cluster := fullCluster(t)
+	cluster.Spec.SshCertificateAuthorityId = new("ssh-ca-1")
+	cluster.Spec.ApiServer.Authorization = &kubernetesapi.ClusterApiServerAuthorizationV1{
+		ClusterRoleBindings: []kubernetesapi.ClusterRoleBindingV1{{
+			ClusterRole: kubernetesapi.ClusterRoleBindingV1ClusterRoleView,
+			Subjects: []kubernetesapi.RbacSubjectV1{
+				{Kind: kubernetesapi.RbacSubjectV1KindGroup, Name: "oidc:viewers"},
+				{Kind: kubernetesapi.RbacSubjectV1KindUser, Name: "oidc:alice"},
+			},
+		}},
 	}
-	current.ApiServer.Authentication = &kubernetesapi.ClusterApiServerAuthenticationV1{}
-
-	tests := map[string]types.Object{
-		"api_server planned": NewKubernetesClusterModel(fullCluster(t)).APIServer,
-		"api_server omitted": types.ObjectNull(apiServerAttrTypes()),
-		"api_server unknown": types.ObjectUnknown(apiServerAttrTypes()),
+	cluster.Spec.ApiServer.Authentication = &kubernetesapi.ClusterApiServerAuthenticationV1{
+		NscaleWebhook: &kubernetesapi.ClusterNscaleWebhookAuthenticationV1{Enabled: new(false)},
+		ExternalIssuers: &[]kubernetesapi.ClusterExternalIssuerV1{{
+			IssuerURL:      "https://issuer.example.com",
+			Audiences:      []string{"kubernetes", "second"},
+			UsernameClaim:  new("sub"),
+			UsernamePrefix: "oidc:",
+			GroupsClaim:    new("groups"),
+			GroupsPrefix:   new("oidc:"),
+		}},
 	}
 
-	for name, apiServer := range tests {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
-			model := NewKubernetesClusterModel(fullCluster(t))
-			model.APIServer = apiServer
-
-			params, diagnostics := model.NscaleClusterUpdateParams(context.Background(), current)
-			if diagnostics.HasError() {
-				t.Fatalf("building update params: %v", diagnostics)
-			}
-
-			spec := params.Spec
-			if spec.SshCertificateAuthorityId == nil || *spec.SshCertificateAuthorityId != "ssh-ca-1" {
-				t.Errorf("sshCertificateAuthorityId = %v, want ssh-ca-1", spec.SshCertificateAuthorityId)
-			}
-			if spec.ApiServer == nil {
-				t.Fatal("apiServer must be sent to carry authorization and authentication")
-			}
-			if spec.ApiServer.Authorization != current.ApiServer.Authorization {
-				t.Error("apiServer.authorization was not carried through from the live spec")
-			}
-			if spec.ApiServer.Authentication != current.ApiServer.Authentication {
-				t.Error("apiServer.authentication was not carried through from the live spec")
-			}
-		})
-	}
+	return cluster
 }
 
-// TestUpdateParamsOmitAbsentUnmodelledFields is the counterpart: a cluster
-// without the unmodelled fields must not grow an apiServer object on update.
-func TestUpdateParamsOmitAbsentUnmodelledFields(t *testing.T) {
+// TestUpdateParamsRoundTripAPIServerAccess reads every access field and writes
+// it back unchanged. Update is a full PUT, so anything that failed to survive
+// would be removed (authorization) or rejected (authentication, SSH CA).
+func TestUpdateParamsRoundTripAPIServerAccess(t *testing.T) {
 	t.Parallel()
 
-	model := NewKubernetesClusterModel(fullCluster(t))
-	model.APIServer = types.ObjectNull(apiServerAttrTypes())
+	cluster := accessCluster(t)
+	model := NewKubernetesClusterModel(cluster)
 
-	current := fullCluster(t).Spec
-	current.ApiServer = nil
-
-	params, diagnostics := model.NscaleClusterUpdateParams(context.Background(), current)
+	params, diagnostics := model.NscaleClusterUpdateParams(context.Background())
 	if diagnostics.HasError() {
 		t.Fatalf("building update params: %v", diagnostics)
 	}
 
-	if params.Spec.ApiServer != nil {
-		t.Errorf("apiServer = %+v, want nil", params.Spec.ApiServer)
+	if got := params.Spec.SshCertificateAuthorityId; got == nil || *got != "ssh-ca-1" {
+		t.Errorf("sshCertificateAuthorityId = %v, want ssh-ca-1", got)
 	}
+
+	sent := params.Spec.ApiServer
+	if sent == nil {
+		t.Fatal("apiServer was dropped from the update payload")
+	}
+	if !authorizationIsRemovalOnly(sent.Authorization, cluster.Spec.ApiServer.Authorization) ||
+		!authorizationIsRemovalOnly(cluster.Spec.ApiServer.Authorization, sent.Authorization) {
+		t.Errorf("authorization changed on round trip: sent %+v", sent.Authorization)
+	}
+	if !reflect.DeepEqual(sent.Authentication, cluster.Spec.ApiServer.Authentication) {
+		t.Errorf(
+			"authentication changed on round trip:\n  sent %+v\n  want %+v",
+			sent.Authentication,
+			cluster.Spec.ApiServer.Authentication,
+		)
+	}
+}
+
+// TestUpdateParamsOmitAbsentAPIServerAccess: a cluster without access settings
+// must not grow them on update, or the API would reject the PUT as an addition.
+func TestUpdateParamsOmitAbsentAPIServerAccess(t *testing.T) {
+	t.Parallel()
+
+	model := NewKubernetesClusterModel(fullCluster(t))
+
+	params, diagnostics := model.NscaleClusterUpdateParams(context.Background())
+	if diagnostics.HasError() {
+		t.Fatalf("building update params: %v", diagnostics)
+	}
+
 	if params.Spec.SshCertificateAuthorityId != nil {
 		t.Errorf("sshCertificateAuthorityId = %q, want nil", *params.Spec.SshCertificateAuthorityId)
+	}
+	if params.Spec.ApiServer.Authorization != nil || params.Spec.ApiServer.Authentication != nil {
+		t.Errorf("access settings appeared in the payload: %+v", params.Spec.ApiServer)
 	}
 }
 
@@ -643,7 +660,7 @@ func TestUpdateParamsKeepDisabledNodeHealth(t *testing.T) {
 
 	model := NewKubernetesClusterModel(fullCluster(t))
 
-	params, diagnostics := model.NscaleClusterUpdateParams(context.Background(), fullCluster(t).Spec)
+	params, diagnostics := model.NscaleClusterUpdateParams(context.Background())
 	if diagnostics.HasError() {
 		t.Fatalf("building update params: %v", diagnostics)
 	}
@@ -654,5 +671,34 @@ func TestUpdateParamsKeepDisabledNodeHealth(t *testing.T) {
 	}
 	if *addons.NodeHealth.Enabled {
 		t.Error("nodeHealth.enabled = true, want false")
+	}
+}
+
+// TestAllowedCIDRsAbsentReadsAsDefault is the regression test for a production
+// failure: NKS returns no allowlist for a cluster created without one, then
+// fills in 0.0.0.0/0 on the next update. Reading absent as null made that
+// update fail as "Provider produced inconsistent result after apply".
+func TestAllowedCIDRsAbsentReadsAsDefault(t *testing.T) {
+	t.Parallel()
+
+	cluster := fullCluster(t)
+	cluster.Spec.ApiServer.AllowedCidrs = nil
+
+	model := NewKubernetesClusterModel(cluster)
+
+	cidrs := model.APIServer.Attributes()["allowed_cidrs"].(types.Set)
+	want := types.SetValueMust(types.StringType, []attr.Value{types.StringValue("0.0.0.0/0")})
+	if !cidrs.Equal(want) {
+		t.Fatalf("allowed_cidrs = %s, want %s", cidrs, want)
+	}
+
+	// And the update then sends it explicitly, leaving the server nothing to
+	// default.
+	params, diagnostics := model.NscaleClusterUpdateParams(context.Background())
+	if diagnostics.HasError() {
+		t.Fatalf("building update params: %v", diagnostics)
+	}
+	if sent := params.Spec.ApiServer.AllowedCidrs; sent == nil || !reflect.DeepEqual(*sent, []string{"0.0.0.0/0"}) {
+		t.Errorf("allowedCidrs sent = %v, want [0.0.0.0/0]", sent)
 	}
 }

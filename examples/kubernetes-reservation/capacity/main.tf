@@ -16,10 +16,15 @@ terraform {
   }
 }
 
-# region_id and project_id default to NSCALE_REGION_ID and NSCALE_PROJECT_ID.
-# The cluster stack builds its network from this reservation's region and
-# project, so pick a region NKS offers a platform release in.
+# project_id defaults to NSCALE_PROJECT_ID. The cluster stack builds its network
+# from this reservation's region and project.
 provider "nscale" {}
+
+variable "region_id" {
+  type        = string
+  description = "Region to reserve in. Must be one NKS offers a platform release in. Null uses NSCALE_REGION_ID."
+  default     = null
+}
 
 variable "name" {
   type        = string
@@ -49,11 +54,13 @@ variable "unit_count" {
 data "nscale_reservation_unit" "gpu" {
   accelerator = var.accelerator
   unit        = var.unit
+  region_id   = var.region_id
 }
 
 resource "nscale_reservation" "gpu" {
   name        = var.name
   description = "Capacity for NKS reservation-backed node pools."
+  region_id   = var.region_id
   accelerator = var.accelerator
   unit        = var.unit
   unit_count  = var.unit_count
