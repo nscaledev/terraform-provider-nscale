@@ -21,7 +21,8 @@ the API level — see [Rolling a pool](#rolling-a-pool) for how the roll behaves
 
 ~> **A reservation pool is close to immutable.** Only `description` and `tags` update in place. `replicas`, `taints` and
 `labels` all force replacement, because the placement backing the pool never rolls and the change could not otherwise
-take effect. Scaling a reservation pool is a rebuild, not a scale.
+take effect. Scaling a reservation pool is a rebuild, not a scale. `reservation.constraints` is fixed at creation
+too: changing, adding or removing it rebuilds the pool.
 
 ~> **`project_id`, `organization_id` and `region_id` are read-only.** They are inherited via the cluster, which derives
 them from its network. Setting any of them is an error.
@@ -62,6 +63,12 @@ resource "nscale_kubernetes_node_pool" "gpu" {
 
   reservation = {
     reservation_id = nscale_reservation.gpu.id
+
+    # Optional; omit for `pack`. Fixed at creation.
+    constraints = {
+      policy             = "spread"
+      when_unsatisfiable = "bestEffort"
+    }
   }
 
   # This pool is reservation-backed, so editing taints, labels or replicas
@@ -127,6 +134,24 @@ Required:
 Required:
 
 - `reservation_id` (String) The identifier of the reservation to consume capacity from. Immutable: changing this forces a new node pool to be created.
+
+Optional:
+
+- `constraints` (Attributes) How the pool's hosts are placed across topology domains in the reservation. Omit for `pack`. Immutable: changing, adding or removing this forces a new node pool to be created. (see [below for nested schema](#nestedatt--reservation--constraints))
+
+<a id="nestedatt--reservation--constraints"></a>
+### Nested Schema for `reservation.constraints`
+
+Required:
+
+- `policy` (String) `pack` fills topology domains one at a time for locality; `spread` distributes hosts across domains.
+
+Optional:
+
+- `max_skew` (Number) The largest allowed difference in host count between domains. `spread` only.
+- `min_domains` (Number) The minimum number of domains that must receive a host. Cannot exceed `replicas`. `spread` only.
+- `when_unsatisfiable` (String) What happens when the spread cannot be met: `fail` rejects it, `bestEffort` accepts the closest layout. `spread` only.
+
 
 
 <a id="nestedatt--taints"></a>

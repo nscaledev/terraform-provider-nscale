@@ -282,6 +282,12 @@ func TestNewKubernetesNodePoolModelReservation(t *testing.T) {
 		t.Errorf("reservation.reservation_id = %q, want res-1", got)
 	}
 
+	// Omitted constraints mean pack, and must read back as null rather than as a
+	// pack object, or every pool created without them would show a diff.
+	if !model.Reservation.Attributes()["constraints"].(types.Object).IsNull() { //nolint:forcetypeassert // fixture is an object
+		t.Error("reservation.constraints should be null when the API omits them")
+	}
+
 	// placementId is exposed because it is genuinely new information — the
 	// placement the pool created. status.reservation.reservationId is not, since
 	// on an immutable selector it is always the one that was asked for.
@@ -515,6 +521,7 @@ func TestWriteSpecOmitsAbsentCapacityBlock(t *testing.T) {
 		Compute:          types.ObjectNull(computeAttrTypes()),
 		Reservation: objectValue(t, reservationAttrTypes(), map[string]attr.Value{
 			"reservation_id": types.StringValue("res-1"),
+			"constraints":    types.ObjectNull(constraintsAttrTypes()),
 		}),
 		Taints: types.ListNull(taintObjectType()),
 		Labels: types.MapNull(types.StringType),
@@ -530,6 +537,9 @@ func TestWriteSpecOmitsAbsentCapacityBlock(t *testing.T) {
 	}
 	if params.Spec.Reservation == nil || *params.Spec.Reservation.ReservationId != "res-1" {
 		t.Errorf("reservation = %+v, want res-1", params.Spec.Reservation)
+	}
+	if params.Spec.Reservation.Constraints != nil {
+		t.Errorf("constraints should be omitted when unset, got %+v", params.Spec.Reservation.Constraints)
 	}
 	if params.Spec.ProvisioningMode != kubernetesapi.NodePoolProvisioningModeV1Reservation {
 		t.Errorf("ProvisioningMode = %q, want reservation", params.Spec.ProvisioningMode)

@@ -701,6 +701,84 @@ resource "nscale_kubernetes_node_pool" "test" {
 	})
 }
 
+func testAccNodePoolConfigConstraints(name, policy string) string {
+	spreadOnly := ""
+	if policy == "spread" {
+		spreadOnly = `
+      max_skew           = 1
+      min_domains        = 1
+      when_unsatisfiable = "bestEffort"`
+	}
+
+	return testAccClusterConfig() + fmt.Sprintf(`
+resource "nscale_kubernetes_node_pool" "test" {
+  name              = %[1]q
+  cluster_id        = data.nscale_kubernetes_cluster.test.id
+  provisioning_mode = "reservation"
+  replicas          = 1
+
+  reservation = {
+    reservation_id = %[2]q
+    constraints = {
+      policy = %[3]q%[4]s
+    }
+  }
+}
+`, name, testAccReservationID(), policy, spreadOnly)
+}
+
+// TestAccKubernetesNodePoolResource_reservationConstraints checks the placement
+// policy round-trips exactly (the API never defaults it, so any drift is a
+// perpetual diff) and that changing it rebuilds the pool, since the API rejects
+// an edit.
+func TestAccKubernetesNodePoolResource_reservationConstraints(t *testing.T) {
+	name := acctest.RandomWithPrefix("tf-acc-test")
+
+	var poolID string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheckNodePoolReservation(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccNodePoolConfigConstraints(name, "spread"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(nodePoolResourceName, "reservation.constraints.policy", "spread"),
+					resource.TestCheckResourceAttr(nodePoolResourceName, "reservation.constraints.max_skew", "1"),
+					resource.TestCheckResourceAttr(nodePoolResourceName, "reservation.constraints.min_domains", "1"),
+					resource.TestCheckResourceAttr(
+						nodePoolResourceName, "reservation.constraints.when_unsatisfiable", "bestEffort",
+					),
+					captureNodePoolID(&poolID),
+				),
+			},
+			{
+				Config:   testAccNodePoolConfigConstraints(name, "spread"),
+				PlanOnly: true,
+			},
+			{
+				Config: testAccNodePoolConfigConstraints(name, "pack"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(nodePoolResourceName, plancheck.ResourceActionReplace),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					expectNodePoolID(&poolID, false),
+					resource.TestCheckResourceAttr(nodePoolResourceName, "reservation.constraints.policy", "pack"),
+					resource.TestCheckNoResourceAttr(nodePoolResourceName, "reservation.constraints.max_skew"),
+				),
+			},
+			{
+				ResourceName:            nodePoolResourceName,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"timeouts"}, // provider-side only, never returned by the API.
+			},
+		},
+	})
+}
+
 // TestAccKubernetesNodePoolResource_rejectsCapacityModeMismatch is the
 // plan-time validation matrix, which the ticket requires fail at plan rather
 // than apply. None of these steps reaches the API.
@@ -800,6 +878,53 @@ func TestAccKubernetesNodePoolResource_rejectsCapacityModeMismatch(t *testing.T)
   }]
 `,
 			expect: regexp.MustCompile(`(?s)effect`),
+		},
+		{
+			name: "a spread-only constraint under pack",
+			config: `
+  provisioning_mode = "reservation"
+  replicas          = 2
+
+  reservation = {
+    reservation_id = "res-1"
+    constraints = {
+      policy   = "pack"
+      max_skew = 1
+    }
+  }
+`,
+			expect: regexp.MustCompile(`(?s)Invalid Placement Constraint.*max_skew`),
+		},
+		{
+			name: "min_domains above replicas",
+			config: `
+  provisioning_mode = "reservation"
+  replicas          = 2
+
+  reservation = {
+    reservation_id = "res-1"
+    constraints = {
+      policy      = "spread"
+      min_domains = 3
+    }
+  }
+`,
+			expect: regexp.MustCompile(`(?s)Invalid Placement Constraint.*min_domains`),
+		},
+		{
+			name: "an unknown placement policy",
+			config: `
+  provisioning_mode = "reservation"
+  replicas          = 2
+
+  reservation = {
+    reservation_id = "res-1"
+    constraints = {
+      policy = "scatter"
+    }
+  }
+`,
+			expect: regexp.MustCompile(`(?s)policy`),
 		},
 	}
 

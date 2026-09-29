@@ -70,6 +70,7 @@ output "api_endpoint" {
 Read-Only:
 
 - `hardware` (Attributes) Configuration for the optional hardware addon profile. (see [below for nested schema](#nestedatt--addons--hardware))
+- `node_health` (Attributes) Configuration for the node-health addon profile. Takes effect only when the cluster's platform release includes a node-health profile. (see [below for nested schema](#nestedatt--addons--node_health))
 
 <a id="nestedatt--addons--hardware"></a>
 ### Nested Schema for `addons.hardware`
@@ -77,6 +78,15 @@ Read-Only:
 Read-Only:
 
 - `enabled` (Boolean) Whether the addon profile is enabled.
+
+
+<a id="nestedatt--addons--node_health"></a>
+### Nested Schema for `addons.node_health`
+
+Read-Only:
+
+- `enabled` (Boolean) Whether the addon profile is enabled.
+
 
 
 <a id="nestedatt--api_server"></a>

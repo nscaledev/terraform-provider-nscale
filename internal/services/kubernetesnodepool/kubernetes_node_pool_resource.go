@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -58,6 +59,9 @@ const (
 	maxTaintKeyLength   = 317
 	maxTaintValueLength = 63
 	maxLabelValueLength = 63
+
+	minConstraintValue = 1
+	maxConstraintValue = 2147483647
 )
 
 var (
@@ -126,14 +130,15 @@ func (r *KubernetesNodePoolResource) ImportState(
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), request, response)
 }
 
-// ValidateConfig surfaces a mode/capacity-block mismatch at plan time rather
-// than letting it fail as an API error at apply.
+// ValidateConfig surfaces mistakes the API would reject — a mode/capacity-block
+// mismatch, or min_domains above replicas — at plan time rather than at apply.
 func (r *KubernetesNodePoolResource) ValidateConfig(
 	ctx context.Context,
 	request resource.ValidateConfigRequest,
 	response *resource.ValidateConfigResponse,
 ) {
 	validateCapacityMode(ctx, request.Config, &response.Diagnostics)
+	validateMinDomainsWithinReplicas(ctx, request.Config, &response.Diagnostics)
 }
 
 func (r *KubernetesNodePoolResource) Schema(
@@ -248,6 +253,61 @@ func (r *KubernetesNodePoolResource) Schema(
 						Required: true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.RequiresReplace(),
+						},
+					},
+					// Not Computed: the API never defaults it, so null round-trips
+					// as null. RequiresReplace on the whole object because the API
+					// rejects any change, including adding or removing it.
+					"constraints": schema.SingleNestedAttribute{
+						MarkdownDescription: "How the pool's hosts are placed across topology domains in the " +
+							"reservation. Omit for `pack`. " +
+							"Immutable: changing, adding or removing this forces a new node pool to be created.",
+						Optional: true,
+						PlanModifiers: []planmodifier.Object{
+							objectplanmodifier.RequiresReplace(),
+						},
+						Validators: []validator.Object{
+							spreadOnlyConstraintsValidator{},
+						},
+						Attributes: map[string]schema.Attribute{
+							"policy": schema.StringAttribute{
+								MarkdownDescription: "`pack` fills topology domains one at a time for locality; " +
+									"`spread` distributes hosts across domains.",
+								Required: true,
+								Validators: []validator.String{
+									stringvalidator.OneOf(
+										string(kubernetesapi.NodePoolPlacementConstraintsV1PolicyPack),
+										string(kubernetesapi.NodePoolPlacementConstraintsV1PolicySpread),
+									),
+								},
+							},
+							"max_skew": schema.Int64Attribute{
+								MarkdownDescription: "The largest allowed difference in host count between " +
+									"domains. `spread` only.",
+								Optional: true,
+								Validators: []validator.Int64{
+									int64validator.Between(minConstraintValue, maxConstraintValue),
+								},
+							},
+							"min_domains": schema.Int64Attribute{
+								MarkdownDescription: "The minimum number of domains that must receive a host. " +
+									"Cannot exceed `replicas`. `spread` only.",
+								Optional: true,
+								Validators: []validator.Int64{
+									int64validator.Between(minConstraintValue, maxConstraintValue),
+								},
+							},
+							"when_unsatisfiable": schema.StringAttribute{
+								MarkdownDescription: "What happens when the spread cannot be met: `fail` rejects " +
+									"it, `bestEffort` accepts the closest layout. `spread` only.",
+								Optional: true,
+								Validators: []validator.String{
+									stringvalidator.OneOf(
+										string(kubernetesapi.NodePoolPlacementConstraintsV1WhenUnsatisfiableFail),
+										string(kubernetesapi.NodePoolPlacementConstraintsV1WhenUnsatisfiableBestEffort),
+									),
+								},
+							},
 						},
 					},
 				},

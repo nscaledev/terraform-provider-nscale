@@ -88,7 +88,8 @@ type clusterNetworkModel struct {
 // (`{enabled}`), so mirroring the wrapper lets a profile grow per-profile
 // settings later without a breaking change to this schema.
 type addonsModel struct {
-	Hardware types.Object `tfsdk:"hardware"`
+	Hardware   types.Object `tfsdk:"hardware"`
+	NodeHealth types.Object `tfsdk:"node_health"`
 }
 
 type addonProfileModel struct {
@@ -117,7 +118,8 @@ func addonProfileAttrTypes() map[string]attr.Type {
 
 func addonsAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"hardware": types.ObjectType{AttrTypes: addonProfileAttrTypes()},
+		"hardware":    types.ObjectType{AttrTypes: addonProfileAttrTypes()},
+		"node_health": types.ObjectType{AttrTypes: addonProfileAttrTypes()},
 	}
 }
 
@@ -212,7 +214,8 @@ func addonsObjectValue(source *kubernetesapi.ClusterAddonsV1) types.Object {
 	}
 
 	return types.ObjectValueMust(addonsAttrTypes(), map[string]attr.Value{
-		"hardware": addonProfileObjectValue(source.Hardware),
+		"hardware":    addonProfileObjectValue(source.Hardware),
+		"node_health": addonProfileObjectValue(source.NodeHealth),
 	})
 }
 
@@ -546,14 +549,20 @@ func (m *KubernetesClusterModel) addonsRequest(
 		return nil, diagnostics
 	}
 
+	nodeHealth, nodeHealthDiagnostics := addonProfileRequest(ctx, model.NodeHealth)
+	if diagnostics.Append(nodeHealthDiagnostics...); diagnostics.HasError() {
+		return nil, diagnostics
+	}
+
 	return &kubernetesapi.ClusterAddonsCreateV1{
-		Hardware: hardware,
+		Hardware:   hardware,
+		NodeHealth: nodeHealth,
 	}, diagnostics
 }
 
 // addonProfileRequest builds one clusterAddonProfileCreateV1 from a nested
 // profile object. An omitted or unresolved profile sends nothing, letting the
-// API apply its own default (hardware is enabled on create).
+// API apply its own default (every profile is enabled when omitted).
 func addonProfileRequest(
 	ctx context.Context,
 	profile types.Object,

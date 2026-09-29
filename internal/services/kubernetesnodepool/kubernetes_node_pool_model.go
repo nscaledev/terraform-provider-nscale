@@ -85,6 +85,17 @@ type computeModel struct {
 // capacity selector, valid only when provisioning_mode is `reservation`.
 type reservationModel struct {
 	ReservationID types.String `tfsdk:"reservation_id"`
+	Constraints   types.Object `tfsdk:"constraints"`
+}
+
+// constraintsModel mirrors nodePoolPlacementConstraintsV1, the topology policy
+// for a reservation pool's placement. The API never defaults it: it reads back
+// exactly what was sent, and null means the backend's pack default.
+type constraintsModel struct {
+	Policy            types.String `tfsdk:"policy"`
+	MaxSkew           types.Int64  `tfsdk:"max_skew"`
+	MinDomains        types.Int64  `tfsdk:"min_domains"`
+	WhenUnsatisfiable types.String `tfsdk:"when_unsatisfiable"`
 }
 
 // taintModel mirrors nodePoolTaintV1.
@@ -108,6 +119,16 @@ func computeAttrTypes() map[string]attr.Type {
 func reservationAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
 		"reservation_id": types.StringType,
+		"constraints":    types.ObjectType{AttrTypes: constraintsAttrTypes()},
+	}
+}
+
+func constraintsAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"policy":             types.StringType,
+		"max_skew":           types.Int64Type,
+		"min_domains":        types.Int64Type,
+		"when_unsatisfiable": types.StringType,
 	}
 }
 
@@ -183,7 +204,34 @@ func reservationObjectValue(source *kubernetesapi.NodePoolReservationV1) types.O
 
 	return types.ObjectValueMust(reservationAttrTypes(), map[string]attr.Value{
 		"reservation_id": types.StringPointerValue(source.ReservationId),
+		"constraints":    constraintsObjectValue(source.Constraints),
 	})
+}
+
+func constraintsObjectValue(source *kubernetesapi.NodePoolPlacementConstraintsV1) types.Object {
+	if source == nil {
+		return types.ObjectNull(constraintsAttrTypes())
+	}
+
+	whenUnsatisfiable := types.StringNull()
+	if source.WhenUnsatisfiable != nil {
+		whenUnsatisfiable = types.StringValue(string(*source.WhenUnsatisfiable))
+	}
+
+	return types.ObjectValueMust(constraintsAttrTypes(), map[string]attr.Value{
+		"policy":             types.StringValue(string(source.Policy)),
+		"max_skew":           intPointerValue(source.MaxSkew),
+		"min_domains":        intPointerValue(source.MinDomains),
+		"when_unsatisfiable": whenUnsatisfiable,
+	})
+}
+
+func intPointerValue(source *int) types.Int64 {
+	if source == nil {
+		return types.Int64Null()
+	}
+
+	return types.Int64Value(int64(*source))
 }
 
 // taintsListValue flattens the taint array, preserving the API's ordering.
@@ -425,9 +473,59 @@ func (m *KubernetesNodePoolModel) reservationRequest(
 		return nil, diagnostics
 	}
 
+	constraints, constraintsDiagnostics := constraintsRequest(ctx, model.Constraints)
+	if diagnostics.Append(constraintsDiagnostics...); diagnostics.HasError() {
+		return nil, diagnostics
+	}
+
 	return &kubernetesapi.NodePoolReservationV1{
 		ReservationId: model.ReservationID.ValueStringPointer(),
+		Constraints:   constraints,
 	}, diagnostics
+}
+
+// constraintsRequest builds the placement policy; omitted sends nothing, which
+// the API treats as pack. The API rejects any change, so updates re-send the
+// planned value unchanged (RequiresReplace keeps a changed one from getting here).
+func constraintsRequest(
+	ctx context.Context,
+	constraints types.Object,
+) (*kubernetesapi.NodePoolPlacementConstraintsV1, diag.Diagnostics) {
+	var diagnostics diag.Diagnostics
+
+	if constraints.IsNull() || constraints.IsUnknown() {
+		return nil, diagnostics
+	}
+
+	var model constraintsModel
+	if diagnostics = constraints.As(ctx, &model, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
+		return nil, diagnostics
+	}
+
+	var whenUnsatisfiable *kubernetesapi.NodePoolPlacementConstraintsV1WhenUnsatisfiable
+	if value := model.WhenUnsatisfiable.ValueStringPointer(); value != nil {
+		converted := kubernetesapi.NodePoolPlacementConstraintsV1WhenUnsatisfiable(*value)
+		whenUnsatisfiable = &converted
+	}
+
+	return &kubernetesapi.NodePoolPlacementConstraintsV1{
+		Policy:            kubernetesapi.NodePoolPlacementConstraintsV1Policy(model.Policy.ValueString()),
+		MaxSkew:           int64PointerToInt(model.MaxSkew),
+		MinDomains:        int64PointerToInt(model.MinDomains),
+		WhenUnsatisfiable: whenUnsatisfiable,
+	}, diagnostics
+}
+
+// int64PointerToInt narrows a schema Int64 to the SDK's *int. The schema caps
+// both fields at MaxInt32, so the conversion cannot overflow.
+func int64PointerToInt(value types.Int64) *int {
+	if value.IsNull() || value.IsUnknown() {
+		return nil
+	}
+
+	converted := int(value.ValueInt64())
+
+	return &converted
 }
 
 // taintsRequest builds the taint array. An omitted attribute sends nothing; a

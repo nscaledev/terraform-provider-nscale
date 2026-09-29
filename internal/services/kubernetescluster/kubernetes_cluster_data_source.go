@@ -145,6 +145,17 @@ func (s *KubernetesClusterDataSource) Schema(
 							},
 						},
 					},
+					"node_health": schema.SingleNestedAttribute{
+						MarkdownDescription: "Configuration for the node-health addon profile. Takes effect only " +
+							"when the cluster's platform release includes a node-health profile.",
+						Computed: true,
+						Attributes: map[string]schema.Attribute{
+							"enabled": schema.BoolAttribute{
+								MarkdownDescription: "Whether the addon profile is enabled.",
+								Computed:            true,
+							},
+						},
+					},
 				},
 			},
 			"project_id": schema.StringAttribute{

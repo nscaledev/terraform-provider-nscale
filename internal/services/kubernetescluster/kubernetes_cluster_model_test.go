@@ -69,7 +69,8 @@ func fullCluster(t *testing.T) *kubernetesapi.ClusterV1Read {
 				ServiceCidr: new("10.96.0.0/16"),
 			},
 			Addons: &kubernetesapi.ClusterAddonsV1{
-				Hardware: &kubernetesapi.ClusterAddonProfileV1{Enabled: new(true)},
+				Hardware:   &kubernetesapi.ClusterAddonProfileV1{Enabled: new(true)},
+				NodeHealth: &kubernetesapi.ClusterAddonProfileV1{Enabled: new(false)},
 			},
 		},
 		Status: kubernetesapi.ClusterStatusV1{
@@ -202,6 +203,22 @@ func TestNewKubernetesClusterModelFull(t *testing.T) {
 	}
 }
 
+// TestNewKubernetesClusterModelNodeHealth reads a disabled nodeHealth, the
+// value a dropped field would silently flip.
+func TestNewKubernetesClusterModelNodeHealth(t *testing.T) {
+	t.Parallel()
+
+	model := NewKubernetesClusterModel(fullCluster(t))
+
+	nodeHealth := model.Addons.Attributes()["node_health"].(types.Object)
+	if nodeHealth.IsNull() {
+		t.Fatal("addons.node_health should be populated when the API returns the profile")
+	}
+	if enabled := nodeHealth.Attributes()["enabled"].(types.Bool); enabled.IsNull() || enabled.ValueBool() {
+		t.Errorf("addons.node_health.enabled = %s, want false", enabled)
+	}
+}
+
 // TestAddonsProfileAbsent covers `addons` present with the hardware profile
 // absent. That is distinct from `hardware = { enabled = false }`: the API has
 // said nothing about the profile rather than said it is off.
@@ -210,13 +227,18 @@ func TestAddonsProfileAbsent(t *testing.T) {
 
 	cluster := fullCluster(t)
 	cluster.Spec.Addons.Hardware = nil
+	cluster.Spec.Addons.NodeHealth = nil
 
 	model := NewKubernetesClusterModel(cluster)
 	if model.Addons.IsNull() {
 		t.Fatal("addons should be populated when spec.addons is present")
 	}
-	if !model.Addons.Attributes()["hardware"].(types.Object).IsNull() {
-		t.Error("addons.hardware should be null when the API omits the profile")
+	// A server that predates nodeHealth omits it; that must read as null, not
+	// as disabled.
+	for _, profile := range []string{"hardware", "node_health"} {
+		if !model.Addons.Attributes()[profile].(types.Object).IsNull() {
+			t.Errorf("addons.%s should be null when the API omits the profile", profile)
+		}
 	}
 }
 
@@ -338,6 +360,9 @@ func TestCreateParamsBoolZeroValues(t *testing.T) {
 			"hardware": objectValue(t, addonProfileAttrTypes(), map[string]attr.Value{
 				"enabled": types.BoolValue(false),
 			}),
+			"node_health": objectValue(t, addonProfileAttrTypes(), map[string]attr.Value{
+				"enabled": types.BoolValue(false),
+			}),
 		}),
 	}
 
@@ -360,6 +385,9 @@ func TestCreateParamsBoolZeroValues(t *testing.T) {
 				Hardware *struct {
 					Enabled *bool `json:"enabled"`
 				} `json:"hardware"`
+				NodeHealth *struct {
+					Enabled *bool `json:"enabled"`
+				} `json:"nodeHealth"`
 			} `json:"addons"`
 		} `json:"spec"`
 	}
@@ -383,6 +411,14 @@ func TestCreateParamsBoolZeroValues(t *testing.T) {
 	if *decoded.Spec.Addons.Hardware.Enabled {
 		t.Errorf("hardware.enabled = true, want false: %s", encoded)
 	}
+
+	// nodeHealth defaults to TRUE server-side too, so a dropped false re-enables it.
+	if decoded.Spec.Addons.NodeHealth == nil || decoded.Spec.Addons.NodeHealth.Enabled == nil {
+		t.Fatalf("nodeHealth.enabled was dropped from the payload: %s", encoded)
+	}
+	if *decoded.Spec.Addons.NodeHealth.Enabled {
+		t.Errorf("nodeHealth.enabled = true, want false: %s", encoded)
+	}
 }
 
 // TestCreateParamsOmitsAbsentAddonProfile covers the profile-level equivalent of
@@ -400,7 +436,8 @@ func TestCreateParamsOmitsAbsentAddonProfile(t *testing.T) {
 		APIServer:         types.ObjectNull(apiServerAttrTypes()),
 		ClusterNetwork:    types.ObjectNull(clusterNetworkAttrTypes()),
 		Addons: objectValue(t, addonsAttrTypes(), map[string]attr.Value{
-			"hardware": types.ObjectNull(addonProfileAttrTypes()),
+			"hardware":    types.ObjectNull(addonProfileAttrTypes()),
+			"node_health": types.ObjectNull(addonProfileAttrTypes()),
 		}),
 	}
 
@@ -414,6 +451,9 @@ func TestCreateParamsOmitsAbsentAddonProfile(t *testing.T) {
 	}
 	if params.Spec.Addons.Hardware != nil {
 		t.Error("hardware should be nil when the profile is omitted, so the API applies its default")
+	}
+	if params.Spec.Addons.NodeHealth != nil {
+		t.Error("nodeHealth should be nil when the profile is omitted, so the API applies its default")
 	}
 }
 
@@ -591,5 +631,28 @@ func TestUpdateParamsOmitAbsentUnmodelledFields(t *testing.T) {
 	}
 	if params.Spec.SshCertificateAuthorityId != nil {
 		t.Errorf("sshCertificateAuthorityId = %q, want nil", *params.Spec.SshCertificateAuthorityId)
+	}
+}
+
+// TestUpdateParamsKeepDisabledNodeHealth guards the reason node_health is
+// modelled at all: update is a full PUT and the API defaults an omitted profile
+// to enabled, so a disabled nodeHealth must be re-sent or every update turns it
+// back on.
+func TestUpdateParamsKeepDisabledNodeHealth(t *testing.T) {
+	t.Parallel()
+
+	model := NewKubernetesClusterModel(fullCluster(t))
+
+	params, diagnostics := model.NscaleClusterUpdateParams(context.Background(), fullCluster(t).Spec)
+	if diagnostics.HasError() {
+		t.Fatalf("building update params: %v", diagnostics)
+	}
+
+	addons := params.Spec.Addons
+	if addons == nil || addons.NodeHealth == nil || addons.NodeHealth.Enabled == nil {
+		t.Fatalf("nodeHealth.enabled was dropped from the update payload: %+v", addons)
+	}
+	if *addons.NodeHealth.Enabled {
+		t.Error("nodeHealth.enabled = true, want false")
 	}
 }

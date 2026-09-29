@@ -128,6 +128,10 @@ type CreateStateWatcher[T any] struct {
 	ResourceTitle string
 	ResourceName  string
 	GetFunc       func(ctx context.Context) (*T, ResourceStatus, error)
+
+	// DefaultTimeout applies when the config sets no create timeout. Zero means
+	// the shared defaultStateWatcherTimeout.
+	DefaultTimeout time.Duration `exhaustruct:"optional"`
 }
 
 func (w *CreateStateWatcher[T]) Wait(
@@ -135,7 +139,12 @@ func (w *CreateStateWatcher[T]) Wait(
 	timeouts tftimeouts.Value,
 	response *resource.CreateResponse,
 ) (*T, bool) {
-	timeout, diagnostics := timeouts.Create(ctx, defaultStateWatcherTimeout)
+	defaultTimeout := defaultStateWatcherTimeout
+	if w.DefaultTimeout > 0 {
+		defaultTimeout = w.DefaultTimeout
+	}
+
+	timeout, diagnostics := timeouts.Create(ctx, defaultTimeout)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return nil, false

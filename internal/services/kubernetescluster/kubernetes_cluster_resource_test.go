@@ -103,6 +103,9 @@ resource "nscale_kubernetes_cluster" "test" {
     hardware = {
       enabled = %[2]t
     }
+    node_health = {
+      enabled = false
+    }
   }
 }
 `, name, hardwareEnabled)
@@ -213,7 +216,7 @@ func TestAccKubernetesClusterResource_basic(t *testing.T) {
 // "Provider produced inconsistent result after apply".
 //
 // The later steps toggle the hardware addon on and back off, proving it is
-// mutable in place. They reuse this cluster because a second build would add
+// mutable in place, and that each full-replacement PUT keeps node_health off. They reuse this cluster because a second build would add
 // half an hour to the suite.
 func TestAccKubernetesClusterResource_boolZeroValues(t *testing.T) {
 	name := acctest.RandomWithPrefix("tf-acc-test")
@@ -229,6 +232,7 @@ func TestAccKubernetesClusterResource_boolZeroValues(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(clusterResourceName, "api_server.public_ip", "false"),
 					resource.TestCheckResourceAttr(clusterResourceName, "addons.hardware.enabled", "false"),
+					resource.TestCheckResourceAttr(clusterResourceName, "addons.node_health.enabled", "false"),
 					captureClusterID(&clusterID),
 				),
 			},
@@ -240,6 +244,7 @@ func TestAccKubernetesClusterResource_boolZeroValues(t *testing.T) {
 				Config: testAccClusterConfigBoolZeroValues(name, true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(clusterResourceName, "addons.hardware.enabled", "true"),
+					resource.TestCheckResourceAttr(clusterResourceName, "addons.node_health.enabled", "false"),
 					expectClusterID(&clusterID, true),
 				),
 			},
@@ -247,6 +252,7 @@ func TestAccKubernetesClusterResource_boolZeroValues(t *testing.T) {
 				Config: testAccClusterConfigBoolZeroValues(name, false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(clusterResourceName, "addons.hardware.enabled", "false"),
+					resource.TestCheckResourceAttr(clusterResourceName, "addons.node_health.enabled", "false"),
 					expectClusterID(&clusterID, true),
 				),
 			},

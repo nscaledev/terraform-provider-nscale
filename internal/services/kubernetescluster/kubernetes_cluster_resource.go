@@ -297,6 +297,27 @@ func (r *KubernetesClusterResource) Schema(
 							},
 						},
 					},
+					// Same shape and semantics as hardware. Being Computed is what
+					// keeps it in every PUT: the API defaults an omitted profile to
+					// enabled, so dropping it would silently re-enable it.
+					"node_health": schema.SingleNestedAttribute{
+						MarkdownDescription: "Configuration for the node-health addon profile. Takes effect only " +
+							"when the cluster's platform release includes a node-health profile; on other releases " +
+							"the setting is accepted and ignored.",
+						Optional: true,
+						Computed: true,
+						PlanModifiers: []planmodifier.Object{
+							objectplanmodifier.UseStateForUnknown(),
+						},
+						Attributes: map[string]schema.Attribute{
+							"enabled": schema.BoolAttribute{
+								MarkdownDescription: "Whether the addon profile is enabled. Defaults to `true`. " +
+									"Can be changed in place without replacing the cluster.",
+								Optional: true,
+								Computed: true,
+							},
+						},
+					},
 				},
 			},
 			"project_id": schema.StringAttribute{

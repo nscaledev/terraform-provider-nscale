@@ -840,6 +840,22 @@
                         },
                         "nesting_mode": "single"
                       }
+                    },
+                    "node_health": {
+                      "computed": true,
+                      "description": "Configuration for the node-health addon profile. Takes effect only when the cluster's platform release includes a node-health profile.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "enabled": {
+                            "computed": true,
+                            "description": "Whether the addon profile is enabled.",
+                            "description_kind": "markdown",
+                            "type": "bool"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      }
                     }
                   },
                   "nesting_mode": "single"
@@ -1212,6 +1228,40 @@
                 "description_kind": "markdown",
                 "nested_type": {
                   "attributes": {
+                    "constraints": {
+                      "computed": true,
+                      "description": "How the pool's hosts are placed across topology domains. Null means `pack`.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "max_skew": {
+                            "computed": true,
+                            "description": "The largest allowed difference in host count between domains.",
+                            "description_kind": "markdown",
+                            "type": "number"
+                          },
+                          "min_domains": {
+                            "computed": true,
+                            "description": "The minimum number of domains that must receive a host.",
+                            "description_kind": "markdown",
+                            "type": "number"
+                          },
+                          "policy": {
+                            "computed": true,
+                            "description": "`pack` or `spread`.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          },
+                          "when_unsatisfiable": {
+                            "computed": true,
+                            "description": "`fail` or `bestEffort`.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      }
+                    },
                     "reservation_id": {
                       "computed": true,
                       "description": "The identifier of the reservation the pool consumes capacity from.",
@@ -3141,6 +3191,24 @@
                         "nesting_mode": "single"
                       },
                       "optional": true
+                    },
+                    "node_health": {
+                      "computed": true,
+                      "description": "Configuration for the node-health addon profile. Takes effect only when the cluster's platform release includes a node-health profile; on other releases the setting is accepted and ignored.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "enabled": {
+                            "computed": true,
+                            "description": "Whether the addon profile is enabled. Defaults to `true`. Can be changed in place without replacing the cluster.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "bool"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      },
+                      "optional": true
                     }
                   },
                   "nesting_mode": "single"
@@ -3555,6 +3623,40 @@
                 "description_kind": "markdown",
                 "nested_type": {
                   "attributes": {
+                    "constraints": {
+                      "description": "How the pool's hosts are placed across topology domains in the reservation. Omit for `pack`. Immutable: changing, adding or removing this forces a new node pool to be created.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "max_skew": {
+                            "description": "The largest allowed difference in host count between domains. `spread` only.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "number"
+                          },
+                          "min_domains": {
+                            "description": "The minimum number of domains that must receive a host. Cannot exceed `replicas`. `spread` only.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "number"
+                          },
+                          "policy": {
+                            "description": "`pack` fills topology domains one at a time for locality; `spread` distributes hosts across domains.",
+                            "description_kind": "markdown",
+                            "required": true,
+                            "type": "string"
+                          },
+                          "when_unsatisfiable": {
+                            "description": "What happens when the spread cannot be met: `fail` rejects it, `bestEffort` accepts the closest layout. `spread` only.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      },
+                      "optional": true
+                    },
                     "reservation_id": {
                       "description": "The identifier of the reservation to consume capacity from. Immutable: changing this forces a new node pool to be created.",
                       "description_kind": "markdown",

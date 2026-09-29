@@ -84,7 +84,19 @@ Read-Only:
 
 Read-Only:
 
+- `constraints` (Attributes) How the pool's hosts are placed across topology domains. Null means `pack`. (see [below for nested schema](#nestedatt--reservation--constraints))
 - `reservation_id` (String) The identifier of the reservation the pool consumes capacity from.
+
+<a id="nestedatt--reservation--constraints"></a>
+### Nested Schema for `reservation.constraints`
+
+Read-Only:
+
+- `max_skew` (Number) The largest allowed difference in host count between domains.
+- `min_domains` (Number) The minimum number of domains that must receive a host.
+- `policy` (String) `pack` or `spread`.
+- `when_unsatisfiable` (String) `fail` or `bestEffort`.
+
 
 
 <a id="nestedatt--taints"></a>

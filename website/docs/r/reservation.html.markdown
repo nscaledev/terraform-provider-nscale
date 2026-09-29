@@ -77,8 +77,12 @@ reservation is removed. Deleting a reservation also deletes every placement allo
 
 The `timeouts` block supports:
 
-* `create` - (Default `30m`)
+* `create` - (Default `90m`)
 * `delete` - (Default `30m`)
+
+Provisioning a reservation can take up to an hour, so `create` defaults well above that. Raise it rather than retrying
+after a timeout: a create that times out leaves the reservation tainted, and the next apply destroys it and requests the
+capacity again from scratch.
 
 ## Import
 

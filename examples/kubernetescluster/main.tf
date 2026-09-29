@@ -127,8 +127,8 @@ resource "nscale_kubernetes_cluster" "main" {
     allowed_cidrs = var.api_server_allowed_cidrs
   }
 
-  # `addons` is omitted so the API applies its own defaults (hardware enabled on
-  # create) and they are read back into state.
+  # `addons` is omitted so the API applies its own defaults (hardware and
+  # node_health both enabled on create) and they are read back into state.
 
   tags = {
     environment = "example"
@@ -263,6 +263,13 @@ resource "nscale_kubernetes_node_pool" "gpu" {
 
   reservation = {
     reservation_id = var.gpu_reservation_id
+
+    # Optional; omit for `pack` (fill one topology domain before the next).
+    # Fixed at creation — changing it rebuilds the pool.
+    constraints = {
+      policy             = "spread"
+      when_unsatisfiable = "bestEffort"
+    }
   }
 
   # The placement backing this pool NEVER ROLLS, so the API refuses any edit

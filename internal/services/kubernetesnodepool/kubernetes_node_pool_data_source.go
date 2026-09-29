@@ -131,6 +131,29 @@ func (s *KubernetesNodePoolDataSource) Schema(
 						MarkdownDescription: "The identifier of the reservation the pool consumes capacity from.",
 						Computed:            true,
 					},
+					"constraints": schema.SingleNestedAttribute{
+						MarkdownDescription: "How the pool's hosts are placed across topology domains. " +
+							"Null means `pack`.",
+						Computed: true,
+						Attributes: map[string]schema.Attribute{
+							"policy": schema.StringAttribute{
+								MarkdownDescription: "`pack` or `spread`.",
+								Computed:            true,
+							},
+							"max_skew": schema.Int64Attribute{
+								MarkdownDescription: "The largest allowed difference in host count between domains.",
+								Computed:            true,
+							},
+							"min_domains": schema.Int64Attribute{
+								MarkdownDescription: "The minimum number of domains that must receive a host.",
+								Computed:            true,
+							},
+							"when_unsatisfiable": schema.StringAttribute{
+								MarkdownDescription: "`fail` or `bestEffort`.",
+								Computed:            true,
+							},
+						},
+					},
 				},
 			},
 			"taints": schema.ListNestedAttribute{

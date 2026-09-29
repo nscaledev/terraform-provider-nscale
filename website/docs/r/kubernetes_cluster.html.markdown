@@ -56,7 +56,8 @@ resource "nscale_kubernetes_cluster" "main" {
   }
 
   addons = {
-    hardware = { enabled = true }
+    hardware    = { enabled = true }
+    node_health = { enabled = true }
   }
 
   # Only needed if the defaults (60m/90m/60m) do not suit; shown here for
@@ -139,6 +140,7 @@ resource "nscale_kubernetes_cluster" "main" {
 Optional:
 
 - `hardware` (Attributes) Configuration for the optional hardware addon profile. (see [below for nested schema](#nestedatt--addons--hardware))
+- `node_health` (Attributes) Configuration for the node-health addon profile. Takes effect only when the cluster's platform release includes a node-health profile; on other releases the setting is accepted and ignored. (see [below for nested schema](#nestedatt--addons--node_health))
 
 <a id="nestedatt--addons--hardware"></a>
 ### Nested Schema for `addons.hardware`
@@ -146,6 +148,15 @@ Optional:
 Optional:
 
 - `enabled` (Boolean) Whether the addon profile is enabled. Defaults to `true`. Can be changed in place without replacing the cluster.
+
+
+<a id="nestedatt--addons--node_health"></a>
+### Nested Schema for `addons.node_health`
+
+Optional:
+
+- `enabled` (Boolean) Whether the addon profile is enabled. Defaults to `true`. Can be changed in place without replacing the cluster.
+
 
 
 <a id="nestedatt--api_server"></a>
