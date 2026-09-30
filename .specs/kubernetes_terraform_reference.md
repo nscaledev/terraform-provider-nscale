@@ -71,7 +71,8 @@ resource "nscale_kubernetes_cluster" "main" {
   }
 
   addons = {
-    hardware = { enabled = true }
+    hardware    = { enabled = true }
+    node_health = { enabled = true }
   }
 
   # `timeouts` is a block — no `=`.
@@ -114,6 +115,8 @@ resource "nscale_kubernetes_cluster" "main" {
 | --- | --- | --- |
 | `hardware` | Object | `{ enabled = true }` |
 | `hardware.enabled` | Bool | **`true`** |
+| `node_health` | Object | `{ enabled = true }` |
+| `node_health.enabled` | Bool | **`true`**, a no-op unless the platform release includes a node-health profile |
 
 All defaults are applied by the API, not the provider, and are read back into
 state. Omit a block to accept them.
@@ -412,3 +415,7 @@ Terraform.
 
 **A production endpoint default.** Pending the NKS service migration;
 `nks_service_api_endpoint` must be set explicitly until then.
+
+*API server authorization and authentication, and `ssh_certificate_authority_id`,
+were listed here until 2026-09-29. They are now supported; see "API server
+access" in the resource docs for what can change in place.*

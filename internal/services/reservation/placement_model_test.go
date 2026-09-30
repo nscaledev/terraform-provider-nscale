@@ -35,7 +35,7 @@ func TestNewPlacementModelFull(t *testing.T) {
 	// the base64 string that was originally configured.
 	userData := []byte("#!/bin/sh\n")
 	encodedUserData := base64.StdEncoding.EncodeToString(userData)
-	whenUnsatisfiable := reservationapi.Fail
+	whenUnsatisfiable := reservationapi.WhenUnsatisfiableV2Fail
 	publicIP := true
 
 	source := &reservationapi.PlacementV2Read{
@@ -55,7 +55,7 @@ func TestNewPlacementModelFull(t *testing.T) {
 		Spec: reservationapi.PlacementV2Spec{
 			Count: 8,
 			Constraints: reservationapi.PlacementConstraintsV2{
-				Policy:            reservationapi.Spread,
+				Policy:            reservationapi.PlacementPolicyV2Spread,
 				MaxSkew:           new(1),
 				MinDomains:        new(3),
 				WhenUnsatisfiable: &whenUnsatisfiable,
@@ -151,7 +151,7 @@ func TestNewPlacementModelMinimal(t *testing.T) {
 		Spec: reservationapi.PlacementV2Spec{
 			Count: 1,
 			Constraints: reservationapi.PlacementConstraintsV2{
-				Policy: reservationapi.Pack,
+				Policy: reservationapi.PlacementPolicyV2Pack,
 			},
 			ServerSpec: reservationapi.PlacementServerSpecV2{
 				ImageId: "ubuntu-24.04",
@@ -253,8 +253,8 @@ func TestNscalePlacementCreateParams(t *testing.T) {
 	if params.Spec.Count != 8 {
 		t.Errorf("Count = %d, want %d", params.Spec.Count, 8)
 	}
-	if params.Spec.Constraints.Policy != reservationapi.Spread {
-		t.Errorf("Policy = %q, want %q", params.Spec.Constraints.Policy, reservationapi.Spread)
+	if params.Spec.Constraints.Policy != reservationapi.PlacementPolicyV2Spread {
+		t.Errorf("Policy = %q, want %q", params.Spec.Constraints.Policy, reservationapi.PlacementPolicyV2Spread)
 	}
 	if params.Spec.Constraints.MaxSkew == nil || *params.Spec.Constraints.MaxSkew != 1 {
 		t.Errorf("MaxSkew = %v, want 1", params.Spec.Constraints.MaxSkew)
@@ -263,7 +263,7 @@ func TestNscalePlacementCreateParams(t *testing.T) {
 		t.Errorf("MinDomains = %v, want 3", params.Spec.Constraints.MinDomains)
 	}
 	if params.Spec.Constraints.WhenUnsatisfiable == nil ||
-		*params.Spec.Constraints.WhenUnsatisfiable != reservationapi.Fail {
+		*params.Spec.Constraints.WhenUnsatisfiable != reservationapi.WhenUnsatisfiableV2Fail {
 		t.Errorf("WhenUnsatisfiable = %v, want fail", params.Spec.Constraints.WhenUnsatisfiable)
 	}
 	if params.Spec.ServerSpec.ImageId != "ubuntu-24.04" {
@@ -410,7 +410,7 @@ func TestNewPlacementModelNetworkingNilLists(t *testing.T) {
 		},
 		Spec: reservationapi.PlacementV2Spec{
 			Count:       1,
-			Constraints: reservationapi.PlacementConstraintsV2{Policy: reservationapi.Pack},
+			Constraints: reservationapi.PlacementConstraintsV2{Policy: reservationapi.PlacementPolicyV2Pack},
 			ServerSpec: reservationapi.PlacementServerSpecV2{
 				ImageId: "ubuntu-24.04",
 				// API echoes the networking object but omits the list fields.

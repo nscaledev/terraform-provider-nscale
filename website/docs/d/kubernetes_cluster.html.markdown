@@ -61,6 +61,7 @@ output "api_endpoint" {
 - `project_id` (String) The identifier of the project the cluster belongs to.
 - `provisioning_status` (String) The provisioning state of the cluster.
 - `region_id` (String) The identifier of the region the cluster is provisioned in.
+- `ssh_certificate_authority_id` (String) The identifier of the region SSH certificate authority the cluster's workers trust.
 - `tags` (Map of String) A map of tags assigned to the cluster.
 - `upgrade_available` (Boolean) Whether at least one eligible platform release upgrade target was observed.
 
@@ -70,6 +71,7 @@ output "api_endpoint" {
 Read-Only:
 
 - `hardware` (Attributes) Configuration for the optional hardware addon profile. (see [below for nested schema](#nestedatt--addons--hardware))
+- `node_health` (Attributes) Configuration for the node-health addon profile. Takes effect only when the cluster's platform release includes a node-health profile. (see [below for nested schema](#nestedatt--addons--node_health))
 
 <a id="nestedatt--addons--hardware"></a>
 ### Nested Schema for `addons.hardware`
@@ -79,13 +81,81 @@ Read-Only:
 - `enabled` (Boolean) Whether the addon profile is enabled.
 
 
+<a id="nestedatt--addons--node_health"></a>
+### Nested Schema for `addons.node_health`
+
+Read-Only:
+
+- `enabled` (Boolean) Whether the addon profile is enabled.
+
+
+
 <a id="nestedatt--api_server"></a>
 ### Nested Schema for `api_server`
 
 Read-Only:
 
 - `allowed_cidrs` (Set of String) Source IPv4 CIDR allowlist for the cluster API endpoint.
+- `authentication` (Attributes) How the Kubernetes API server authenticates callers, beyond the Nscale defaults. (see [below for nested schema](#nestedatt--api_server--authentication))
+- `authorization` (Attributes) RBAC bindings granting built-in cluster roles to users and groups. (see [below for nested schema](#nestedatt--api_server--authorization))
 - `public_ip` (Boolean) Whether the API server is exposed through a public endpoint.
+
+<a id="nestedatt--api_server--authentication"></a>
+### Nested Schema for `api_server.authentication`
+
+Read-Only:
+
+- `external_issuers` (Attributes List) External JWT/OIDC issuers the API server trusts. (see [below for nested schema](#nestedatt--api_server--authentication--external_issuers))
+- `nscale_webhook` (Attributes) Per-cluster override of whether the Nscale authentication webhook is enabled. (see [below for nested schema](#nestedatt--api_server--authentication--nscale_webhook))
+
+<a id="nestedatt--api_server--authentication--external_issuers"></a>
+### Nested Schema for `api_server.authentication.external_issuers`
+
+Read-Only:
+
+- `audiences` (List of String) Token audiences accepted from this issuer.
+- `ca_certificate` (String) PEM-encoded CA certificate for the issuer.
+- `groups_claim` (String) The JWT claim mapped to the user's groups.
+- `groups_prefix` (String) Prepended to each group from `groups_claim`.
+- `issuer_url` (String) The issuer URL clients present tokens from.
+- `username_claim` (String) The JWT claim mapped to the username.
+- `username_prefix` (String) Prepended to the username claim.
+
+
+<a id="nestedatt--api_server--authentication--nscale_webhook"></a>
+### Nested Schema for `api_server.authentication.nscale_webhook`
+
+Read-Only:
+
+- `enabled` (Boolean) Whether the Nscale authentication webhook is enabled for this cluster.
+
+
+
+<a id="nestedatt--api_server--authorization"></a>
+### Nested Schema for `api_server.authorization`
+
+Read-Only:
+
+- `cluster_role_bindings` (Attributes Set) One binding per cluster role. (see [below for nested schema](#nestedatt--api_server--authorization--cluster_role_bindings))
+
+<a id="nestedatt--api_server--authorization--cluster_role_bindings"></a>
+### Nested Schema for `api_server.authorization.cluster_role_bindings`
+
+Read-Only:
+
+- `cluster_role` (String) The built-in cluster role bound.
+- `subjects` (Attributes Set) The users and groups granted the role. (see [below for nested schema](#nestedatt--api_server--authorization--cluster_role_bindings--subjects))
+
+<a id="nestedatt--api_server--authorization--cluster_role_bindings--subjects"></a>
+### Nested Schema for `api_server.authorization.cluster_role_bindings.subjects`
+
+Read-Only:
+
+- `kind` (String) `User` or `Group`.
+- `name` (String) The user or group name.
+
+
+
 
 
 <a id="nestedatt--api_server_endpoint"></a>
