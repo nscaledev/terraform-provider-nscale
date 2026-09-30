@@ -526,7 +526,7 @@ func TestProvisionedTimeoutQuotesLastRead(t *testing.T) {
 		t.Error("Provisioned() should hand back the last read alongside the timeout")
 	}
 
-	for _, want := range []string{"last reported", `provisioning status "provisioning"`, "next apply resumes it"} {
+	for _, want := range []string{"last reported", `provisioning status "provisioning"`, "terraform untaint"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("Provisioned() error = %q, want it to contain %q", err, want)
 		}
@@ -619,5 +619,57 @@ func TestProvisionedFailsPersistentError(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("Provisioned() error = %q, want it to contain %q", err, want)
 		}
+	}
+}
+
+// limitPollServerErrors keeps the SDK's exponential backoff between skipped
+// reads well inside a test's timeout.
+func limitPollServerErrors(t *testing.T, limit int) {
+	t.Helper()
+
+	restore := pollMaxServerErrors
+	pollMaxServerErrors = limit
+	t.Cleanup(func() { pollMaxServerErrors = restore })
+}
+
+func serverError() error {
+	return &nscale.APIError{StatusCode: http.StatusServiceUnavailable, Message: "unavailable"}
+}
+
+// TestProvisionedRidesOutServerErrors: a short run of 5xx reads mid-wait must
+// not fail the apply, or a healthy resource ends up tainted and replaced.
+func TestProvisionedRidesOutServerErrors(t *testing.T) {
+	windDownWaiter(t, time.Minute)
+	limitPollServerErrors(t, 2)
+
+	ready := clusterSequence(kubernetesapi.ResourceProvisioningStatusProvisioned)
+	calls := 0
+	get := func(ctx context.Context) (*kubernetesapi.ClusterV1Read, error) {
+		calls++
+		if calls <= pollMaxServerErrors {
+			return nil, serverError()
+		}
+
+		return ready(ctx)
+	}
+
+	if _, err := Provisioned(t.Context(), clusterTarget(get, time.Minute)); err != nil {
+		t.Fatalf("Provisioned() = %v, want success once the 5xx cleared", err)
+	}
+}
+
+// TestProvisionedFailsPersistentServerErrors: past pollMaxServerErrors in a
+// row, the 5xx is surfaced rather than waited out to the timeout.
+func TestProvisionedFailsPersistentServerErrors(t *testing.T) {
+	windDownWaiter(t, time.Minute)
+	limitPollServerErrors(t, 1)
+
+	get := func(_ context.Context) (*kubernetesapi.ClusterV1Read, error) {
+		return nil, serverError()
+	}
+
+	_, err := Provisioned(t.Context(), clusterTarget(get, 5*time.Second))
+	if err == nil || !strings.Contains(err.Error(), "unavailable") {
+		t.Fatalf("Provisioned() = %v, want the 5xx surfaced", err)
 	}
 }

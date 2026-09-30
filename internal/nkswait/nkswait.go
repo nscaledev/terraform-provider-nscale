@@ -61,6 +61,11 @@ var (
 	// cluster upgrade reported "one or more add-ons are degraded" 15s in, where
 	// the same upgrade had completed earlier that day.
 	pollFailureGrace = 5 * time.Minute
+
+	// pollMaxServerErrors is how many consecutive 5xx reads a wait rides out.
+	// The HTTP client never retries 5xx, and failing the wait on one would taint
+	// a healthy resource for the next apply to replace.
+	pollMaxServerErrors = 5
 )
 
 // Waiter states. These are internal to the state machine below and
@@ -256,6 +261,9 @@ func Provisioned[T any](ctx context.Context, target Target[T]) (*T, error) {
 		Target:  provisionedTarget(),
 		Refresh: func() (any, string, error) {
 			raw, state, err := refresh()
+			if raw == nil {
+				return raw, state, err // a skipped transient read, or a real error
+			}
 			if value, ok := raw.(*T); ok {
 				last = value
 			}
@@ -310,13 +318,14 @@ func Provisioned[T any](ctx context.Context, target Target[T]) (*T, error) {
 
 	// Not a failure, so the operation is most likely still running: nothing
 	// upstream sets a drain timeout, so an unsatisfiable PodDisruptionBudget
-	// blocks a roll indefinitely and this timeout is the only bound. The work
-	// resumes on the next apply, so say so rather than leaving a bare deadline
-	// that reads like a broken resource.
+	// blocks a roll indefinitely and this timeout is the only bound. After a
+	// create Terraform taints the resource, so warn before the next apply
+	// replaces something that is still coming up.
 	if detail, reported := target.lastReported(last); reported {
 		return last, fmt.Errorf(
 			"waiting for %s to be provisioned: %w — last reported %s; "+
-				"the operation may still be in progress remotely, in which case the next apply resumes it",
+				"the operation may still be in progress remotely. If this was a create, the resource is now "+
+				"tainted and the next apply will replace it: run `terraform untaint` once it finishes instead",
 			target.Kind, err, detail,
 		)
 	}
@@ -391,21 +400,42 @@ func Deleted[T any](ctx context.Context, target Target[T]) error {
 // refresh is the shared StateRefreshFunc. notFoundState decides how a 404 is
 // interpreted: terminal success when deleting, a transient not-yet-visible
 // state when creating.
+//
+// A 5xx comes back as a nil result, which StateChangeConf treats as "try
+// again", until pollMaxServerErrors in a row.
 func (t Target[T]) refresh(ctx context.Context, notFoundState string) retry.StateRefreshFunc {
+	var transientErrors int
+
 	return func() (any, string, error) {
 		value, err := t.Get(ctx)
 		if err != nil {
 			if IsNotFound(err) {
+				transientErrors = 0
+
 				var zero T
 
 				return &zero, notFoundState, nil
 			}
 
+			if isServerError(err) && transientErrors < pollMaxServerErrors {
+				transientErrors++
+
+				return nil, "", nil
+			}
+
 			return nil, "", err
 		}
 
+		transientErrors = 0
+
 		return value, Classify(t.Inspect(value)), nil
 	}
+}
+
+func isServerError(err error) bool {
+	e, ok := nscale.AsAPIError(err)
+
+	return ok && e.StatusCode >= http.StatusInternalServerError
 }
 
 // lastReported describes the final observed status, or reports false when the
