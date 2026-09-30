@@ -425,8 +425,7 @@ func (m *KubernetesClusterModel) NscaleClusterCreateParams(
 // with; a different one is rejected. That holds automatically because
 // network_id is RequiresReplace, so a changed network destroys and recreates
 // rather than ever reaching this path. The same goes for the other immutable
-// fields, and for the non-removal access changes planned as replacements by
-// requiresReplaceUnlessRemoval.
+// fields, including api_server authorization and authentication.
 func (m *KubernetesClusterModel) NscaleClusterUpdateParams(
 	ctx context.Context,
 ) (kubernetesapi.ClusterV1Update, diag.Diagnostics) {
@@ -492,10 +491,8 @@ func (m *KubernetesClusterModel) apiServerRequest(
 	}
 
 	return &kubernetesapi.ClusterApiServerAccessV1{
-		// ValueBoolPointer yields a non-nil *bool for a configured false, which is
-		// what keeps `public_ip = false` on the wire. The generated field is
-		// already *bool, so encoding/json emits it explicitly.
-		PublicIP:       model.PublicIP.ValueBoolPointer(),
+		// A configured false stays non-nil, so `public_ip = false` stays on the wire.
+		PublicIP:       knownBoolPointer(model.PublicIP),
 		AllowedCidrs:   allowedCIDRs,
 		Authorization:  authorization,
 		Authentication: authentication,
@@ -517,8 +514,8 @@ func (m *KubernetesClusterModel) clusterNetworkRequest(
 	}
 
 	return &kubernetesapi.ClusterNetworkV1{
-		PodCidr:     model.PodCIDR.ValueStringPointer(),
-		ServiceCidr: model.ServiceCIDR.ValueStringPointer(),
+		PodCidr:     knownStringPointer(model.PodCIDR),
+		ServiceCidr: knownStringPointer(model.ServiceCIDR),
 	}, diagnostics
 }
 
@@ -571,9 +568,7 @@ func addonProfileRequest(
 	}
 
 	return &kubernetesapi.ClusterAddonProfileCreateV1{
-		// ValueBoolPointer yields a non-nil *bool for a configured false, so
-		// `enabled = false` stays on the wire rather than being dropped by
-		// omitempty and silently re-defaulted to true by the API.
-		Enabled: model.Enabled.ValueBoolPointer(),
+		// A configured false stays non-nil, so the API doesn't re-default it to true.
+		Enabled: knownBoolPointer(model.Enabled),
 	}, diagnostics
 }

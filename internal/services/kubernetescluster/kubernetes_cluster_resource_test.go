@@ -533,7 +533,7 @@ resource "nscale_kubernetes_cluster" "test" {
 // plans a replacement and the new cluster comes up with the smaller settings,
 // and the result imports cleanly.
 //
-// The change step is a removal: once removalsApplyInPlace is true, flip its
+// The change step is a removal: once NKS accepts removals in place, flip its
 // plan check to ResourceActionUpdate and expectClusterID to same=true.
 func TestAccKubernetesClusterResource_apiServerAccess(t *testing.T) {
 	name := acctest.RandomWithPrefix("tf-acc-test")

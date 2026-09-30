@@ -17,9 +17,11 @@ limitations under the License.
 package kubernetescluster
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -507,6 +509,55 @@ func TestCreateParamsOmitsAbsentBlocks(t *testing.T) {
 	}
 }
 
+// TestCreateParamsOmitsUnknownComputedFields: an unset Computed attribute is
+// unknown on create and must be left out, not sent as "" or false. A false
+// hardware.enabled would turn off a profile that defaults to on.
+func TestCreateParamsOmitsUnknownComputedFields(t *testing.T) {
+	t.Parallel()
+
+	model := &KubernetesClusterModel{
+		Name:              types.StringValue("cluster"),
+		NetworkID:         types.StringValue("net-1"),
+		PlatformReleaseID: types.StringValue("rel-1"),
+		Tags:              types.MapNull(types.StringType),
+		APIServer: objectValue(t, apiServerAttrTypes(), map[string]attr.Value{
+			"public_ip":      types.BoolUnknown(),
+			"allowed_cidrs":  types.SetValueMust(types.StringType, []attr.Value{types.StringValue("10.0.0.0/8")}),
+			"authorization":  types.ObjectNull(authorizationAttrTypes()),
+			"authentication": types.ObjectNull(authenticationAttrTypes()),
+		}),
+		ClusterNetwork: objectValue(t, clusterNetworkAttrTypes(), map[string]attr.Value{
+			"pod_cidr":     types.StringValue("10.0.0.0/16"),
+			"service_cidr": types.StringUnknown(),
+		}),
+		Addons: objectValue(t, addonsAttrTypes(), map[string]attr.Value{
+			"hardware": objectValue(t, addonProfileAttrTypes(), map[string]attr.Value{
+				"enabled": types.BoolUnknown(),
+			}),
+			"node_health": types.ObjectUnknown(addonProfileAttrTypes()),
+		}),
+	}
+
+	params, diagnostics := model.NscaleClusterCreateParams(context.Background())
+	if diagnostics.HasError() {
+		t.Fatalf("building create params: %v", diagnostics)
+	}
+
+	spec := params.Spec
+	if spec.ApiServer == nil || spec.ApiServer.PublicIP != nil {
+		t.Errorf("apiServer.publicIP = %v, want omitted", spec.ApiServer)
+	}
+	if spec.ClusterNetwork == nil || spec.ClusterNetwork.ServiceCidr != nil {
+		t.Errorf("clusterNetwork.serviceCidr = %v, want omitted", spec.ClusterNetwork)
+	}
+	if got := spec.ClusterNetwork.PodCidr; got == nil || *got != "10.0.0.0/16" {
+		t.Errorf("clusterNetwork.podCidr = %v, want 10.0.0.0/16", got)
+	}
+	if spec.Addons == nil || spec.Addons.Hardware == nil || spec.Addons.Hardware.Enabled != nil {
+		t.Errorf("addons.hardware = %+v, want a profile with enabled omitted", spec.Addons)
+	}
+}
+
 // TestUpdateParamsMatchCreateParams pins the two request bodies together. NKS
 // models create and update as distinct Go types with identical fields, so the
 // risk is one converter drifting from the other.
@@ -565,6 +616,28 @@ func TestUpdateParamsRoundTripsTags(t *testing.T) {
 	}
 }
 
+// sortedBindings copies and orders bindings and their subjects, which are sets
+// in the schema and so may come back in any order.
+func sortedBindings(authorization *kubernetesapi.ClusterApiServerAuthorizationV1) []kubernetesapi.ClusterRoleBindingV1 {
+	if authorization == nil {
+		return nil
+	}
+
+	out := make([]kubernetesapi.ClusterRoleBindingV1, len(authorization.ClusterRoleBindings))
+	for i, binding := range authorization.ClusterRoleBindings {
+		subjects := slices.Clone(binding.Subjects)
+		slices.SortFunc(subjects, func(a, b kubernetesapi.RbacSubjectV1) int {
+			return cmp.Or(cmp.Compare(a.Kind, b.Kind), cmp.Compare(a.Name, b.Name))
+		})
+		out[i] = kubernetesapi.ClusterRoleBindingV1{ClusterRole: binding.ClusterRole, Subjects: subjects}
+	}
+	slices.SortFunc(out, func(a, b kubernetesapi.ClusterRoleBindingV1) int {
+		return cmp.Compare(a.ClusterRole, b.ClusterRole)
+	})
+
+	return out
+}
+
 // accessCluster is fullCluster with every API server access field and the SSH
 // CA set, the shape an imported cluster with RBAC and OIDC comes back as.
 func accessCluster(t *testing.T) *kubernetesapi.ClusterV1Read {
@@ -618,8 +691,7 @@ func TestUpdateParamsRoundTripAPIServerAccess(t *testing.T) {
 	if sent == nil {
 		t.Fatal("apiServer was dropped from the update payload")
 	}
-	if !authorizationIsRemovalOnly(sent.Authorization, cluster.Spec.ApiServer.Authorization) ||
-		!authorizationIsRemovalOnly(cluster.Spec.ApiServer.Authorization, sent.Authorization) {
+	if !reflect.DeepEqual(sortedBindings(sent.Authorization), sortedBindings(cluster.Spec.ApiServer.Authorization)) {
 		t.Errorf("authorization changed on round trip: sent %+v", sent.Authorization)
 	}
 	if !reflect.DeepEqual(sent.Authentication, cluster.Spec.ApiServer.Authentication) {

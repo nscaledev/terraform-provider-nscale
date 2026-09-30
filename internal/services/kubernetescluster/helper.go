@@ -57,6 +57,26 @@ func stringSliceValuePointer(values *[]string) basetypes.ListValue {
 	return stringSliceValue(*values)
 }
 
+// knownStringPointer is ValueStringPointer that also maps unknown to nil. An
+// unset Computed attribute is unknown on create, and ValueStringPointer would
+// send it as "" rather than leaving the API to default it.
+func knownStringPointer(value types.String) *string {
+	if value.IsUnknown() {
+		return nil
+	}
+
+	return value.ValueStringPointer()
+}
+
+// knownBoolPointer is the bool counterpart of knownStringPointer.
+func knownBoolPointer(value types.Bool) *bool {
+	if value.IsUnknown() {
+		return nil
+	}
+
+	return value.ValueBoolPointer()
+}
+
 // getCluster reads one cluster by ID. It returns the decoded body plus the
 // metadata and status the waiters need, so callers get the freshness inputs
 // without a second request.

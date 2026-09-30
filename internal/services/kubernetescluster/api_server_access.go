@@ -19,18 +19,13 @@ package kubernetescluster
 // API server access: api_server.authorization (RBAC bindings) and
 // api_server.authentication (webhook override + external OIDC issuers).
 //
-// Deployed NKS (and the spec in nscale-sdk-go v0.5.0) treats both as immutable,
-// so any change plans a replacement. nks-core main relaxes that to removal-only
-// — role bindings, subjects and external issuers may be removed in place — and
-// the rules for it are ported here from nks-core's authorizationIsRemovalOnly and
-// authenticationIsRemovalOnly. Flip removalsApplyInPlace once that ships: until
-// then a planned in-place removal fails at apply with "is immutable".
+// Deployed NKS treats both as immutable, so any change plans a replacement.
+// nks-core main allows removals in place; relax the plan modifiers when that
+// ships (a removal returns 422 "is immutable" until then).
 
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"slices"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -64,11 +59,6 @@ const (
 	maxClaimOrPrefix    = 256
 	maxCACertificatePEM = 8192
 )
-
-// removalsApplyInPlace switches the plan modifiers from "any change replaces"
-// to nks-core main's removal-only rules. False until production runs them:
-// verified 2026-09-29 that a removal still returns 422 "is immutable".
-const removalsApplyInPlace = false
 
 // defaultUsernameClaim is the API's default for usernameClaim. The server
 // stores it and reads it back, so the schema defaults to it as well.
@@ -339,120 +329,6 @@ func authenticationRequest(
 	}, diagnostics
 }
 
-// --- removal-only rules (ported from nks-core cluster_update_delete.go) -------
-
-// authorizationIsRemovalOnly: dropping authorization entirely is a removal;
-// adding it to a cluster without it is not; otherwise every planned binding
-// must exist for the same role with a subset of its subjects.
-func authorizationIsRemovalOnly(planned, current *kubernetesapi.ClusterApiServerAuthorizationV1) bool {
-	if planned == nil {
-		return true
-	}
-	if current == nil {
-		return false
-	}
-
-	for _, binding := range planned.ClusterRoleBindings {
-		index := slices.IndexFunc(current.ClusterRoleBindings, func(existing kubernetesapi.ClusterRoleBindingV1) bool {
-			return existing.ClusterRole == binding.ClusterRole
-		})
-		if index < 0 {
-			return false
-		}
-
-		for _, subject := range binding.Subjects {
-			if !slices.Contains(current.ClusterRoleBindings[index].Subjects, subject) {
-				return false
-			}
-		}
-	}
-
-	return true
-}
-
-// authenticationIsRemovalOnly: whether authentication is set, and the webhook
-// override, are fixed; external issuers may only be dropped, each compared
-// exactly (the API compares audiences in order, so this does too).
-func authenticationIsRemovalOnly(planned, current *kubernetesapi.ClusterApiServerAuthenticationV1) bool {
-	if planned == nil || current == nil {
-		return planned == nil && current == nil
-	}
-	if !reflect.DeepEqual(planned.NscaleWebhook, current.NscaleWebhook) {
-		return false
-	}
-	if planned.ExternalIssuers == nil {
-		return true
-	}
-
-	var existing []kubernetesapi.ClusterExternalIssuerV1
-	if current.ExternalIssuers != nil {
-		existing = *current.ExternalIssuers
-	}
-
-	for _, issuer := range *planned.ExternalIssuers {
-		if !slices.ContainsFunc(existing, func(candidate kubernetesapi.ClusterExternalIssuerV1) bool {
-			return reflect.DeepEqual(candidate, issuer)
-		}) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// --- plan modifiers -----------------------------------------------------------
-
-// requiresReplaceUnlessRemoval replaces the cluster when a change to
-// authorization or authentication is anything other than a removal the API
-// accepts in place.
-func requiresReplaceUnlessRemoval[T any](
-	build func(context.Context, types.Object) (*T, diag.Diagnostics),
-	isRemovalOnly func(planned, current *T) bool,
-	description string,
-) planmodifier.Object {
-	return objectplanmodifier.RequiresReplaceIf(
-		func(ctx context.Context, request planmodifier.ObjectRequest, response *objectplanmodifier.RequiresReplaceIfFuncResponse) {
-			if request.PlanValue.IsUnknown() {
-				return
-			}
-
-			planned, plannedDiagnostics := build(ctx, request.PlanValue)
-			current, currentDiagnostics := build(ctx, request.StateValue)
-			response.Diagnostics.Append(plannedDiagnostics...)
-			response.Diagnostics.Append(currentDiagnostics...)
-			if response.Diagnostics.HasError() {
-				return
-			}
-
-			if !removalsApplyInPlace {
-				response.RequiresReplace = true // RequiresReplaceIf only calls this when the value changed.
-
-				return
-			}
-
-			response.RequiresReplace = !isRemovalOnly(planned, current)
-		},
-		description,
-		description,
-	)
-}
-
-func authorizationRequiresReplace() planmodifier.Object {
-	return requiresReplaceUnlessRemoval(
-		authorizationRequest,
-		authorizationIsRemovalOnly,
-		"Any change to authorization forces a new cluster.",
-	)
-}
-
-func authenticationRequiresReplace() planmodifier.Object {
-	return requiresReplaceUnlessRemoval(
-		authenticationRequest,
-		authenticationIsRemovalOnly,
-		"Any change to authentication forces a new cluster.",
-	)
-}
-
 // --- validators ---------------------------------------------------------------
 
 // reservedPrefixValidator rejects an identity prefix that starts with, or is
@@ -592,7 +468,7 @@ func authorizationSchema() schema.SingleNestedAttribute {
 			"Fixed at creation: any change, including adding or removing this block, forces a new cluster.",
 		Optional: true,
 		PlanModifiers: []planmodifier.Object{
-			authorizationRequiresReplace(),
+			objectplanmodifier.RequiresReplace(),
 		},
 		Attributes: map[string]schema.Attribute{
 			"cluster_role_bindings": schema.SetNestedAttribute{
@@ -658,7 +534,7 @@ func authenticationSchema() schema.SingleNestedAttribute {
 			"Fixed at creation: any change, including adding or removing this block, forces a new cluster.",
 		Optional: true,
 		PlanModifiers: []planmodifier.Object{
-			authenticationRequiresReplace(),
+			objectplanmodifier.RequiresReplace(),
 		},
 		Attributes: map[string]schema.Attribute{
 			"nscale_webhook": schema.SingleNestedAttribute{

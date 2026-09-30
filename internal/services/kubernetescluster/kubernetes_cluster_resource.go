@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -196,6 +197,9 @@ func (r *KubernetesClusterResource) Schema(
 						MarkdownDescription: "Whether to expose the API server through a public endpoint. Defaults to `false`.",
 						Optional:            true,
 						Computed:            true,
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
 					},
 					"allowed_cidrs": schema.SetAttribute{
 						MarkdownDescription: "Source IPv4 CIDR allowlist for the cluster API endpoint, including the " +
@@ -305,6 +309,9 @@ func (r *KubernetesClusterResource) Schema(
 									"Can be changed in place without replacing the cluster.",
 								Optional: true,
 								Computed: true,
+								PlanModifiers: []planmodifier.Bool{
+									boolplanmodifier.UseStateForUnknown(),
+								},
 							},
 						},
 					},
@@ -326,6 +333,9 @@ func (r *KubernetesClusterResource) Schema(
 									"Can be changed in place without replacing the cluster.",
 								Optional: true,
 								Computed: true,
+								PlanModifiers: []planmodifier.Bool{
+									boolplanmodifier.UseStateForUnknown(),
+								},
 							},
 						},
 					},

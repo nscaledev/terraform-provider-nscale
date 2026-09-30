@@ -634,10 +634,10 @@ check that proves the Optional+Computed defaults (`api_server`, `cluster_network
   `api_server.{authorization,authentication}`, all RequiresReplace on any
   change. nks-core main has since relaxed the last two to *removal-only*
   (bindings, subjects and external issuers removable in place), but production
-  still returns 422 "is immutable" for a removal (verified 2026-09-29). The
-  removal rules are ported and unit-tested in `api_server_access.go` behind
-  `removalsApplyInPlace = false`; flip it, and the `_apiServerAccess` plan check,
-  when that ships.
+  still returns 422 "is immutable" for a removal (verified 2026-09-29). When
+  that ships, replace the plain `RequiresReplace` with removal-only rules
+  (port nks-core's `authorizationIsRemovalOnly` / `authenticationIsRemovalOnly`)
+  and flip the `_apiServerAccess` plan check.
 - `409 Conflict` on `updateCluster` — concurrent modification. Surface unmodified
   per [playbook §3.1](../.claude/skills/tf-provider-feature/reference/playbook.md);
   do not auto-retry (it is not transient, it means someone else wrote).
