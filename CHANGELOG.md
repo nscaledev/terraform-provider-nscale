@@ -11,6 +11,13 @@ in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) style, using the
 categories `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 `DEPRECATIONS` and `DOCS`; they are preserved as-is below.
 
+## [1.6.0](https://github.com/nscaledev/terraform-provider-nscale/compare/v1.5.0...v1.6.0) (2026-09-30)
+
+
+### Features
+
+* **kubernetes:** add NKS cluster and node pool resources ([#91](https://github.com/nscaledev/terraform-provider-nscale/issues/91)) ([fb201f0](https://github.com/nscaledev/terraform-provider-nscale/commit/fb201f0c7ff163d887bca56bb41bd2ca1b1f74ed))
+
 ## [1.5.0](https://github.com/nscaledev/terraform-provider-nscale/compare/v1.4.0...v1.5.0) (2026-09-04)
 
 
