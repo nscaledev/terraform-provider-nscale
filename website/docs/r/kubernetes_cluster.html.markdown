@@ -1,0 +1,473 @@
+---
+page_title: "Nscale: nscale_kubernetes_cluster"
+subcategory: ""
+description: |-
+  Nscale Kubernetes Cluster
+---
+
+# Resource: nscale_kubernetes_cluster
+
+Manages a Nscale Kubernetes Service (NKS) cluster — a managed Kubernetes control plane attached to an
+[`nscale_network`](network.html).
+
+~> **A cluster on its own has no workers.** NKS models node pools as a separate resource, which this provider does
+not yet expose. Until it does, a `nscale_kubernetes_cluster` gives you a control plane with nothing to schedule on;
+node pools must be created outside Terraform.
+
+~> **`project_id`, `organization_id` and `region_id` are read-only here.** Unlike every other project-scoped resource
+in this provider, a cluster does not take a `project_id`. The NKS API derives all three from the network referenced by
+`network_id`, so you choose a cluster's scope by choosing its network. Setting any of them is an error.
+
+~> **The name and the network layout are fixed at creation.** `name`, `network_id`, `cluster_network.pod_cidr` and
+`cluster_network.service_cidr` cannot be changed on an existing cluster; the API rejects it. Changing any of them
+destroys and recreates the cluster. Get the CIDRs right the first time.
+
+-> **The NKS endpoint must be configured.** NKS has no default endpoint baked into the provider yet. Set
+`nks_service_api_endpoint` on the provider, or the `NSCALE_NKS_SERVICE_API_ENDPOINT` environment variable, before
+using this resource.
+
+## Example Usage
+
+```hcl
+resource "nscale_network" "main" {
+  name       = "kubernetes"
+  cidr_block = "10.0.0.0/16"
+
+  dns_nameservers = ["1.1.1.1"]
+}
+
+# Releases eligible for a new cluster, as the nscale CLI offers at create time.
+# The API guarantees no ordering, so releases[0] is not necessarily the newest.
+data "nscale_kubernetes_platform_releases" "eligible" {
+  region_id  = nscale_network.main.region_id
+  deprecated = false
+  withdrawn  = false
+  prerelease = false
+}
+
+resource "nscale_kubernetes_cluster" "main" {
+  name                = "production"
+  network_id          = nscale_network.main.id
+  platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
+
+  # releases[0] moves when a new release ships, which would plan an upgrade with
+  # no config change. To upgrade, remove this and set the ID explicitly.
+  lifecycle {
+    ignore_changes = [platform_release_id]
+  }
+
+  api_server = {
+    public_ip     = true
+    allowed_cidrs = ["203.0.113.0/24"]
+  }
+
+  addons = {
+    hardware    = { enabled = true }
+    node_health = { enabled = true }
+  }
+
+  # Only needed if the defaults (60m/90m/60m) do not suit; shown here for
+  # illustration. Note these raise the defaults rather than lower them.
+  timeouts {
+    create = "90m"
+    update = "120m"
+  }
+}
+```
+
+Note that `api_server`, `cluster_network` and `addons` are nested *attributes*, not blocks — they take an `=` and a
+`{ }` object. `timeouts` is a block, and takes no `=`.
+
+### Attaching an existing network
+
+More typical in production: an existing, corporate-routed network, pod and service CIDRs chosen to sit clear of it, and
+no public API endpoint.
+
+```hcl
+resource "nscale_kubernetes_cluster" "main" {
+  name       = "production"
+  network_id = "b5023904-09c6-4d62-9395-752d1b505d3b"
+
+  platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
+
+  lifecycle {
+    ignore_changes = [platform_release_id]
+  }
+
+  # Separate from the attached network's own prefix, and fixed for the life of
+  # the cluster — changing either CIDR later replaces the cluster.
+  cluster_network = {
+    pod_cidr     = "100.65.0.0/16"
+    service_cidr = "172.20.0.0/16"
+  }
+
+  api_server = {
+    public_ip = false
+  }
+}
+```
+
+### RBAC and single sign-on
+
+Grant cluster roles to people from your own identity provider, and let workers trust a region SSH certificate
+authority. All three are fixed at creation — see [API server access](#api-server-access).
+
+```hcl
+resource "nscale_kubernetes_cluster" "main" {
+  name                = "production"
+  network_id          = nscale_network.main.id
+  platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
+
+  lifecycle {
+    ignore_changes = [platform_release_id]
+  }
+
+  # Must be in the cluster's project, which comes from the network.
+  ssh_certificate_authority_id = nscale_ssh_certificate_authority.ops.id
+
+  api_server = {
+    public_ip     = false
+    allowed_cidrs = ["10.0.0.0/8"]
+
+    authentication = {
+      external_issuers = [{
+        issuer_url      = "https://login.example.com"
+        audiences       = ["kubernetes"]
+        username_prefix = "corp:"
+        groups_claim    = "groups"
+        groups_prefix   = "corp:"
+      }]
+    }
+
+    # Subject names include the issuer's prefix.
+    authorization = {
+      cluster_role_bindings = [
+        {
+          cluster_role = "cluster-admin"
+          subjects     = [{ kind = "Group", name = "corp:platform-team" }]
+        },
+        {
+          cluster_role = "view"
+          subjects = [
+            { kind = "Group", name = "corp:developers" },
+            { kind = "User", name = "corp:auditor@example.com" },
+          ]
+        },
+      ]
+    }
+  }
+}
+```
+
+<!-- schema generated by tfplugindocs -->
+## Schema
+
+### Required
+
+- `name` (String) The name of the cluster. Immutable: changing this forces a new cluster to be created.
+- `network_id` (String) The identifier of the region network the cluster attaches to. The cluster's project, organization and region are all inherited from this network. Immutable: changing this forces a new cluster to be created.
+- `platform_release_id` (String) The identifier of the NKS platform release the cluster runs. Changing this performs an in-place cluster upgrade. Use the `nscale_kubernetes_platform_releases` data source to select an eligible release.
+
+### Optional
+
+- `addons` (Attributes) Addon profiles enabled on the cluster. Omit to accept the API defaults. (see [below for nested schema](#nestedatt--addons))
+- `api_server` (Attributes) Network exposure for the cluster's Kubernetes API server. Omit to accept the API defaults. (see [below for nested schema](#nestedatt--api_server))
+- `cluster_network` (Attributes) Pod and service network CIDRs for the cluster. Omit to accept the API defaults. Immutable: changing either CIDR forces a new cluster to be created. (see [below for nested schema](#nestedatt--cluster_network))
+- `description` (String) The description of the cluster.
+- `ssh_certificate_authority_id` (String) The identifier of an SSH certificate authority the cluster's workers trust. It must be in the cluster's organization and project, which come from `network_id`. Immutable, including whether it is set: changing, adding or removing it forces a new cluster.
+- `tags` (Map of String) A map of tags assigned to the cluster.
+- `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
+- `wait_for_provisioned` (Boolean) Whether `terraform apply` blocks until the cluster reports `provisioned`. Defaults to `true`. Set to `false` to return as soon as the cluster exists, so node pools in the same apply are created while it is still provisioning rather than afterwards. When `false` this resource's status attributes and `api_server_endpoint` describe the moment of creation and stay stale until the next refresh — read them back through the `nscale_kubernetes_cluster` data source, with `depends_on` set to a node pool. **When `false`, `timeouts.create` on this resource is never used** — Create returns before it is read, so the control-plane build is covered by the create timeout of whichever node pool follows it, which must be long enough for both.
+
+### Read-Only
+
+- `api_server_endpoint` (Attributes) Credential-free connection data for the cluster's Kubernetes API server. Null until the control plane is reachable. (see [below for nested schema](#nestedatt--api_server_endpoint))
+- `applied_platform_release_id` (String) The platform release last observed as applied to the cluster. Lags `platform_release_id` while an upgrade is in progress.
+- `creation_time` (String) The timestamp when the cluster was created.
+- `eligible_upgrade_target_ids` (List of String) Eligible platform release IDs, in upgrade order. Empty when eligibility was observed and no upgrade is available.
+- `health_status` (String) The health state of the cluster.
+- `id` (String) A unique identifier for the cluster.
+- `kubernetes_version_observed` (String) The Kubernetes version reported by the managed control plane.
+- `kubernetes_version_target` (String) The Kubernetes version applied to the cluster's control plane.
+- `organization_id` (String) The identifier of the organization the cluster belongs to. Inherited from `network_id` and cannot be set.
+- `platform_release_deprecated` (Boolean) Whether the applied platform release is currently deprecated.
+- `platform_release_withdrawn` (Boolean) Whether operators have withdrawn the applied platform release.
+- `project_id` (String) The identifier of the project the cluster belongs to. Inherited from `network_id` and cannot be set: the NKS API derives cluster scope from the network.
+- `provisioning_status` (String) The provisioning state of the cluster.
+- `region_id` (String) The identifier of the region the cluster is provisioned in. Inherited from `network_id` and cannot be set.
+- `upgrade_available` (Boolean) Whether at least one eligible platform release upgrade target was observed.
+
+<a id="nestedatt--addons"></a>
+### Nested Schema for `addons`
+
+Optional:
+
+- `hardware` (Attributes) Configuration for the optional hardware addon profile. (see [below for nested schema](#nestedatt--addons--hardware))
+- `node_health` (Attributes) Configuration for the node-health addon profile. Takes effect only when the cluster's platform release includes a node-health profile; on other releases the setting is accepted and ignored. (see [below for nested schema](#nestedatt--addons--node_health))
+
+<a id="nestedatt--addons--hardware"></a>
+### Nested Schema for `addons.hardware`
+
+Optional:
+
+- `enabled` (Boolean) Whether the addon profile is enabled. Defaults to `true`. Can be changed in place without replacing the cluster.
+
+
+<a id="nestedatt--addons--node_health"></a>
+### Nested Schema for `addons.node_health`
+
+Optional:
+
+- `enabled` (Boolean) Whether the addon profile is enabled. Defaults to `true`. Can be changed in place without replacing the cluster.
+
+
+
+<a id="nestedatt--api_server"></a>
+### Nested Schema for `api_server`
+
+Optional:
+
+- `allowed_cidrs` (Set of String) Source IPv4 CIDR allowlist for the cluster API endpoint, including the private endpoint. Defaults to `["0.0.0.0/0"]`, so if `public_ip` is `true` and this is omitted the API server is reachable from anywhere.
+- `authentication` (Attributes) How the Kubernetes API server authenticates callers, beyond the Nscale defaults. Fixed at creation: any change, including adding or removing this block, forces a new cluster. (see [below for nested schema](#nestedatt--api_server--authentication))
+- `authorization` (Attributes) RBAC bindings granting built-in cluster roles to users and groups. Fixed at creation: any change, including adding or removing this block, forces a new cluster. (see [below for nested schema](#nestedatt--api_server--authorization))
+- `public_ip` (Boolean) Whether to expose the API server through a public endpoint. Defaults to `false`.
+
+<a id="nestedatt--api_server--authentication"></a>
+### Nested Schema for `api_server.authentication`
+
+Optional:
+
+- `external_issuers` (Attributes List) External JWT/OIDC issuers the API server trusts, such as a corporate identity provider. (see [below for nested schema](#nestedatt--api_server--authentication--external_issuers))
+- `nscale_webhook` (Attributes) Per-cluster override of whether the Nscale authentication webhook is enabled. Omit to inherit the cell-wide default. (see [below for nested schema](#nestedatt--api_server--authentication--nscale_webhook))
+
+<a id="nestedatt--api_server--authentication--external_issuers"></a>
+### Nested Schema for `api_server.authentication.external_issuers`
+
+Required:
+
+- `audiences` (List of String) Token audiences accepted from this issuer.
+- `issuer_url` (String) The issuer URL clients present tokens from.
+- `username_prefix` (String) Prepended to the username claim, so issuer users cannot collide with in-cluster ones. Must not start with, or be a prefix of, `system:`, `kubeadm:`, `nks-management:`, `nks:` or `nscale.com/`.
+
+Optional:
+
+- `ca_certificate` (String) PEM-encoded CA certificate for the issuer, when it is not signed by a well-known CA.
+- `groups_claim` (String) The JWT claim mapped to the user's groups. Requires `groups_prefix`.
+- `groups_prefix` (String) Prepended to each group from `groups_claim`. Same reserved-prefix rule as `username_prefix`.
+- `username_claim` (String) The JWT claim mapped to the username. Defaults to `sub`.
+
+
+<a id="nestedatt--api_server--authentication--nscale_webhook"></a>
+### Nested Schema for `api_server.authentication.nscale_webhook`
+
+Optional:
+
+- `enabled` (Boolean) Whether the Nscale authentication webhook is enabled for this cluster.
+
+
+
+<a id="nestedatt--api_server--authorization"></a>
+### Nested Schema for `api_server.authorization`
+
+Required:
+
+- `cluster_role_bindings` (Attributes Set) One binding per cluster role. (see [below for nested schema](#nestedatt--api_server--authorization--cluster_role_bindings))
+
+<a id="nestedatt--api_server--authorization--cluster_role_bindings"></a>
+### Nested Schema for `api_server.authorization.cluster_role_bindings`
+
+Required:
+
+- `cluster_role` (String) The built-in cluster role to bind: `cluster-admin`, `admin`, `edit` or `view`.
+- `subjects` (Attributes Set) The users and groups granted the role. (see [below for nested schema](#nestedatt--api_server--authorization--cluster_role_bindings--subjects))
+
+<a id="nestedatt--api_server--authorization--cluster_role_bindings--subjects"></a>
+### Nested Schema for `api_server.authorization.cluster_role_bindings.subjects`
+
+Required:
+
+- `kind` (String) `User` or `Group`.
+- `name` (String) The user or group name, as the authenticator presents it (including any issuer prefix).
+
+
+
+
+
+<a id="nestedatt--cluster_network"></a>
+### Nested Schema for `cluster_network`
+
+Optional:
+
+- `pod_cidr` (String) IPv4 CIDR used for Kubernetes pod addresses. Defaults to `10.240.0.0/12`. Immutable: changing this forces a new cluster to be created.
+- `service_cidr` (String) IPv4 CIDR used for Kubernetes service addresses. Defaults to `10.96.0.0/16`. Immutable: changing this forces a new cluster to be created.
+
+
+<a id="nestedblock--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+- `delete` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.
+- `update` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+
+
+<a id="nestedatt--api_server_endpoint"></a>
+### Nested Schema for `api_server_endpoint`
+
+Read-Only:
+
+- `certificate_authority_data` (String) The complete Kubernetes API server CA bundle, base64-encoded. Public key material, not a secret.
+- `private_host` (String) The address of the private API server endpoint.
+- `private_port` (Number) The TCP port of the private API server endpoint.
+- `public_host` (String) The address of the public API server endpoint. Null unless `api_server.public_ip` is enabled.
+- `public_port` (Number) The TCP port of the public API server endpoint. Null unless `api_server.public_ip` is enabled.
+
+## Async behaviour
+
+Creates, updates and deletes are all asynchronous.
+
+For creates and updates, Terraform polls until two things are true at once:
+
+1. `status.observedGeneration` has caught up with the cluster's spec generation — until it has, the API is still
+   reporting status for the *previous* version of the spec; and
+2. `provisioning_status` is `provisioned`.
+
+The first condition matters more than it looks. NKS projects status asynchronously and independently of the write
+itself, so a `provisioned` read taken too soon after an apply describes the cluster as it was *before* your change.
+Waiting on it is what guarantees the computed attributes written to state — `api_server_endpoint`,
+`kubernetes_version_*`, `applied_platform_release_id` — describe the cluster you just asked for.
+
+~> **Health does not gate the apply.** NKS defines convergence as the generation being observed plus
+`provisioning_status` reaching `provisioned`, and documents health as an independent signal that "does not determine
+convergence". A cluster can therefore report `degraded` — or `error` — on a successful apply; a single NotReady worker
+in one node pool is enough. Read `health_status` to judge whether the cluster is actually well. This matches every
+other resource in this provider, none of which waits on health.
+
+`provisioning_status` is an aggregate over the whole cluster rather than its control plane alone: it folds in
+infrastructure, the control plane, core and hardware addons, authorization and **every node pool**. So an apply that
+overlaps a node pool roll can wait for that roll to complete before returning.
+
+An `error` fails the apply only if it lasts five minutes. NKS reports `error` whenever an add-on profile is degraded,
+and a release upgrade can briefly degrade one while it rolls out new versions, so a short-lived error is waited out.
+An error that persists is reported with NKS's own explanation.
+
+Deletes poll until the cluster is gone. If the cluster flips to an error state *after* deprovisioning has begun, that
+is a terminal delete failure and Terraform reports it immediately rather than waiting out the timeout.
+
+## Timeouts
+
+The `timeouts` block supports:
+
+* `create` - (Default `60m`)
+* `update` - (Default `90m`)
+* `delete` - (Default `60m`)
+
+These defaults are deliberately generous. A cluster measured on a development environment took **32 minutes** to reach
+`provisioned`; the defaults allow roughly twice that, because build time varies with region and load.
+`update` is longer still, since changing `platform_release_id` is a rolling control-plane upgrade rather than a
+configuration write.
+
+Prefer raising these over lowering them. A timeout that fires on a cluster which was simply slow leaves Terraform's
+state and reality disagreeing, and the cluster still exists and still bills.
+
+!> **With `wait_for_provisioned = false`, `timeouts.create` here is never read.** Create returns straight after the
+POST, so the control-plane build is covered by the create timeout of whichever `nscale_kubernetes_node_pool` follows
+it — which defaults to `30m`, against a measured 32-minute build. Raise the *pool's* `timeouts.create`, not this one.
+
+~> **A PodDisruptionBudget can stall a destroy indefinitely.** An empty cluster deletes in about two minutes, but
+deleting a cluster that has node pools cordons and drains every worker through the Eviction API first, which honours
+PDBs. A PDB that can never be satisfied blocks the drain with no server-side deadline, so the destroy makes no
+progress and Terraform eventually times out with the cluster still present and still billing. Raising `delete` does
+not help; resolve the PDB inside the cluster and re-run `terraform destroy`.
+
+## API server access
+
+`ssh_certificate_authority_id`, `api_server.authorization` and `api_server.authentication` are fixed when the cluster
+is created. **Any change to them — adding, editing or removing — forces a new cluster**, so check the plan for
+`forces replacement` before applying.
+
+-> NKS is adding in-place removal: dropping role bindings, subjects or external issuers without a rebuild. The provider
+will plan those as updates once that ships.
+
+~> **Omitting these from configuration removes them, which forces a new cluster.** They are not computed, so after
+importing a cluster that has any of them, copy them into configuration before applying. `terraform plan` shows the
+replacement first.
+
+`external_issuers` and `audiences` are lists rather than sets because NKS compares issuers exactly, including the order
+of `audiences`.
+
+## Import
+
+-> **`timeouts` and `wait_for_provisioned` always show a diff on the first plan after an import.** Neither is returned
+by the API — they are provider-side behaviour — so an import cannot recover them. `wait_for_provisioned` is seeded to
+its default of `true`, which imports cleanly unless your configuration sets it to `false`. Applying the diff is
+harmless; it only writes the values into state.
+
+
+Kubernetes clusters can be imported using the cluster ID:
+
+```sh
+terraform import nscale_kubernetes_cluster.main <cluster-id>
+```
+
+Every attribute round-trips: NKS returns no write-once secrets, and every argument is readable from the cluster's spec.
+A `terraform plan` immediately after import should report no changes.
+
+## Connecting to the cluster
+
+NKS has no kubeconfig endpoint and no token endpoint. `api_server_endpoint` gives you the CA bundle and the endpoints,
+and authentication is handled by the `nscale` CLI acting as a client-go credential plugin. Wire the `kubernetes` or
+`helm` provider up with an `exec` block:
+
+```hcl
+provider "kubernetes" {
+  host = format(
+    "https://%s:%s",
+    nscale_kubernetes_cluster.main.api_server_endpoint.public_host,
+    nscale_kubernetes_cluster.main.api_server_endpoint.public_port,
+  )
+  cluster_ca_certificate = base64decode(
+    nscale_kubernetes_cluster.main.api_server_endpoint.certificate_authority_data
+  )
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1"
+    command     = "nscale"
+    args        = ["kubernetes", "token"]
+  }
+}
+```
+
+This requires the `nscale` CLI on the machine running `terraform apply`. In CI, set `NSCALE_SERVICE_TOKEN` and the CLI
+will use it. The advantage over a data source that returns a token is that no credential is written to Terraform state.
+
+Use `api_server_endpoint.private_host` instead when running from inside the network — `public_host` and `public_port`
+are null unless `api_server.public_ip` is enabled.
+
+`certificate_authority_data` is **not** a secret. It is the cluster's public CA bundle, which is why it is not marked
+sensitive.
+
+## Notes
+
+* **`network_id` is immutable.** It is also what determines the cluster's project, organization and region, so changing
+  it is a move between projects — Terraform destroys and recreates the cluster. Sending a different `network_id` to the
+  API returns HTTP 422.
+* **So are `name` and both `cluster_network` CIDRs.** The API returns HTTP 422 for a rename
+  (*"cluster names are immutable"*) and for a CIDR change (*"clusterNetwork.podCidr is immutable"*), so the provider
+  plans a replacement rather than an update you could not apply.
+* **Pod and service CIDR behaviour on an attached network is not fully documented.** How workers are addressed
+  relative to the network's own prefix, whether pod egress is source-NAT'd to the worker address, and how a
+  `Service` of `type=LoadBalancer` selects a private or public address are questions for the NKS team. Confirm them
+  before choosing a layout, since the CIDRs cannot be changed afterwards. `cluster_network` is the only Terraform
+  surface involved — Services themselves are created with the `kubernetes` provider.
+* **Updates are a full replacement.** NKS exposes `PUT`, not `PATCH`, so the provider rebuilds the whole spec from your
+  configuration on every update. Removing an argument from your configuration clears it rather than leaving it alone.
+* **Platform release selection.** For a new cluster, choose a release that is neither deprecated nor withdrawn. When
+  upgrading an existing cluster you may need to re-state a release that has since been deprecated — that is allowed —
+  but a withdrawn release is not. `eligible_upgrade_target_ids` lists valid upgrade targets in order, and
+  `upgrade_available` tells you whether there are any.
+* **`applied_platform_release_id` lags `platform_release_id`** while an upgrade is in progress. Once the apply
+  completes they agree.
+* Selecting a withdrawn release, or one not available in the network's region, fails with HTTP 422 and the API's
+  explanation.

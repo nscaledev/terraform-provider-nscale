@@ -364,3 +364,38 @@ func TestDeleteStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
 		t.Fatalf("Wait() did not produce a diagnostic with summary %q: %#v", wantSummary, response.Diagnostics)
 	}
 }
+
+// TestCreateStateWatcherWaitUsesDefaultTimeout checks a per-resource default
+// replaces the shared 30m one when the config sets no create timeout. A
+// resource that never settles must give up after DefaultTimeout, not after 30m.
+func TestCreateStateWatcherWaitUsesDefaultTimeout(t *testing.T) {
+	watcher := CreateStateWatcher[waitTestResource]{
+		ResourceTitle:  "Reservation",
+		ResourceName:   "reservation",
+		DefaultTimeout: 50 * time.Millisecond,
+		GetFunc: func(ctx context.Context) (*waitTestResource, ResourceStatus, error) {
+			return &waitTestResource{name: "provisioning"}, ResourceStatus{
+				ProvisioningStatus: ProvisioningStatusProvisioning,
+			}, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var response resource.CreateResponse
+	var timeouts tftimeouts.Value
+
+	start := time.Now()
+	_, ok := watcher.Wait(ctx, timeouts, &response)
+
+	if ok {
+		t.Fatal("Wait() returned ok=true for a resource that never settles")
+	}
+	if ctx.Err() != nil {
+		t.Fatalf("Wait() ran until the test deadline (%s) instead of giving up after DefaultTimeout", time.Since(start))
+	}
+	if !response.Diagnostics.HasError() {
+		t.Fatal("Wait() gave up without an error diagnostic")
+	}
+}

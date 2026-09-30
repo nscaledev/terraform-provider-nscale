@@ -19,6 +19,7 @@ package reservation
 import (
 	"context"
 	"fmt"
+	"time"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -58,6 +59,8 @@ type ReservationResource struct {
 	*nscale.GenericResource[ReservationResourceModel, reservationapi.ReservationV2Read]
 }
 
+const defaultReservationCreateTimeout = 90 * time.Minute
+
 func NewReservationResource() resource.Resource {
 	return &ReservationResource{
 		GenericResource: nscale.NewGenericResource(reservationAdapter()),
@@ -85,6 +88,9 @@ func reservationAdapter() nscale.ResourceAdapter[ReservationResourceModel, reser
 		},
 		IDFromModel:       func(m ReservationResourceModel) string { return m.ID.ValueString() },
 		TimeoutsFromModel: func(m ReservationResourceModel) tftimeouts.Value { return m.Timeouts },
+		// Provisioning can take up to an hour. A create that times out leaves the
+		// reservation tainted, and the next apply destroys and re-requests it.
+		DefaultCreateTimeout: defaultReservationCreateTimeout,
 	}
 }
 
