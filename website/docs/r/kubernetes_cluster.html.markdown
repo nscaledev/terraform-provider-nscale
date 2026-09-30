@@ -36,13 +36,13 @@ resource "nscale_network" "main" {
   dns_nameservers = ["1.1.1.1"]
 }
 
-# Pick the newest release that is eligible for a new cluster: the API returns
-# releases in catalogue order, and filtering out deprecated and withdrawn ones
-# mirrors what the nscale CLI offers at create time.
+# Releases eligible for a new cluster, as the nscale CLI offers at create time.
+# The API guarantees no ordering, so releases[0] is not necessarily the newest.
 data "nscale_kubernetes_platform_releases" "eligible" {
   region_id  = nscale_network.main.region_id
   deprecated = false
   withdrawn  = false
+  prerelease = false
 }
 
 resource "nscale_kubernetes_cluster" "main" {

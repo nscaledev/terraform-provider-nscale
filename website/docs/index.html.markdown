@@ -45,6 +45,7 @@ The Nscale Provider first uses values from its configuration. If a value is not 
 provider "nscale" {
   region_service_api_endpoint  = "<region-service-api-endpoint>"
   compute_service_api_endpoint = "<compute-service-api-endpoint>"
+  nks_service_api_endpoint     = "<nks-service-api-endpoint>"
   service_token                = "<your-service-token>"
   region_id                    = "<your-region-id>"
   organization_id              = "<your-organization-id>"
@@ -54,6 +55,7 @@ provider "nscale" {
 
 - `region_service_api_endpoint` (String) The endpoint of the Nscale Region Service API server.
 - `compute_service_api_endpoint` (String) The endpoint of the Nscale Compute Service API server.
+- `nks_service_api_endpoint` (String) The endpoint of the Nscale Kubernetes Service (NKS) API server. Required to use the `nscale_kubernetes_*` resources and data sources; there is no default yet.
 - `service_token` (String, Sensitive) The service token for authenticating with the Nscale API server.
 - `region_id` (String) The identifier of the region for which resources are managed. Regional resources include a top-level region_id field, allowing the region to be explicitly specified and to override the default region when provided.
 - `organization_id` (String) The identifier of the organization for which resources are managed.
@@ -68,6 +70,7 @@ provider "nscale" {}
 ```shell
 % export NSCALE_REGION_SERVICE_API_ENDPOINT="<region-service-api-endpoint>"
 % export NSCALE_COMPUTE_SERVICE_API_ENDPOINT="<compute-service-api-endpoint>"
+% export NSCALE_NKS_SERVICE_API_ENDPOINT="<nks-service-api-endpoint>"
 % export NSCALE_SERVICE_TOKEN="<your-service-token>"
 % export NSCALE_REGION_ID="<your-region-id>"
 % export NSCALE_ORGANIZATION_ID="<your-organization-id>"

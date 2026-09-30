@@ -95,6 +95,7 @@ data "nscale_kubernetes_platform_releases" "eligible" {
   region_id  = local.region_id
   deprecated = false
   withdrawn  = false
+  prerelease = false
 }
 
 # The cluster's project, organization and region are all inherited from the

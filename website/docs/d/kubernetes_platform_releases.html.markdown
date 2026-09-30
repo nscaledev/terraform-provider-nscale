@@ -19,13 +19,14 @@ using this data source.
 
 ## Example Usage
 
-Select the newest release eligible for a new cluster:
+Select a release eligible for a new cluster:
 
 ```hcl
 data "nscale_kubernetes_platform_releases" "eligible" {
   region_id  = nscale_network.main.region_id
   deprecated = false
   withdrawn  = false
+  prerelease = false
 }
 
 resource "nscale_kubernetes_cluster" "main" {
@@ -41,7 +42,7 @@ resource "nscale_kubernetes_cluster" "main" {
 }
 ```
 
-Pin to a specific Kubernetes minor version rather than to whatever is newest:
+Pin to a specific Kubernetes minor version rather than to whatever sorts first:
 
 ```hcl
 data "nscale_kubernetes_platform_releases" "all" {
@@ -93,8 +94,8 @@ Read-Only:
 
 ## Selecting a release
 
-The API returns releases in catalogue order, so `releases[0]` is the newest match. It moves as the catalogue changes,
-so pair it with `ignore_changes = [platform_release_id]` or pin the ID — otherwise a new release plans an upgrade on
+The API guarantees no ordering, so `releases[0]` is not necessarily the newest match, and it moves as the catalogue
+changes. Pair it with `ignore_changes = [platform_release_id]` or pin the ID — otherwise a new release plans an upgrade on
 the next apply. Which filters you want depends on what you are doing:
 
 * **Creating a cluster** — filter `deprecated = false` and `withdrawn = false`. These are the releases that are

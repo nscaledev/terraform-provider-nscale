@@ -348,7 +348,7 @@ data "nscale_kubernetes_platform_releases" "eligible" {
   withdrawn  = false
 }
 
-# releases[0] is the newest match — the API returns catalogue order.
+# releases[0] is whatever sorts first — the API guarantees no ordering.
 output "newest" {
   value = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
 }

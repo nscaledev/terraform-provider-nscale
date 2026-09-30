@@ -103,6 +103,7 @@ data "nscale_kubernetes_platform_releases" "eligible" {
   region_id  = data.nscale_reservation.capacity.region_id
   deprecated = false
   withdrawn  = false
+  prerelease = false
 
   lifecycle {
     postcondition {
