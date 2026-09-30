@@ -119,6 +119,12 @@ resource "nscale_kubernetes_cluster" "main" {
   network_id          = nscale_network.main.id
   platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
 
+  # releases[0] moves when a new release ships, which would plan an upgrade with
+  # no config change. To upgrade, remove this and set the ID explicitly.
+  lifecycle {
+    ignore_changes = [platform_release_id]
+  }
+
   # The GPU operator. Enabled by default; shown because this cluster exists for GPUs.
   addons = {
     hardware = { enabled = true }

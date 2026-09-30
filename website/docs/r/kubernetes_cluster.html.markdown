@@ -50,6 +50,12 @@ resource "nscale_kubernetes_cluster" "main" {
   network_id          = nscale_network.main.id
   platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
 
+  # releases[0] moves when a new release ships, which would plan an upgrade with
+  # no config change. To upgrade, remove this and set the ID explicitly.
+  lifecycle {
+    ignore_changes = [platform_release_id]
+  }
+
   api_server = {
     public_ip     = true
     allowed_cidrs = ["203.0.113.0/24"]
@@ -84,6 +90,10 @@ resource "nscale_kubernetes_cluster" "main" {
 
   platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
 
+  lifecycle {
+    ignore_changes = [platform_release_id]
+  }
+
   # Separate from the attached network's own prefix, and fixed for the life of
   # the cluster — changing either CIDR later replaces the cluster.
   cluster_network = {
@@ -107,6 +117,10 @@ resource "nscale_kubernetes_cluster" "main" {
   name                = "production"
   network_id          = nscale_network.main.id
   platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
+
+  lifecycle {
+    ignore_changes = [platform_release_id]
+  }
 
   # Must be in the cluster's project, which comes from the network.
   ssh_certificate_authority_id = nscale_ssh_certificate_authority.ops.id

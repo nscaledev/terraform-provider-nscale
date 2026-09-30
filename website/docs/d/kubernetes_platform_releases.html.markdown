@@ -32,6 +32,12 @@ resource "nscale_kubernetes_cluster" "main" {
   name                = "production"
   network_id          = nscale_network.main.id
   platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
+
+  # releases[0] moves when a new release ships, which would plan an upgrade with
+  # no config change. To upgrade, remove this and set the ID explicitly.
+  lifecycle {
+    ignore_changes = [platform_release_id]
+  }
 }
 ```
 
@@ -87,8 +93,9 @@ Read-Only:
 
 ## Selecting a release
 
-The API returns releases in catalogue order, so `releases[0]` is the newest match. Which filters you want depends on
-what you are doing:
+The API returns releases in catalogue order, so `releases[0]` is the newest match. It moves as the catalogue changes,
+so pair it with `ignore_changes = [platform_release_id]` or pin the ID — otherwise a new release plans an upgrade on
+the next apply. Which filters you want depends on what you are doing:
 
 * **Creating a cluster** — filter `deprecated = false` and `withdrawn = false`. These are the releases that are
   genuinely current.

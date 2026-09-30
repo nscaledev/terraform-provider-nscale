@@ -108,6 +108,12 @@ resource "nscale_kubernetes_cluster" "main" {
   network_id          = local.network_id
   platform_release_id = data.nscale_kubernetes_platform_releases.eligible.releases[0].id
 
+  # releases[0] moves when a new release ships, which would plan an upgrade with
+  # no config change. To upgrade, remove this and set the ID explicitly.
+  lifecycle {
+    ignore_changes = [platform_release_id]
+  }
+
   # Nested attributes, not blocks — note the `=`.
   #
   # Omit the block to take the API defaults (10.240.0.0/12 and 10.96.0.0/16).
