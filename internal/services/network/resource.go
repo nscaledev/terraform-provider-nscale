@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -39,6 +40,11 @@ type NetworkResource struct {
 	*nscale.GenericResource[NetworkResourceModel, regionapi.NetworkV2Read]
 }
 
+// networkCreateErrorGracePeriod covers regions where the backend network create
+// outlasts the region controller's client timeout: the network is reported as
+// 'error', then recovers to 'provisioned' minutes later (DX-2622).
+const networkCreateErrorGracePeriod = 10 * time.Minute
+
 func NewNetworkResource() resource.Resource {
 	return &NetworkResource{
 		GenericResource: nscale.NewGenericResource(networkAdapter()),
@@ -67,6 +73,9 @@ func networkAdapter() nscale.ResourceAdapter[NetworkResourceModel, regionapi.Net
 		},
 		IDFromModel:       func(m NetworkResourceModel) string { return m.ID.ValueString() },
 		TimeoutsFromModel: func(m NetworkResourceModel) tftimeouts.Value { return m.Timeouts },
+		// Failing on the transient error taints a network that is about to become
+		// usable, so the next apply needlessly replaces it.
+		CreateErrorGracePeriod: networkCreateErrorGracePeriod,
 	}
 }
 

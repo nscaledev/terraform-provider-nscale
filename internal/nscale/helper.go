@@ -132,7 +132,16 @@ type CreateStateWatcher[T any] struct {
 	// DefaultTimeout applies when the config sets no create timeout. Zero means
 	// the shared defaultStateWatcherTimeout.
 	DefaultTimeout time.Duration `exhaustruct:"optional"`
+
+	// ErrorGracePeriod keeps waiting through an 'error' status for this long
+	// before failing, for resources whose backend can report error and then
+	// recover on its own. Zero fails on the first 'error'.
+	ErrorGracePeriod time.Duration `exhaustruct:"optional"`
 }
+
+// createStateTransientError is the synthetic pending state for an 'error'
+// status still inside CreateStateWatcher.ErrorGracePeriod.
+const createStateTransientError = "error (within grace period)"
 
 func (w *CreateStateWatcher[T]) Wait(
 	ctx context.Context,
@@ -152,6 +161,7 @@ func (w *CreateStateWatcher[T]) Wait(
 
 	var lastStatus ResourceStatus
 	var haveStatus bool
+	var errorSince time.Time
 
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
@@ -159,6 +169,7 @@ func (w *CreateStateWatcher[T]) Wait(
 			string(ProvisioningStatusProvisioning),
 			string(ProvisioningStatusPending),
 			string(ProvisioningStatusUnknown),
+			createStateTransientError,
 		},
 		Target: []string{
 			string(ProvisioningStatusProvisioned),
@@ -175,6 +186,19 @@ func (w *CreateStateWatcher[T]) Wait(
 			}
 			lastStatus = status
 			haveStatus = true
+
+			if status.ProvisioningStatus != ProvisioningStatusError {
+				errorSince = time.Time{}
+				return result, string(status.ProvisioningStatus), nil
+			}
+
+			if errorSince.IsZero() {
+				errorSince = time.Now()
+			}
+			if time.Since(errorSince) < w.ErrorGracePeriod {
+				return result, createStateTransientError, nil
+			}
+
 			return result, string(status.ProvisioningStatus), nil
 		},
 	}

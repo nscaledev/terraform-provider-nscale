@@ -254,6 +254,115 @@ func TestCreateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
 	}
 }
 
+// TestCreateStateWatcherWaitRecoversFromTransientError covers DX-2622: with a
+// grace period, an 'error' that recovers to 'provisioned' is not a failure.
+func TestCreateStateWatcherWaitRecoversFromTransientError(t *testing.T) {
+	statuses := []ProvisioningStatus{
+		ProvisioningStatusProvisioning,
+		ProvisioningStatusError,
+		ProvisioningStatusError,
+		ProvisioningStatusProvisioned,
+	}
+
+	var calls int
+
+	finalResult := &waitTestResource{name: "ready"}
+
+	watcher := CreateStateWatcher[waitTestResource]{
+		ResourceTitle:    "Network",
+		ResourceName:     "network",
+		ErrorGracePeriod: time.Minute,
+		GetFunc: func(ctx context.Context) (*waitTestResource, ResourceStatus, error) {
+			status := statuses[min(calls, len(statuses)-1)]
+			calls++
+
+			if status == ProvisioningStatusProvisioned {
+				return finalResult, ResourceStatus{ProvisioningStatus: status}, nil
+			}
+
+			return &waitTestResource{name: string(status)}, ResourceStatus{ProvisioningStatus: status}, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var response resource.CreateResponse
+	var timeouts tftimeouts.Value
+
+	got, ok := watcher.Wait(ctx, timeouts, &response)
+	if !ok {
+		t.Fatalf("Wait() returned ok=false with diagnostics: %#v", response.Diagnostics)
+	}
+
+	if got != finalResult {
+		t.Fatalf("Wait() returned %p, want %p", got, finalResult)
+	}
+
+	if calls != len(statuses) {
+		t.Fatalf("GetFunc call count = %d, want %d", calls, len(statuses))
+	}
+
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("Wait() returned unexpected diagnostics: %#v", response.Diagnostics)
+	}
+}
+
+// TestCreateStateWatcherWaitFailsWhenErrorOutlastsGracePeriod ensures the grace
+// period only delays a genuine failure rather than hiding it.
+func TestCreateStateWatcherWaitFailsWhenErrorOutlastsGracePeriod(t *testing.T) {
+	const (
+		resourceID  = "0d3c1a43-5c1e-4b8e-9a43-7f0f6a3f2b11"
+		wantSummary = "Network Entered Error State"
+	)
+
+	var calls int
+
+	watcher := CreateStateWatcher[waitTestResource]{
+		ResourceTitle:    "Network",
+		ResourceName:     "network",
+		ErrorGracePeriod: 200 * time.Millisecond,
+		GetFunc: func(ctx context.Context) (*waitTestResource, ResourceStatus, error) {
+			calls++
+
+			return &waitTestResource{name: "failed"}, ResourceStatus{
+				ID:                 resourceID,
+				ProvisioningStatus: ProvisioningStatusError,
+			}, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var response resource.CreateResponse
+	var timeouts tftimeouts.Value
+
+	started := time.Now()
+
+	_, ok := watcher.Wait(ctx, timeouts, &response)
+	if ok {
+		t.Fatalf("Wait() returned ok=true, want ok=false when error outlasts the grace period")
+	}
+
+	if elapsed := time.Since(started); elapsed < watcher.ErrorGracePeriod {
+		t.Fatalf("Wait() failed after %s, want at least the %s grace period", elapsed, watcher.ErrorGracePeriod)
+	}
+
+	if calls < 2 {
+		t.Fatalf("GetFunc call count = %d, want >= 2 (watcher must keep polling through the grace period)", calls)
+	}
+
+	errs := response.Diagnostics.Errors()
+	if len(errs) != 1 || errs[0].Summary() != wantSummary {
+		t.Fatalf("Wait() diagnostics = %#v, want a single %q error", response.Diagnostics, wantSummary)
+	}
+
+	if !strings.Contains(errs[0].Detail(), resourceID) {
+		t.Fatalf("Wait() diagnostic detail did not include resource ID %q: %s", resourceID, errs[0].Detail())
+	}
+}
+
 // TestUpdateStateWatcherWaitTreatsErrorAsTerminal ensures the update waiter exits cleanly with a
 // diagnostic when the API reports provisioningStatus=error during an update.
 func TestUpdateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
