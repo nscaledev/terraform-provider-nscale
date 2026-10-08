@@ -241,6 +241,9 @@ linters:
         - ^github.com/nscaledev/terraform-provider-nscale/internal/services/.+(Resource|DataSource|Model)$
         # Own error type — TraceID/Code/Endpoint/BodyBytes are populated when present.
         - ^github.com/nscaledev/terraform-provider-nscale/internal/nscale\.APIError$
+        # Custom attribute types embed the framework base type, whose zero value is
+        # the null value; `uuidtype.Type{}` is how a CustomType is written.
+        - ^github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype\.(Type|Value)$
       # Allows empty structures in return statements.
       # Default: false
       allow-empty-returns: true

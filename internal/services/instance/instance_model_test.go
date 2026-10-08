@@ -26,6 +26,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 )
 
 // The compute API types every spec identifier as a UUID, so these fixtures
@@ -63,8 +65,8 @@ func testInstanceModel(userData types.String) InstanceModel {
 		Name:             types.StringValue("test-instance"),
 		UserData:         userData,
 		NetworkInterface: testNetworkInterfaceObject(),
-		ImageID:          types.StringValue(testImageIDString),
-		FlavorID:         types.StringValue(testFlavorIDString),
+		ImageID:          uuidtype.NewValue(testImageIDString),
+		FlavorID:         uuidtype.NewValue(testFlavorIDString),
 		ProjectID:        types.StringValue(testProjectIDString),
 		Tags:             types.MapNull(types.StringType),
 	}
@@ -137,8 +139,8 @@ func TestNscaleInstanceUpdateParamsDecodesUserData(t *testing.T) {
 // per apply.
 func TestNscaleInstanceCreateParamsRejectsNonUUIDIdentifiers(t *testing.T) {
 	model := testInstanceModel(types.StringNull())
-	model.FlavorID = types.StringValue("flavor-1")
-	model.ImageID = types.StringValue("image-1")
+	model.FlavorID = uuidtype.NewValue("flavor-1")
+	model.ImageID = uuidtype.NewValue("image-1")
 
 	_, diagnostics := model.NscaleInstanceCreateParams(testOrganizationIDString)
 	if !diagnostics.HasError() {

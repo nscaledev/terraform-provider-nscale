@@ -25,6 +25,7 @@ import (
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 )
 
 var _ datasource.DataSourceWithConfigure = &PlacementDataSource{}
@@ -117,6 +118,7 @@ func (s *PlacementDataSource) Schema(
 				Attributes: map[string]schema.Attribute{
 					"image_id": schema.StringAttribute{
 						MarkdownDescription: "The image used for each pinned server.",
+						CustomType:          uuidtype.Type{},
 						Computed:            true,
 					},
 					"ssh_certificate_authority_id": schema.StringAttribute{

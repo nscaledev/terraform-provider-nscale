@@ -25,6 +25,7 @@ import (
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 )
 
 var _ datasource.DataSourceWithConfigure = &InstanceDataSource{}
@@ -90,14 +91,17 @@ func (s *InstanceDataSource) Schema(
 				Computed:            true,
 			},
 			"image_id": schema.StringAttribute{
+				CustomType:          uuidtype.Type{},
 				MarkdownDescription: "The identifier of the image used for the instance.",
 				Computed:            true,
 			},
 			"flavor_id": schema.StringAttribute{
+				CustomType:          uuidtype.Type{},
 				MarkdownDescription: "The identifier of the flavor used for the instance.",
 				Computed:            true,
 			},
 			"ssh_certificate_authority_id": schema.StringAttribute{
+				CustomType:          uuidtype.Type{},
 				MarkdownDescription: "The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created.",
 				Computed:            true,
 			},

@@ -29,6 +29,7 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/pointer"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 )
 
 type PlacementModel struct {
@@ -84,7 +85,7 @@ type PlacementServerNetworkingModel struct {
 // PlacementServerSpecModelAttributeType describes the server_spec sub-object.
 var PlacementServerSpecModelAttributeType = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
-		"image_id":                     types.StringType,
+		"image_id":                     uuidtype.Type{},
 		"ssh_certificate_authority_id": types.StringType,
 		"user_data":                    types.StringType,
 		"networking":                   PlacementServerNetworkingModelAttributeType,
@@ -92,10 +93,10 @@ var PlacementServerSpecModelAttributeType = types.ObjectType{
 }
 
 type PlacementServerSpecModel struct {
-	ImageID                   types.String `tfsdk:"image_id"`
-	SSHCertificateAuthorityID types.String `tfsdk:"ssh_certificate_authority_id"`
-	UserData                  types.String `tfsdk:"user_data"`
-	Networking                types.Object `tfsdk:"networking"`
+	ImageID                   uuidtype.Value `tfsdk:"image_id"`
+	SSHCertificateAuthorityID types.String   `tfsdk:"ssh_certificate_authority_id"`
+	UserData                  types.String   `tfsdk:"user_data"`
+	Networking                types.Object   `tfsdk:"networking"`
 }
 
 func NewPlacementModel(source *reservationapi.PlacementV2Read) PlacementModel {
@@ -155,7 +156,7 @@ func newPlacementServerSpecObject(source reservationapi.PlacementServerSpecV2) t
 	return types.ObjectValueMust(
 		PlacementServerSpecModelAttributeType.AttrTypes,
 		map[string]attr.Value{
-			"image_id":                     types.StringValue(source.ImageId),
+			"image_id":                     uuidtype.NewValue(source.ImageId),
 			"ssh_certificate_authority_id": types.StringPointerValue(source.SshCertificateAuthorityId),
 			"user_data":                    tftypes.Base64StringValue(source.UserData),
 			"networking":                   newPlacementServerNetworkingObject(source.Networking),

@@ -30,24 +30,25 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/pointer"
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/tftypes"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 )
 
 type InstanceModel struct {
-	ID                        types.String `tfsdk:"id"`
-	Name                      types.String `tfsdk:"name"`
-	Description               types.String `tfsdk:"description"`
-	NetworkInterface          types.Object `tfsdk:"network_interface"`
-	UserData                  types.String `tfsdk:"user_data"`
-	PublicIP                  types.String `tfsdk:"public_ip"`
-	PrivateIP                 types.String `tfsdk:"private_ip"`
-	PowerState                types.String `tfsdk:"power_state"`
-	ImageID                   types.String `tfsdk:"image_id"`
-	FlavorID                  types.String `tfsdk:"flavor_id"`
-	SSHCertificateAuthorityID types.String `tfsdk:"ssh_certificate_authority_id"`
-	Tags                      types.Map    `tfsdk:"tags"`
-	ProjectID                 types.String `tfsdk:"project_id"`
-	RegionID                  types.String `tfsdk:"region_id"`
-	CreationTime              types.String `tfsdk:"creation_time"`
+	ID                        types.String   `tfsdk:"id"`
+	Name                      types.String   `tfsdk:"name"`
+	Description               types.String   `tfsdk:"description"`
+	NetworkInterface          types.Object   `tfsdk:"network_interface"`
+	UserData                  types.String   `tfsdk:"user_data"`
+	PublicIP                  types.String   `tfsdk:"public_ip"`
+	PrivateIP                 types.String   `tfsdk:"private_ip"`
+	PowerState                types.String   `tfsdk:"power_state"`
+	ImageID                   uuidtype.Value `tfsdk:"image_id"`
+	FlavorID                  uuidtype.Value `tfsdk:"flavor_id"`
+	SSHCertificateAuthorityID uuidtype.Value `tfsdk:"ssh_certificate_authority_id"`
+	Tags                      types.Map      `tfsdk:"tags"`
+	ProjectID                 types.String   `tfsdk:"project_id"`
+	RegionID                  types.String   `tfsdk:"region_id"`
+	CreationTime              types.String   `tfsdk:"creation_time"`
 }
 
 func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
@@ -67,9 +68,9 @@ func NewInstanceModel(source *computeapi.InstanceRead) InstanceModel {
 		PublicIP:                  types.StringPointerValue(source.Status.PublicIP),
 		PrivateIP:                 types.StringPointerValue(source.Status.PrivateIP),
 		PowerState:                powerState,
-		ImageID:                   tftypes.UUIDStringValue(source.Spec.ImageId),
-		FlavorID:                  tftypes.UUIDStringValue(source.Spec.FlavorId),
-		SSHCertificateAuthorityID: tftypes.UUIDStringPointerValue(source.Spec.SshCertificateAuthorityId),
+		ImageID:                   uuidtype.FromUUID(source.Spec.ImageId),
+		FlavorID:                  uuidtype.FromUUID(source.Spec.FlavorId),
+		SSHCertificateAuthorityID: uuidtype.FromUUIDPointer(source.Spec.SshCertificateAuthorityId),
 		Tags:                      tftypes.TagMapValueMust(tags),
 		ProjectID:                 types.StringValue(source.Metadata.ProjectId),
 		RegionID:                  types.StringValue(source.Status.RegionId),

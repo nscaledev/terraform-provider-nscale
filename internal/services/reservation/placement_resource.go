@@ -42,6 +42,7 @@ import (
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 )
 
@@ -49,6 +50,7 @@ var (
 	_ resource.Resource                   = &PlacementResource{}
 	_ resource.ResourceWithConfigure      = &PlacementResource{}
 	_ resource.ResourceWithImportState    = &PlacementResource{}
+	_ resource.ResourceWithModifyPlan     = &PlacementResource{}
 	_ resource.ResourceWithValidateConfig = &PlacementResource{}
 )
 
@@ -93,6 +95,15 @@ func placementAdapter() nscale.ResourceAdapter[PlacementResourceModel, reservati
 		IDFromModel:       func(m PlacementResourceModel) string { return m.ID.ValueString() },
 		TimeoutsFromModel: func(m PlacementResourceModel) tftimeouts.Value { return m.Timeouts },
 	}
+}
+
+// ModifyPlan plans no change when the configuration respells the image UUID.
+func (r *PlacementResource) ModifyPlan(
+	ctx context.Context,
+	request resource.ModifyPlanRequest,
+	response *resource.ModifyPlanResponse,
+) {
+	nscale.KeepStateWhenUnchanged(ctx, request, response)
 }
 
 func (r *PlacementResource) Schema(
@@ -224,7 +235,11 @@ func (r *PlacementResource) Schema(
 				Attributes: map[string]schema.Attribute{
 					"image_id": schema.StringAttribute{
 						MarkdownDescription: "The image to use for each pinned server.",
+						CustomType:          uuidtype.Type{},
 						Required:            true,
+						PlanModifiers: []planmodifier.String{
+							uuidtype.UseStateForSameUUID(),
+						},
 					},
 					"ssh_certificate_authority_id": schema.StringAttribute{
 						MarkdownDescription: "The SSH certificate authority ID.",

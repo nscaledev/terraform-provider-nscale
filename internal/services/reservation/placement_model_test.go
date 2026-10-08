@@ -25,6 +25,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 )
 
 func objectAsOptions() basetypes.ObjectAsOptions { return basetypes.ObjectAsOptions{} }
@@ -219,7 +221,7 @@ func TestNscalePlacementCreateParams(t *testing.T) {
 		ServerSpec: types.ObjectValueMust(
 			PlacementServerSpecModelAttributeType.AttrTypes,
 			map[string]attr.Value{
-				"image_id":                     types.StringValue("ubuntu-24.04"),
+				"image_id":                     uuidtype.NewValue("ubuntu-24.04"),
 				"ssh_certificate_authority_id": types.StringValue("ca-1"),
 				// Supplied as base64; the create params must carry the decoded bytes
 				// so the SDK does not base64-encode the value a second time.
@@ -306,7 +308,7 @@ func TestNscalePlacementCreateParamsNoNetworking(t *testing.T) {
 		ServerSpec: types.ObjectValueMust(
 			PlacementServerSpecModelAttributeType.AttrTypes,
 			map[string]attr.Value{
-				"image_id":                     types.StringValue("ubuntu-24.04"),
+				"image_id":                     uuidtype.NewValue("ubuntu-24.04"),
 				"ssh_certificate_authority_id": types.StringNull(),
 				"user_data":                    types.StringNull(),
 				"networking":                   types.ObjectNull(PlacementServerNetworkingModelAttributeType.AttrTypes),
@@ -357,7 +359,7 @@ func TestNscalePlacementCreateParamsUnknownNetworkingLists(t *testing.T) {
 		ServerSpec: types.ObjectValueMust(
 			PlacementServerSpecModelAttributeType.AttrTypes,
 			map[string]attr.Value{
-				"image_id":                     types.StringValue("ubuntu-24.04"),
+				"image_id":                     uuidtype.NewValue("ubuntu-24.04"),
 				"ssh_certificate_authority_id": types.StringNull(),
 				"user_data":                    types.StringNull(),
 				"networking": types.ObjectValueMust(
