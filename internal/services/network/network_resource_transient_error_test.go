@@ -155,7 +155,7 @@ func (a *mockNetworkAPI) handleCreate(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	writeMockJSON(w, http.StatusAccepted, a.network)
+	writeMockJSON(w, http.StatusCreated, a.network)
 }
 
 func (a *mockNetworkAPI) handleGet(w http.ResponseWriter, r *http.Request) {

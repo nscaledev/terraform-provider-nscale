@@ -140,27 +140,6 @@ type CreateStateWatcher[T any] struct {
 	ErrorGracePeriod time.Duration `exhaustruct:"optional"`
 }
 
-// ErrorGrace lets a waiter ride out an error the backend recovers from on its
-// own: an unbroken run of failing polls is tolerated for up to Period.
-type ErrorGrace struct {
-	Period time.Duration
-
-	since time.Time `exhaustruct:"optional"`
-}
-
-// Tolerate records one poll and reports whether a failing resource is still
-// within Period. A non-failing poll ends the run.
-func (g *ErrorGrace) Tolerate(failing bool) bool {
-	if !failing {
-		g.since = time.Time{}
-		return false
-	}
-	if g.since.IsZero() {
-		g.since = time.Now()
-	}
-	return time.Since(g.since) < g.Period
-}
-
 // createStateTransientError is the synthetic pending state for an 'error'
 // status still inside CreateStateWatcher.ErrorGracePeriod.
 const createStateTransientError = "error (within grace period)"
@@ -228,12 +207,13 @@ func (w *CreateStateWatcher[T]) Wait(
 			response.Diagnostics.AddError(
 				fmt.Sprintf("%s Still in Error State at Create Timeout", w.ResourceTitle),
 				fmt.Sprintf(
-					"%s %s (name %s) was still reporting 'error' when the %s create timeout expired, within the %s it is allowed to recover. Set a longer create timeout in the resource's timeouts block, e.g. timeouts { create = \"30m\" }.",
+					"%s %s (name %s) was still reporting 'error' when the %s create timeout expired, within the %s it is allowed to recover. Set a longer create timeout in the resource's timeouts block, e.g. timeouts { create = \"%s\" }.",
 					w.ResourceTitle,
 					lastStatus.ID,
 					lastStatus.Name,
 					timeout,
 					w.ErrorGracePeriod,
+					timeout+w.ErrorGracePeriod,
 				),
 			)
 			return zero, false

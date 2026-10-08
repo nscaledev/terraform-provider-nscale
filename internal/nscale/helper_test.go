@@ -2,6 +2,7 @@ package nscale
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -254,27 +255,6 @@ func TestCreateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
 	}
 }
 
-func TestErrorGraceTolerate(t *testing.T) {
-	grace := ErrorGrace{Period: 50 * time.Millisecond}
-
-	if grace.Tolerate(false) {
-		t.Fatalf("Tolerate(false) = true, want false for a non-failing poll")
-	}
-	if !grace.Tolerate(true) {
-		t.Fatalf("Tolerate(true) = false on the first failing poll, want true")
-	}
-
-	time.Sleep(60 * time.Millisecond)
-	if grace.Tolerate(true) {
-		t.Fatalf("Tolerate(true) = true after the period elapsed, want false")
-	}
-
-	grace.Tolerate(false)
-	if !grace.Tolerate(true) {
-		t.Fatalf("Tolerate(true) = false after a non-failing poll, want the run to restart")
-	}
-}
-
 // TestCreateStateWatcherWaitRecoversFromTransientError ensures that, with a
 // grace period, an 'error' that recovers to 'provisioned' is not a failure.
 func TestCreateStateWatcherWaitRecoversFromTransientError(t *testing.T) {
@@ -422,7 +402,8 @@ func TestCreateStateWatcherWaitTimesOutWithinGracePeriod(t *testing.T) {
 		t.Fatalf("Wait() diagnostics = %#v, want a single %q error", response.Diagnostics, wantSummary)
 	}
 
-	for _, want := range []string{resourceID, "timeouts", "create"} {
+	wantExample := fmt.Sprintf("create = %q", watcher.DefaultTimeout+watcher.ErrorGracePeriod)
+	for _, want := range []string{resourceID, wantExample} {
 		if !strings.Contains(errs[0].Detail(), want) {
 			t.Fatalf("Wait() diagnostic detail did not include %q: %s", want, errs[0].Detail())
 		}
@@ -570,7 +551,9 @@ func TestCreateStateWatcherWaitUsesDefaultTimeout(t *testing.T) {
 	if ctx.Err() != nil {
 		t.Fatalf("Wait() ran until the test deadline (%s) instead of giving up after DefaultTimeout", time.Since(start))
 	}
-	if !response.Diagnostics.HasError() {
-		t.Fatal("Wait() gave up without an error diagnostic")
+	const wantSummary = "Failed to Wait for Reservation to be Created"
+	errs := response.Diagnostics.Errors()
+	if len(errs) != 1 || errs[0].Summary() != wantSummary {
+		t.Fatalf("Wait() diagnostics = %#v, want a single %q error", response.Diagnostics, wantSummary)
 	}
 }
