@@ -74,7 +74,7 @@ type ResourceAdapter[TFModel any, APIRead any] struct {
 	DefaultCreateTimeout time.Duration `exhaustruct:"optional"`
 
 	// CreateErrorGracePeriod tolerates a transient 'error' status during create;
-	// see CreateStateWatcher.ErrorGracePeriod. Zero fails on the first 'error'.
+	// see CreateStateWatcher.ErrorGracePeriod.
 	CreateErrorGracePeriod time.Duration `exhaustruct:"optional"`
 }
 

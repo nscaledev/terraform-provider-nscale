@@ -42,7 +42,8 @@ type NetworkResource struct {
 
 // networkCreateErrorGracePeriod covers regions where the backend network create
 // outlasts the region controller's client timeout: the network is reported as
-// 'error', then recovers to 'provisioned' minutes later (DX-2622).
+// 'error', then recovers to 'provisioned' minutes later. Failing on that error
+// would taint a network that is about to become usable.
 const networkCreateErrorGracePeriod = 10 * time.Minute
 
 func NewNetworkResource() resource.Resource {
@@ -71,10 +72,8 @@ func networkAdapter() nscale.ResourceAdapter[NetworkResourceModel, regionapi.Net
 		ToModel: func(api *regionapi.NetworkV2Read, dst *NetworkResourceModel) {
 			dst.NetworkModel = NewNetworkModel(api)
 		},
-		IDFromModel:       func(m NetworkResourceModel) string { return m.ID.ValueString() },
-		TimeoutsFromModel: func(m NetworkResourceModel) tftimeouts.Value { return m.Timeouts },
-		// Failing on the transient error taints a network that is about to become
-		// usable, so the next apply needlessly replaces it.
+		IDFromModel:            func(m NetworkResourceModel) string { return m.ID.ValueString() },
+		TimeoutsFromModel:      func(m NetworkResourceModel) tftimeouts.Value { return m.Timeouts },
 		CreateErrorGracePeriod: networkCreateErrorGracePeriod,
 	}
 }

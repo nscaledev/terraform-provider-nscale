@@ -38,14 +38,11 @@ const (
 	mockRegionID       = "9d8c7b6a-5f4e-4d3c-2b1a-0f9e8d7c6b5a"
 )
 
-// TestAccNetworkResource_transientErrorDuringCreate reproduces DX-2622 against
-// a mock region API: the network reports 'error' partway through create, then
-// recovers to 'provisioned'. The apply must succeed without tainting the
-// resource, so the post-apply plan is empty and no second network is created.
-//
-// The mock stands in for staging because the transient error only happens in
-// regions with a slow backend network create, which a live run can't force.
-func TestAccNetworkResource_transientErrorDuringCreate(t *testing.T) {
+// TestNetworkResource_transientErrorDuringCreate runs real Terraform against a
+// mock region API whose network reports 'error' mid-create, then recovers. The
+// apply must succeed without tainting it. A mock because staging can't force
+// the slow backend create that causes the error.
+func TestNetworkResource_transientErrorDuringCreate(t *testing.T) {
 	api := newMockNetworkAPI(t, []regionapi.ResourceProvisioningStatus{
 		regionapi.ResourceProvisioningStatusProvisioning,
 		regionapi.ResourceProvisioningStatusError,
@@ -61,7 +58,7 @@ func TestAccNetworkResource_transientErrorDuringCreate(t *testing.T) {
 	t.Setenv("NSCALE_PROJECT_ID", mockProjectID)
 	t.Setenv("NSCALE_REGION_ID", mockRegionID)
 
-	resource.Test(t, resource.TestCase{
+	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		CheckDestroy: func(*terraform.State) error {
 			if !api.deleted() {

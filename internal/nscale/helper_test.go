@@ -254,7 +254,28 @@ func TestCreateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
 	}
 }
 
-// TestCreateStateWatcherWaitRecoversFromTransientError covers DX-2622: with a
+func TestErrorGraceTolerate(t *testing.T) {
+	grace := ErrorGrace{Period: 50 * time.Millisecond}
+
+	if grace.Tolerate(false) {
+		t.Fatalf("Tolerate(false) = true, want false for a non-failing poll")
+	}
+	if !grace.Tolerate(true) {
+		t.Fatalf("Tolerate(true) = false on the first failing poll, want true")
+	}
+
+	time.Sleep(60 * time.Millisecond)
+	if grace.Tolerate(true) {
+		t.Fatalf("Tolerate(true) = true after the period elapsed, want false")
+	}
+
+	grace.Tolerate(false)
+	if !grace.Tolerate(true) {
+		t.Fatalf("Tolerate(true) = false after a non-failing poll, want the run to restart")
+	}
+}
+
+// TestCreateStateWatcherWaitRecoversFromTransientError ensures that, with a
 // grace period, an 'error' that recovers to 'provisioned' is not a failure.
 func TestCreateStateWatcherWaitRecoversFromTransientError(t *testing.T) {
 	statuses := []ProvisioningStatus{

@@ -140,6 +140,27 @@ type CreateStateWatcher[T any] struct {
 	ErrorGracePeriod time.Duration `exhaustruct:"optional"`
 }
 
+// ErrorGrace lets a waiter ride out an error the backend recovers from on its
+// own: an unbroken run of failing polls is tolerated for up to Period.
+type ErrorGrace struct {
+	Period time.Duration
+
+	since time.Time `exhaustruct:"optional"`
+}
+
+// Tolerate records one poll and reports whether a failing resource is still
+// within Period. A non-failing poll ends the run.
+func (g *ErrorGrace) Tolerate(failing bool) bool {
+	if !failing {
+		g.since = time.Time{}
+		return false
+	}
+	if g.since.IsZero() {
+		g.since = time.Now()
+	}
+	return time.Since(g.since) < g.Period
+}
+
 // createStateTransientError is the synthetic pending state for an 'error'
 // status still inside CreateStateWatcher.ErrorGracePeriod.
 const createStateTransientError = "error (within grace period)"
@@ -162,7 +183,7 @@ func (w *CreateStateWatcher[T]) Wait(
 
 	var lastStatus ResourceStatus
 	var haveStatus bool
-	var errorSince time.Time
+	errorGrace := ErrorGrace{Period: w.ErrorGracePeriod}
 
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
@@ -188,15 +209,7 @@ func (w *CreateStateWatcher[T]) Wait(
 			lastStatus = status
 			haveStatus = true
 
-			if status.ProvisioningStatus != ProvisioningStatusError {
-				errorSince = time.Time{}
-				return result, string(status.ProvisioningStatus), nil
-			}
-
-			if errorSince.IsZero() {
-				errorSince = time.Now()
-			}
-			if time.Since(errorSince) < w.ErrorGracePeriod {
+			if errorGrace.Tolerate(status.ProvisioningStatus == ProvisioningStatusError) {
 				return result, createStateTransientError, nil
 			}
 

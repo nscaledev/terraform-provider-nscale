@@ -251,10 +251,9 @@ func Provisioned[T any](ctx context.Context, target Target[T]) (*T, error) {
 
 	refresh := target.refresh(ctx, StateGone)
 
-	// failedSince is when the current unbroken run of failed reads began; zero
-	// while the resource is not failing. Until pollFailureGrace has passed, a failed
-	// read is reported as still provisioning so the waiter keeps polling.
-	var failedSince time.Time
+	// Until pollFailureGrace has passed, a failed read is reported as still
+	// provisioning so the waiter keeps polling.
+	failureGrace := nscale.ErrorGrace{Period: pollFailureGrace}
 
 	stateChange := &retry.StateChangeConf{
 		Pending: provisionedPending(),
@@ -268,16 +267,7 @@ func Provisioned[T any](ctx context.Context, target Target[T]) (*T, error) {
 				last = value
 			}
 
-			if state != StateFailed {
-				failedSince = time.Time{}
-
-				return raw, state, err
-			}
-
-			if failedSince.IsZero() {
-				failedSince = time.Now()
-			}
-			if time.Since(failedSince) < pollFailureGrace {
+			if failureGrace.Tolerate(state == StateFailed) {
 				return raw, StateProvisioning, err
 			}
 
