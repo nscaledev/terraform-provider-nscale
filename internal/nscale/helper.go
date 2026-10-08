@@ -18,6 +18,7 @@ package nscale
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -208,6 +209,22 @@ func (w *CreateStateWatcher[T]) Wait(
 	state, err := stateWatcher.WaitForStateContext(ctx)
 	if err != nil {
 		TerraformDebugLogAPIResponseBody(ctx, err)
+		// The resource may still recover, but it's tainted now; the only fix
+		// is a longer create timeout.
+		if e := (*retry.TimeoutError)(nil); errors.As(err, &e) && e.LastState == createStateTransientError {
+			response.Diagnostics.AddError(
+				fmt.Sprintf("%s Still in Error State at Create Timeout", w.ResourceTitle),
+				fmt.Sprintf(
+					"%s %s (name %s) was still reporting 'error' when the %s create timeout expired, within the %s it is allowed to recover. Set a longer create timeout in the resource's timeouts block, e.g. timeouts { create = \"30m\" }.",
+					w.ResourceTitle,
+					lastStatus.ID,
+					lastStatus.Name,
+					timeout,
+					w.ErrorGracePeriod,
+				),
+			)
+			return zero, false
+		}
 		response.Diagnostics.AddError(
 			fmt.Sprintf("Failed to Wait for %s to be Created", w.ResourceTitle),
 			fmt.Sprintf("An error occurred while waiting for the %s to be created: %s", w.ResourceName, err),
