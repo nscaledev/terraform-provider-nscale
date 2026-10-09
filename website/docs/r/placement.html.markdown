@@ -184,6 +184,7 @@ configured `update` timeout, until the service has observed the change and the p
 reconciled explicitly. Under `RollingUpdate` it waits until every server has converged onto the new image, which can
 take a long time for a large placement, and fails if a server fails provisioning, as the rollout cannot complete until a
 further image change. Under either strategy it fails if the placement stays in an error state.
+If the wait fails or times out, the update itself stays applied and the service carries on with it.
 Changing `update_strategy` alone is also an in-place update, waited on the same way. The read-only `updated_host_count`
 and `drifted_host_count` report how many servers run the placement's image and how many do not yet.
 

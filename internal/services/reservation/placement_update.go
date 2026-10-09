@@ -196,6 +196,21 @@ func waitForPlacementUpdate(
 	}
 
 	state, err := stateWatcher.WaitForStateContext(ctx)
+	if e := (*retry.TimeoutError)(nil); errors.As(err, &e) && e.LastState == placementUpdatePending {
+		diagnostics.AddError(
+			"Placement Still Updating at Update Timeout",
+			fmt.Sprintf(
+				"The placement was still converging when the %s update timeout expired. The update has been "+
+					"applied and the service carries on rolling it out; updated_host_count and "+
+					"drifted_host_count show its progress. To wait longer, set a longer update timeout in "+
+					"the resource's timeouts block.",
+				timeout,
+			),
+		)
+
+		return nil, diagnostics
+	}
+
 	if err != nil {
 		nscale.TerraformDebugLogAPIResponseBody(ctx, err)
 		diagnostics.AddError(

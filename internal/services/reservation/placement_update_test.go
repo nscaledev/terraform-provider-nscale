@@ -452,11 +452,8 @@ func TestWaitForPlacementUpdateKeepsPendingThroughServerErrors(t *testing.T) {
 		t.Fatal("waitForPlacementUpdate() diagnostics = none, want a timeout")
 	}
 
-	if detail := diagnostics.Errors()[0].Detail(); !strings.Contains(
-		detail,
-		"last state: '"+placementUpdatePending+"'",
-	) {
-		t.Errorf("diagnostic detail = %q, want a timeout while %s", detail, placementUpdatePending)
+	if summary := diagnostics.Errors()[0].Summary(); summary != "Placement Still Updating at Update Timeout" {
+		t.Errorf("diagnostic summary = %q, want the update timeout", summary)
 	}
 }
 
