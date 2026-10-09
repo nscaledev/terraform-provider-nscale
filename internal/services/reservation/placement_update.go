@@ -252,23 +252,9 @@ func waitForPlacementUpdate(
 	return placement, diagnostics
 }
 
-// placementUpdateProgress reports from one read whether a placement update has
-// taken effect, or why it cannot.
-//
-// An error fails the update under either strategy. Until statusCurrent is
-// true the service has not observed the new spec and the convergence counts
-// describe the old one, so nothing else is read from them. Once it has,
-// neither strategy is done until the placement is provisioned with its counts
-// accounting for every server: the service also reports statusCurrent with
-// every count zeroed when a reconcile stops before observing the servers.
-//
-//   - Manual: the update is done once every server is counted as updated or
-//     drifted. Servers stay on their image, drifted, until each is reconciled
-//     explicitly; that is the strategy, not a failure.
-//   - RollingUpdate: the update is done when every server is updated, with
-//     none drifted or in flight. A stalled server has failed provisioning; the
-//     service never rebuilds a server that is not provisioned, so it holds the
-//     rollout until a further image change.
+// placementUpdateProgress reports whether one read shows the update done. The
+// counts describe the old spec until statusCurrent, and can read all zero
+// after it, so provisioned is checked too.
 func placementUpdateProgress(placement *reservationapi.PlacementV2Read) (bool, error) {
 	status := placement.Status
 

@@ -192,12 +192,8 @@ func (r *PlacementResource) Schema(
 			"constraints": schema.SingleNestedAttribute{
 				MarkdownDescription: "The scheduling policy applied when selecting hosts from the reservation. Changing this forces a new placement to be created.",
 				Required:            true,
-				// Replacement is decided per attribute, not on the whole object: the
-				// framework marks unconfigured computed attributes unknown whenever
-				// the placement changes, and an object holding an unknown never
-				// equals its prior state, so an image update would replace. Only a
-				// wholly unknown object, whose attributes the framework does not
-				// plan, replaces as a whole.
+				// Replaced per attribute: an object holding an unknown never
+				// equals its prior state.
 				PlanModifiers: []planmodifier.Object{
 					requiresReplaceIfUnknown(),
 				},
@@ -253,7 +249,7 @@ func (r *PlacementResource) Schema(
 			"server_spec": schema.SingleNestedAttribute{
 				MarkdownDescription: "Region server options applied to each pinned server. Changing `image_id` updates the placement in place; changing anything else forces a new placement to be created.",
 				Required:            true,
-				// Replacement is decided per attribute, as for constraints.
+				// Replaced per attribute, as for constraints.
 				PlanModifiers: []planmodifier.Object{
 					requiresReplaceIfUnknown(),
 				},
