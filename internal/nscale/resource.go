@@ -56,9 +56,9 @@ type ResourceAdapter[TFModel any, APIRead any] struct {
 	// UpdateAndWait marks the resource immutable.
 	Update func(ctx context.Context, client *Client, id string, plan TFModel) (operationTagKey string, diags diag.Diagnostics)
 
-	// UpdateAndWait replaces Update and the operation-tag watcher for a
-	// resource whose update endpoint does not store tags, so the watcher could
-	// never see the write land. It issues the update, waits within timeout for
+	// UpdateAndWait replaces Update, which must then be nil, and the
+	// operation-tag watcher for a resource whose update endpoint does not
+	// store tags, so the watcher could never see the write land. It issues the update, waits within timeout for
 	// it to take effect, and returns the final read. prior is the state the
 	// plan was made from.
 	UpdateAndWait func(
@@ -109,6 +109,10 @@ type GenericResource[TFModel any, APIRead any] struct {
 func NewGenericResource[TFModel, APIRead any](
 	adapter ResourceAdapter[TFModel, APIRead],
 ) *GenericResource[TFModel, APIRead] {
+	if adapter.Update != nil && adapter.UpdateAndWait != nil {
+		panic(fmt.Sprintf("%s adapter sets both Update and UpdateAndWait", adapter.Name))
+	}
+
 	// client is populated later, in Configure.
 	return &GenericResource[TFModel, APIRead]{client: nil, adapter: adapter}
 }
