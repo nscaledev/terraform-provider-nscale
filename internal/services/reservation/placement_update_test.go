@@ -379,6 +379,13 @@ func reads(
 	}
 }
 
+func unobserved() *reservationapi.PlacementV2Read {
+	placement := updateTestPlacement()
+	placement.Status.StatusCurrent = false
+
+	return placement
+}
+
 func erroredBeforeObserved() *reservationapi.PlacementV2Read {
 	placement := updateTestPlacement()
 	placement.Status.StatusCurrent = false
@@ -400,6 +407,7 @@ func TestWaitForPlacementUpdateRidesOutTransientFailure(t *testing.T) {
 	got, diagnostics := waitForPlacementUpdate(
 		t.Context(),
 		10*time.Second,
+		unobserved(),
 		reads(erroredBeforeObserved(), erroredBeforeObserved(), observed),
 	)
 	if diagnostics.HasError() {
@@ -434,7 +442,7 @@ func TestWaitForPlacementUpdateRidesOutServerError(t *testing.T) {
 
 	observed := updateTestPlacement()
 
-	got, diagnostics := waitForPlacementUpdate(t.Context(), 10*time.Second, serverErrorThen(2, observed))
+	got, diagnostics := waitForPlacementUpdate(t.Context(), 10*time.Second, unobserved(), serverErrorThen(2, observed))
 	if diagnostics.HasError() {
 		t.Fatalf("waitForPlacementUpdate() diagnostics = %v", diagnostics)
 	}
@@ -444,10 +452,33 @@ func TestWaitForPlacementUpdateRidesOutServerError(t *testing.T) {
 	}
 }
 
+// 5xx reads within the grace keep the update pending, so the wait ends on its
+// timeout rather than reading them as the placement gone.
+func TestWaitForPlacementUpdateKeepsPendingThroughServerErrors(t *testing.T) {
+	setPlacementFailureGrace(t, time.Hour)
+
+	_, diagnostics := waitForPlacementUpdate(t.Context(), time.Second, unobserved(), serverErrorThen(1000, nil))
+	if !diagnostics.HasError() {
+		t.Fatal("waitForPlacementUpdate() diagnostics = none, want a timeout")
+	}
+
+	if detail := diagnostics.Errors()[0].Detail(); !strings.Contains(
+		detail,
+		"last state: '"+placementUpdatePending+"'",
+	) {
+		t.Errorf("diagnostic detail = %q, want a timeout while %s", detail, placementUpdatePending)
+	}
+}
+
 func TestWaitForPlacementUpdateFailsPersistentServerError(t *testing.T) {
 	setPlacementFailureGrace(t, 0)
 
-	_, diagnostics := waitForPlacementUpdate(t.Context(), 10*time.Second, serverErrorThen(1, updateTestPlacement()))
+	_, diagnostics := waitForPlacementUpdate(
+		t.Context(),
+		10*time.Second,
+		unobserved(),
+		serverErrorThen(1, updateTestPlacement()),
+	)
 	if !diagnostics.HasError() {
 		t.Fatal("waitForPlacementUpdate() diagnostics = none, want an error")
 	}
@@ -456,7 +487,7 @@ func TestWaitForPlacementUpdateFailsPersistentServerError(t *testing.T) {
 func TestWaitForPlacementUpdateFailsPersistentFailure(t *testing.T) {
 	setPlacementFailureGrace(t, 0)
 
-	_, diagnostics := waitForPlacementUpdate(t.Context(), 10*time.Second, reads(erroredBeforeObserved()))
+	_, diagnostics := waitForPlacementUpdate(t.Context(), 10*time.Second, unobserved(), reads(erroredBeforeObserved()))
 	if !diagnostics.HasError() {
 		t.Fatal("waitForPlacementUpdate() diagnostics = none, want an error")
 	}

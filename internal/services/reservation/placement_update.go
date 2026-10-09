@@ -114,14 +114,19 @@ func placementUpdateAndWait(
 		return current, diagnostics
 	}
 
-	return waitForPlacementUpdate(ctx, timeout, func(ctx context.Context) (*reservationapi.PlacementV2Read, error) {
-		return getPlacement(ctx, id, client)
-	})
+	return waitForPlacementUpdate(
+		ctx,
+		timeout,
+		current,
+		func(ctx context.Context) (*reservationapi.PlacementV2Read, error) {
+			return getPlacement(ctx, id, client)
+		},
+	)
 }
 
 // updatePlacement makes one read-modify-write of the placement's spec. It
-// returns the read, and whether it sent an update: it does not when the
-// planned spec matches the read.
+// returns the placement as the update left it, and whether it sent an update:
+// it does not when the planned spec matches the read.
 func updatePlacement(
 	ctx context.Context,
 	client *nscale.Client,
@@ -148,11 +153,12 @@ func updatePlacement(
 	}
 	defer updateResponse.Body.Close()
 
-	if _, err = nscale.ReadJSONResponsePointer[reservationapi.PlacementV2Read](updateResponse); err != nil {
+	updated, err := nscale.ReadJSONResponsePointer[reservationapi.PlacementV2Read](updateResponse)
+	if err != nil {
 		return nil, false, fmt.Errorf("sending the update: %w", err)
 	}
 
-	return current, true, nil
+	return updated, true, nil
 }
 
 // placementSpecUnchanged reports whether requested asks for the spec the API
@@ -171,17 +177,19 @@ func placementSpecUnchanged(current, requested reservationapi.PlacementV2Spec) b
 
 // waitForPlacementUpdate polls until placementUpdateProgress reports the
 // update done, or a failure, reported or a 5xx read, outlasts
-// placementFailureGrace.
+// placementFailureGrace. A 5xx read reports the last good read as pending,
+// never nil: the watcher gives up on a run of nil results inside the grace.
 func waitForPlacementUpdate(
 	ctx context.Context,
 	timeout time.Duration,
+	sent *reservationapi.PlacementV2Read,
 	get func(ctx context.Context) (*reservationapi.PlacementV2Read, error),
 ) (*reservationapi.PlacementV2Read, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
 
 	grace := nscale.ErrorGrace{Period: placementFailureGrace}
 
-	var last *reservationapi.PlacementV2Read
+	last := sent
 
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
@@ -192,12 +200,6 @@ func waitForPlacementUpdate(
 			if err != nil {
 				if !nscale.IsServerError(err) || !grace.Tolerate(true) {
 					return nil, "", err
-				}
-
-				// A nil result reads as not found, which the watcher also
-				// tolerates for a while.
-				if last == nil {
-					return nil, "", nil
 				}
 
 				return last, placementUpdatePending, nil
