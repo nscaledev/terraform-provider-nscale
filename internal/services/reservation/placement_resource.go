@@ -386,9 +386,6 @@ func (r *PlacementResource) Schema(
 			"provisioning_status": schema.StringAttribute{
 				MarkdownDescription: "The provisioning status of the placement.",
 				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 		},
 		Blocks: map[string]schema.Block{

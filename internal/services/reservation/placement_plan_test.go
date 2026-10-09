@@ -305,6 +305,24 @@ func TestPlacementImageChangePlansInPlaceUpdate(t *testing.T) {
 	}
 }
 
+func TestPlacementImageChangeOnErroredPlacementPlansStatusUnknown(t *testing.T) {
+	prior := planTestPlacement()
+	prior.Metadata.ProvisioningStatus = reservationapi.ResourceProvisioningStatusError
+
+	next := planTestPlacement()
+	next.Metadata.ProvisioningStatus = reservationapi.ResourceProvisioningStatusError
+	next.Spec.ServerSpec.ImageId = planTestUpdatedImageID
+
+	_, planned := planPlacement(t, prior, next, nil)
+
+	if !planned.ProvisioningStatus.IsUnknown() {
+		t.Errorf(
+			"planned provisioning_status = %s, want unknown: the update waits for provisioned",
+			planned.ProvisioningStatus,
+		)
+	}
+}
+
 func TestPlacementUpdateStrategyChangePlansInPlaceUpdate(t *testing.T) {
 	next := planTestPlacement()
 	next.Spec.UpdateStrategy = &reservationapi.PlacementUpdateStrategyV2{
