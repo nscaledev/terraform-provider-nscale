@@ -11,6 +11,13 @@ in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) style, using the
 categories `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 `DEPRECATIONS` and `DOCS`; they are preserved as-is below.
 
+## [1.6.1](https://github.com/nscaledev/terraform-provider-nscale/compare/v1.6.0...v1.6.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **network:** tolerate a transient error state during network create ([#93](https://github.com/nscaledev/terraform-provider-nscale/issues/93)) ([1c73496](https://github.com/nscaledev/terraform-provider-nscale/commit/1c73496cd35df9c496babdf11ee95d815191d1b6))
+
 ## [1.6.0](https://github.com/nscaledev/terraform-provider-nscale/compare/v1.5.0...v1.6.0) (2026-09-30)
 
 
