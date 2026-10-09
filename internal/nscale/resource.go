@@ -60,13 +60,12 @@ type ResourceAdapter[TFModel any, APIRead any] struct {
 	// operation-tag watcher for a resource whose update endpoint does not
 	// store tags, so the watcher could never see the write land. It issues
 	// the update, waits within timeout for it to take effect, and returns the
-	// final read. prior is the state the plan was made from.
+	// final read.
 	UpdateAndWait func(
 		ctx context.Context,
 		client *Client,
 		id string,
 		plan TFModel,
-		prior TFModel,
 		timeout time.Duration,
 	) (*APIRead, diag.Diagnostics) `exhaustruct:"optional"`
 
@@ -297,19 +296,13 @@ func (r *GenericResource[TFModel, APIRead]) updateAndWait(
 	data TFModel,
 	response *resource.UpdateResponse,
 ) {
-	prior, diagnostics := ReadTerraformState[TFModel](ctx, request.State.Get)
-	if diagnostics.HasError() {
-		response.Diagnostics.Append(diagnostics...)
-		return
-	}
-
 	timeout, diagnostics := r.adapter.TimeoutsFromModel(data).Update(ctx, r.adapter.updateTimeoutDefault())
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
 	}
 
-	final, diagnostics := r.adapter.UpdateAndWait(ctx, r.client, id, data, prior, timeout)
+	final, diagnostics := r.adapter.UpdateAndWait(ctx, r.client, id, data, timeout)
 	response.Diagnostics.Append(diagnostics...)
 
 	if diagnostics.HasError() {

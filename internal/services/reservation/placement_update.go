@@ -62,14 +62,9 @@ func placementUpdateAndWait(
 	client *nscale.Client,
 	id string,
 	plan PlacementResourceModel,
-	prior PlacementResourceModel,
 	timeout time.Duration,
 ) (*reservationapi.PlacementV2Read, diag.Diagnostics) {
 	var diagnostics diag.Diagnostics
-
-	if plan.UpdateStrategy.Equal(prior.UpdateStrategy) {
-		plan.UpdateStrategy = newPlacementUpdateStrategyObject(nil)
-	}
 
 	var (
 		current *reservationapi.PlacementV2Read

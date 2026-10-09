@@ -38,7 +38,7 @@ func TestNewGenericResourceRejectsBothUpdates(t *testing.T) {
 			return "", nil
 		},
 		UpdateAndWait: func(
-			context.Context, *Client, string, struct{}, struct{}, time.Duration,
+			context.Context, *Client, string, struct{}, time.Duration,
 		) (*struct{}, diag.Diagnostics) {
 			return nil, nil
 		},

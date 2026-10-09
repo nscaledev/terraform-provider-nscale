@@ -571,16 +571,14 @@ func updateThroughFakeAPI(
 	planned := updateTestPlacement()
 	planned.Spec.ServerSpec.ImageId = imageID
 	plan := PlacementResourceModel{PlacementModel: NewPlacementModel(planned)}
-	prior := PlacementResourceModel{PlacementModel: NewPlacementModel(updateTestPlacement())}
 
-	return updateThroughFakeAPIFrom(t, server.URL, plan, prior)
+	return updateThroughFakeAPIFrom(t, server.URL, plan)
 }
 
 func updateThroughFakeAPIFrom(
 	t *testing.T,
 	url string,
 	plan PlacementResourceModel,
-	prior PlacementResourceModel,
 ) (*reservationapi.PlacementV2Read, diag.Diagnostics) {
 	t.Helper()
 
@@ -594,7 +592,6 @@ func updateThroughFakeAPIFrom(
 		&nscale.Client{Reservation: reservationClient},
 		"placement-1",
 		plan,
-		prior,
 		10*time.Second,
 	)
 }
@@ -716,36 +713,6 @@ func TestPlacementUpdateAndWaitSkipsUnchangedSpec(t *testing.T) {
 	}
 }
 
-func TestPlacementUpdateAndWaitKeepsStrategyChangedOutsideTerraform(t *testing.T) {
-	stored := updateTestPlacement()
-	stored.Spec.UpdateStrategy = &reservationapi.PlacementUpdateStrategyV2{
-		Type:          reservationapi.PlacementUpdateStrategyTypeV2RollingUpdate,
-		RollingUpdate: &reservationapi.PlacementRollingUpdateV2{MaxUnavailable: new("1")},
-	}
-	api := &fakePlacementAPI{placement: stored}
-
-	server := httptest.NewServer(api)
-	t.Cleanup(server.Close)
-
-	planned := updateTestPlacement()
-	planned.Spec.ServerSpec.ImageId = updateTestNewImageID
-	plan := PlacementResourceModel{PlacementModel: NewPlacementModel(planned)}
-	prior := PlacementResourceModel{PlacementModel: NewPlacementModel(updateTestPlacement())}
-
-	got, diagnostics := updateThroughFakeAPIFrom(t, server.URL, plan, prior)
-	if diagnostics.HasError() {
-		t.Fatalf("placementUpdateAndWait() diagnostics = %v", diagnostics)
-	}
-
-	if len(api.updates) != 1 || !strings.Contains(string(api.updates[0]), `"type":"RollingUpdate"`) {
-		t.Errorf("updates = %s, want one update sending back the RollingUpdate read", api.updates)
-	}
-
-	if got.Spec.UpdateStrategy.Type != reservationapi.PlacementUpdateStrategyTypeV2RollingUpdate {
-		t.Errorf("final strategy = %s, want the RollingUpdate set outside Terraform", got.Spec.UpdateStrategy.Type)
-	}
-}
-
 func TestPlacementUpdateAndWaitSendsChangedStrategy(t *testing.T) {
 	api := &fakePlacementAPI{placement: updateTestPlacement()}
 
@@ -758,9 +725,8 @@ func TestPlacementUpdateAndWaitSendsChangedStrategy(t *testing.T) {
 		RollingUpdate: &reservationapi.PlacementRollingUpdateV2{MaxUnavailable: new("1")},
 	}
 	plan := PlacementResourceModel{PlacementModel: NewPlacementModel(planned)}
-	prior := PlacementResourceModel{PlacementModel: NewPlacementModel(updateTestPlacement())}
 
-	got, diagnostics := updateThroughFakeAPIFrom(t, server.URL, plan, prior)
+	got, diagnostics := updateThroughFakeAPIFrom(t, server.URL, plan)
 	if diagnostics.HasError() {
 		t.Fatalf("placementUpdateAndWait() diagnostics = %v", diagnostics)
 	}
