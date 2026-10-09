@@ -43,8 +43,6 @@ const (
 	planTestUpdatedImageID = "2f8a1d4e-6b3c-4f5a-9e0d-7c1b8a2f3d40"
 )
 
-// planTestPlacement is a placement as the API reads it back with only the
-// required fields set, so every optional computed attribute is null in state.
 func planTestPlacement() *reservationapi.PlacementV2Read {
 	return &reservationapi.PlacementV2Read{
 		Metadata: reservationapi.ProjectScopedResourceReadMetadata{
@@ -78,22 +76,11 @@ func planTestPlacement() *reservationapi.PlacementV2Read {
 	}
 }
 
-// planPlacement asks the provider to plan the change from prior to a
-// configuration that reads back as next, the way Terraform does: the proposed
-// state is the configuration with computed values carried over from prior
-// state, and the configuration leaves every computed-only attribute unset.
-// configure may unset more of the configuration. It returns the response and
-// the planned state.
-//
-// It goes through the provider server rather than calling plan modifiers one
-// by one, because whether a change replaces depends on the framework's own
-// planning: it marks unconfigured computed attributes unknown whenever
-// anything changes, before the plan modifiers run.
 func planPlacement(
 	t *testing.T,
 	prior *reservationapi.PlacementV2Read,
 	next *reservationapi.PlacementV2Read,
-	configure func(config, proposed *reservation.PlacementResourceModel),
+	unsetConfig func(config, proposed *reservation.PlacementResourceModel),
 ) (*tfprotov6.PlanResourceChangeResponse, reservation.PlacementResourceModel) {
 	t.Helper()
 
@@ -116,8 +103,6 @@ func planPlacement(
 	priorModel := placementResourceModel(prior)
 	proposedModel := placementResourceModel(next)
 
-	// Computed-only attributes are never configured; the proposed state
-	// carries their prior values.
 	configModel := proposedModel
 	configModel.ID = types.StringNull()
 	configModel.RegionID = types.StringNull()
@@ -137,8 +122,8 @@ func planPlacement(
 	proposedModel.CreationTime = priorModel.CreationTime
 	proposedModel.ProvisioningStatus = priorModel.ProvisioningStatus
 
-	if configure != nil {
-		configure(&configModel, &proposedModel)
+	if unsetConfig != nil {
+		unsetConfig(&configModel, &proposedModel)
 	}
 
 	proposedModel.UpdateStrategy, _ = proposeAttribute(
@@ -290,8 +275,6 @@ func nullValue(ctx context.Context, attributeType attr.Type) attr.Value {
 	return value
 }
 
-// plansNoChange reports whether the plan leaves the placement as it was, which
-// is how Terraform decides that there is nothing to do.
 func plansNoChange(
 	t *testing.T,
 	response *tfprotov6.PlanResourceChangeResponse,
@@ -317,7 +300,6 @@ func TestPlacementImageChangePlansInPlaceUpdate(t *testing.T) {
 		t.Errorf("RequiresReplace = %v, want none for an image change", response.RequiresReplace)
 	}
 
-	// The update returns a fresh read, so the counts cannot be known in advance.
 	if !planned.UpdatedHostCount.IsUnknown() {
 		t.Errorf("planned updated_host_count = %s, want unknown", planned.UpdatedHostCount)
 	}
@@ -339,8 +321,6 @@ func TestPlacementUpdateStrategyChangePlansInPlaceUpdate(t *testing.T) {
 	}
 }
 
-// An unconfigured update strategy keeps the one the API reports, so an image
-// change does not diff it.
 func TestPlacementUnconfiguredUpdateStrategyKeepsState(t *testing.T) {
 	prior := planTestPlacement()
 	prior.Spec.UpdateStrategy = &reservationapi.PlacementUpdateStrategyV2{
@@ -360,8 +340,6 @@ func TestPlacementUnconfiguredUpdateStrategyKeepsState(t *testing.T) {
 	}
 }
 
-// Once created, a placement whose configuration omits update_strategy plans
-// no change, whichever strategy the API holds.
 func TestPlacementUnconfiguredUpdateStrategyPlansNoChange(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -396,8 +374,6 @@ func TestPlacementUnconfiguredUpdateStrategyPlansNoChange(t *testing.T) {
 	}
 }
 
-// The API stores the image UUID canonicalised, so respelling it in
-// configuration is no change.
 func TestPlacementRespelledImagePlansNoChange(t *testing.T) {
 	next := planTestPlacement()
 	next.Spec.ServerSpec.ImageId = strings.ToUpper(planTestImageID)
@@ -446,9 +422,6 @@ func TestPlacementServerSpecChangesPlanReplacement(t *testing.T) {
 	}
 }
 
-// A configured value unknown at plan time leaves its whole object unknown, and
-// the framework does not run nested plan modifiers under an unknown object,
-// so the object itself must require replacement.
 func TestPlacementUnknownObjectsPlanReplacement(t *testing.T) {
 	unknownServerNetworking := types.ObjectValueMust(
 		reservation.PlacementServerSpecModelAttributeType.AttrTypes,
@@ -496,8 +469,6 @@ func TestPlacementUnknownObjectsPlanReplacement(t *testing.T) {
 	}
 }
 
-// The update endpoint ignores metadata, so a metadata change must replace
-// rather than plan an update that would never take effect.
 func TestPlacementMetadataChangesPlanReplacement(t *testing.T) {
 	testCases := []struct {
 		name   string

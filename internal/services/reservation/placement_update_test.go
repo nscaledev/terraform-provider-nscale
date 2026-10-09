@@ -39,9 +39,6 @@ const (
 	updateTestNewImageID = "2f8a1d4e-6b3c-4f5a-9e0d-7c1b8a2f3d40"
 )
 
-// updateTestPlacement is a placement as the API reads it back, with the
-// defaults the API materialises (readinessPolicy, updateStrategy) and
-// networking whose unset lists the API renders absent.
 func updateTestPlacement() *reservationapi.PlacementV2Read {
 	userData := []byte("#!/bin/sh\n")
 
@@ -86,11 +83,6 @@ func updateTestPlacement() *reservationapi.PlacementV2Read {
 	}
 }
 
-// The API rejects an update whose spec differs from its own rendering of the
-// stored spec in anything but the image and update strategy. The model holds
-// unset networking lists as known empty lists, so a body built from the model
-// would send [] where the API renders the lists absent; the body must instead
-// carry the read's spec untouched.
 func TestNscalePlacementUpdateParamsKeepsReadSpec(t *testing.T) {
 	current := updateTestPlacement()
 
@@ -132,8 +124,6 @@ func TestNscalePlacementUpdateParamsKeepsReadSpec(t *testing.T) {
 	}
 }
 
-// A configured update strategy replaces the stored one whole; an absent one
-// sends back the one read.
 func TestNscalePlacementUpdateParamsUpdateStrategy(t *testing.T) {
 	rolling := &reservationapi.PlacementUpdateStrategyV2{
 		Type: reservationapi.PlacementUpdateStrategyTypeV2RollingUpdate,
@@ -372,8 +362,6 @@ func setPlacementFailureGrace(t *testing.T, grace time.Duration) {
 	t.Cleanup(func() { placementFailureGrace = restore })
 }
 
-// reads returns a get function serving the given reads in order, repeating
-// the last once they run out.
 func reads(
 	placements ...*reservationapi.PlacementV2Read,
 ) func(context.Context) (*reservationapi.PlacementV2Read, error) {
@@ -405,8 +393,6 @@ func erroredBeforeObserved() *reservationapi.PlacementV2Read {
 	return placement
 }
 
-// A placement already in error before the update keeps reading error until
-// the service observes the new spec, which must not fail the apply.
 func TestWaitForPlacementUpdateRidesOutTransientFailure(t *testing.T) {
 	setPlacementFailureGrace(t, time.Hour)
 
@@ -427,8 +413,6 @@ func TestWaitForPlacementUpdateRidesOutTransientFailure(t *testing.T) {
 	}
 }
 
-// serverErrorThen returns a get function that fails its first n reads with a
-// 503, then serves placement.
 func serverErrorThen(
 	n int,
 	placement *reservationapi.PlacementV2Read,
@@ -460,8 +444,6 @@ func TestWaitForPlacementUpdateRidesOutServerError(t *testing.T) {
 	}
 }
 
-// 5xx reads within the grace keep the update pending, so the wait ends on its
-// timeout rather than reading them as the placement gone.
 func TestWaitForPlacementUpdateKeepsPendingThroughServerErrors(t *testing.T) {
 	setPlacementFailureGrace(t, time.Hour)
 
@@ -508,20 +490,14 @@ func TestWaitForPlacementUpdateFailsPersistentFailure(t *testing.T) {
 	}
 }
 
-// fakePlacementAPI serves one placement the way the reservation API does: an
-// update stores the image and leaves status unobserved until the next read.
 type fakePlacementAPI struct {
 	mu        sync.Mutex
 	placement *reservationapi.PlacementV2Read
 	updates   []json.RawMessage
 	reads     int
 
-	// conflicts is how many updates to answer with 409, as the service does
-	// when another writer lands between an update's read and write.
-	conflicts int
+	conflictsLeft int
 
-	// reject answers every update with 400, as the service does for a change
-	// to an immutable field.
 	reject bool
 }
 
@@ -547,8 +523,8 @@ func (f *fakePlacementAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		f.updates = append(f.updates, body)
 
-		if f.conflicts > 0 {
-			f.conflicts--
+		if f.conflictsLeft > 0 {
+			f.conflictsLeft--
 
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
@@ -582,8 +558,6 @@ func (f *fakePlacementAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(f.placement)
 }
 
-// updateThroughFakeAPI runs placementUpdateAndWait against api, planning the
-// test placement with imageID.
 func updateThroughFakeAPI(
 	t *testing.T,
 	api *fakePlacementAPI,
@@ -602,8 +576,6 @@ func updateThroughFakeAPI(
 	return updateThroughFakeAPIFrom(t, server.URL, plan, prior)
 }
 
-// updateThroughFakeAPIFrom runs placementUpdateAndWait against the fake API at
-// url with the given plan and prior state.
 func updateThroughFakeAPIFrom(
 	t *testing.T,
 	url string,
@@ -627,8 +599,6 @@ func updateThroughFakeAPIFrom(
 	)
 }
 
-// The update reads the placement, sends its spec back with only the image
-// changed, and waits for the service to observe it.
 func TestPlacementUpdateAndWait(t *testing.T) {
 	api := &fakePlacementAPI{placement: updateTestPlacement()}
 
@@ -666,10 +636,8 @@ func TestPlacementUpdateAndWait(t *testing.T) {
 	}
 }
 
-// A conflict means the placement changed between the update's read and write;
-// the update repeats from a fresh read.
 func TestPlacementUpdateAndWaitRetriesConflict(t *testing.T) {
-	api := &fakePlacementAPI{placement: updateTestPlacement(), conflicts: 1}
+	api := &fakePlacementAPI{placement: updateTestPlacement(), conflictsLeft: 1}
 
 	got, diagnostics := updateThroughFakeAPI(t, api, updateTestNewImageID)
 	if diagnostics.HasError() {
@@ -684,14 +652,13 @@ func TestPlacementUpdateAndWaitRetriesConflict(t *testing.T) {
 		t.Errorf("updates sent = %d, want 2", len(api.updates))
 	}
 
-	// One read before each update, then at least one while waiting.
-	if api.reads < 3 {
-		t.Errorf("reads = %d, want a fresh read before the retried update", api.reads)
+	if wantReads := len(api.updates) + 1; api.reads < wantReads {
+		t.Errorf("reads = %d, want at least %d: one before each update, then the wait", api.reads, wantReads)
 	}
 }
 
 func TestPlacementUpdateAndWaitGivesUpOnRepeatedConflicts(t *testing.T) {
-	api := &fakePlacementAPI{placement: updateTestPlacement(), conflicts: placementUpdateAttempts}
+	api := &fakePlacementAPI{placement: updateTestPlacement(), conflictsLeft: placementUpdateAttempts}
 
 	_, diagnostics := updateThroughFakeAPI(t, api, updateTestNewImageID)
 	if !diagnostics.HasError() {
@@ -707,7 +674,6 @@ func TestPlacementUpdateAndWaitGivesUpOnRepeatedConflicts(t *testing.T) {
 	}
 }
 
-// Only a conflict is worth repeating; any other rejection stands.
 func TestPlacementUpdateAndWaitDoesNotRetryRejection(t *testing.T) {
 	api := &fakePlacementAPI{placement: updateTestPlacement(), reject: true}
 
@@ -725,8 +691,6 @@ func TestPlacementUpdateAndWaitDoesNotRetryRejection(t *testing.T) {
 	}
 }
 
-// A plan that changes nothing the API stores, such as only timeouts or the
-// spelling of the image UUID, sends no update and does not wait.
 func TestPlacementUpdateAndWaitSkipsUnchangedSpec(t *testing.T) {
 	for _, imageID := range []string{updateTestImageID, strings.ToUpper(updateTestImageID)} {
 		t.Run(imageID, func(t *testing.T) {
@@ -752,8 +716,6 @@ func TestPlacementUpdateAndWaitSkipsUnchangedSpec(t *testing.T) {
 	}
 }
 
-// A strategy changed outside Terraform after the plan survives an apply that
-// leaves update_strategy as planned.
 func TestPlacementUpdateAndWaitKeepsStrategyChangedOutsideTerraform(t *testing.T) {
 	stored := updateTestPlacement()
 	stored.Spec.UpdateStrategy = &reservationapi.PlacementUpdateStrategyV2{

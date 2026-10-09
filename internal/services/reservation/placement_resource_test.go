@@ -60,7 +60,6 @@ func TestAccPlacementResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("nscale_placement.test", "provisioning_status"),
 					resource.TestCheckResourceAttrSet("nscale_placement.test", "creation_time"),
 				),
-				// update_strategy is unconfigured, so the API's default must not diff.
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PostApplyPostRefresh: []plancheck.PlanCheck{
 						plancheck.ExpectEmptyPlan(),
@@ -72,7 +71,6 @@ func TestAccPlacementResource_basic(t *testing.T) {
 				Config:   testAccPlacementResourceConfig(name, accelerator, unit, imageID),
 				PlanOnly: true,
 			},
-			// The API stores the image UUID canonicalised; another spelling of it is no change.
 			{
 				Config:   testAccPlacementResourceConfig(name, accelerator, unit, strings.ToUpper(imageID)),
 				PlanOnly: true,
@@ -88,8 +86,6 @@ func TestAccPlacementResource_basic(t *testing.T) {
 	})
 }
 
-// TestAccPlacementResource_updateImage changes the image of a live placement and
-// checks it is updated in place rather than replaced.
 func TestAccPlacementResource_updateImage(t *testing.T) {
 	name := acctest.RandomWithPrefix("tf-acc-test")
 	accelerator := os.Getenv("NSCALE_TEST_RESERVATION_ACCELERATOR")

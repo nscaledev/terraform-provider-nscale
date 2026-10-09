@@ -38,9 +38,6 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 )
 
-// The API stores the instance's identifiers canonicalised, so respelling them
-// in configuration is no change: neither an update nor, for the SSH
-// certificate authority, a replacement.
 func TestInstanceRespelledUUIDsPlanNoChange(t *testing.T) {
 	ctx := context.Background()
 

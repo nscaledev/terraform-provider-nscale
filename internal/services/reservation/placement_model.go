@@ -102,8 +102,6 @@ type PlacementServerSpecModel struct {
 	Networking                types.Object   `tfsdk:"networking"`
 }
 
-// PlacementRollingUpdateModelAttributeType describes the rolling_update
-// sub-object nested inside update_strategy.
 var PlacementRollingUpdateModelAttributeType = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
 		"max_unavailable": types.StringType,
@@ -114,8 +112,6 @@ type PlacementRollingUpdateModel struct {
 	MaxUnavailable types.String `tfsdk:"max_unavailable"`
 }
 
-// PlacementUpdateStrategyModelAttributeType describes the update_strategy
-// sub-object.
 var PlacementUpdateStrategyModelAttributeType = types.ObjectType{
 	AttrTypes: map[string]attr.Type{
 		"type":           types.StringType,
@@ -331,7 +327,6 @@ func (m *PlacementModel) NscalePlacementUpdateParams(
 	spec := current.Spec
 	spec.ServerSpec.ImageId = serverSpec.ImageID.ValueString()
 
-	// An absent strategy sends back the one just read.
 	if updateStrategy != nil {
 		spec.UpdateStrategy = updateStrategy
 	}
@@ -402,8 +397,6 @@ func (m *PlacementModel) serverSpec(ctx context.Context) (reservationapi.Placeme
 	}, nil
 }
 
-// updateStrategy returns the configured update strategy, or nil when it is
-// unset so the API keeps its own: Manual on create, the stored one on update.
 func (m *PlacementModel) updateStrategy(
 	ctx context.Context,
 ) (*reservationapi.PlacementUpdateStrategyV2, diag.Diagnostics) {

@@ -96,12 +96,10 @@ func NewValue(s string) Value {
 	return Value{StringValue: basetypes.NewStringValue(s)}
 }
 
-// NewNull returns a null value.
 func NewNull() Value {
 	return Value{StringValue: basetypes.NewStringNull()}
 }
 
-// NewUnknown returns an unknown value.
 func NewUnknown() Value {
 	return Value{StringValue: basetypes.NewStringUnknown()}
 }

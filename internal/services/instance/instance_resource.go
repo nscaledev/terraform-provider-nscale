@@ -89,8 +89,6 @@ func instanceAdapter() nscale.ResourceAdapter[InstanceResourceModel, computeapi.
 	}
 }
 
-// ModifyPlan plans no change when the configuration names the stored UUIDs in
-// another spelling.
 func (r *InstanceResource) ModifyPlan(
 	ctx context.Context,
 	request resource.ModifyPlanRequest,

@@ -31,9 +31,7 @@ import (
 // any plan modifier runs, and on a difference marks every computed attribute
 // the configuration leaves null unknown. A plan modifier that settles on the
 // prior value, such as for a respelled UUID, therefore still plans an update
-// of those attributes. When putting them back to their prior values leaves the
-// plan equal to prior state, the plan becomes prior state; otherwise it is
-// left as it is.
+// of those attributes.
 func KeepStateWhenUnchanged(
 	_ context.Context,
 	request resource.ModifyPlanRequest,

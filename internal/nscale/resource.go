@@ -58,9 +58,9 @@ type ResourceAdapter[TFModel any, APIRead any] struct {
 
 	// UpdateAndWait replaces Update, which must then be nil, and the
 	// operation-tag watcher for a resource whose update endpoint does not
-	// store tags, so the watcher could never see the write land. It issues the update, waits within timeout for
-	// it to take effect, and returns the final read. prior is the state the
-	// plan was made from.
+	// store tags, so the watcher could never see the write land. It issues
+	// the update, waits within timeout for it to take effect, and returns the
+	// final read. prior is the state the plan was made from.
 	UpdateAndWait func(
 		ctx context.Context,
 		client *Client,
@@ -282,7 +282,6 @@ func (r *GenericResource[TFModel, APIRead]) Update(
 	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }
 
-// updateTimeoutDefault is the update timeout when the configuration sets none.
 func (a ResourceAdapter[TFModel, APIRead]) updateTimeoutDefault() time.Duration {
 	if a.DefaultUpdateTimeout > 0 {
 		return a.DefaultUpdateTimeout

@@ -27,9 +27,6 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 )
 
-// The API canonicalises server_spec.image_id on create, so it must carry the
-// UUID type for a differently spelled configuration to survive apply. The model
-// is shared with the data source, so both schemas must agree.
 func TestPlacementImageIDUsesUUIDType(t *testing.T) {
 	ctx := context.Background()
 	imageIDPath := path.Root("server_spec").AtName("image_id")

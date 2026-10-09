@@ -27,10 +27,6 @@ import (
 	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 )
 
-// The API returns these identifiers in canonical form, so each must carry the
-// UUID type for a differently spelled configuration to survive apply. The model
-// shares its field types between the resource and the data source, so both
-// schemas must agree or reads fail with a value conversion error.
 func TestInstanceUUIDAttributesUseUUIDType(t *testing.T) {
 	ctx := context.Background()
 

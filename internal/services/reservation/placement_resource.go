@@ -84,12 +84,10 @@ func NewPlacementResource() resource.Resource {
 
 func placementAdapter() nscale.ResourceAdapter[PlacementResourceModel, reservationapi.PlacementV2Read] {
 	return nscale.ResourceAdapter[PlacementResourceModel, reservationapi.PlacementV2Read]{
-		TypeNameSuffix: "_placement",
-		Title:          "Placement",
-		Name:           "placement",
-		Create:         placementCreate,
-		// The update endpoint ignores tags, so the operation-tag watcher behind
-		// Update cannot be used.
+		TypeNameSuffix:       "_placement",
+		Title:                "Placement",
+		Name:                 "placement",
+		Create:               placementCreate,
 		Update:               nil,
 		UpdateAndWait:        placementUpdateAndWait,
 		DefaultUpdateTimeout: defaultPlacementUpdateTimeout,
@@ -109,8 +107,6 @@ func placementAdapter() nscale.ResourceAdapter[PlacementResourceModel, reservati
 	}
 }
 
-// ModifyPlan plans no change when nothing configured changes, as when the
-// configuration respells the image UUID or leaves update_strategy unset.
 func (r *PlacementResource) ModifyPlan(
 	ctx context.Context,
 	request resource.ModifyPlanRequest,
@@ -249,7 +245,6 @@ func (r *PlacementResource) Schema(
 			"server_spec": schema.SingleNestedAttribute{
 				MarkdownDescription: "Region server options applied to each pinned server. Changing `image_id` updates the placement in place; changing anything else forces a new placement to be created.",
 				Required:            true,
-				// Replaced per attribute, as for constraints.
 				PlanModifiers: []planmodifier.Object{
 					requiresReplaceIfUnknown(),
 				},
@@ -424,10 +419,6 @@ func requiresReplaceIfUnknown() planmodifier.Object {
 	)
 }
 
-// requiresReplaceIfPresenceChanges replaces the placement when an optional
-// object is added, removed or wholly unknown. Changes within it are left to
-// its attributes' own plan modifiers, which see their values after
-// UseStateForUnknown.
 func requiresReplaceIfPresenceChanges() planmodifier.Object {
 	return objectplanmodifier.RequiresReplaceIf(
 		func(
@@ -446,8 +437,7 @@ func requiresReplaceIfPresenceChanges() planmodifier.Object {
 // ValidateConfig surfaces constraint/policy mismatches at plan time rather than
 // letting them fail as an API 400 at apply. The spread-only fields (max_skew,
 // min_domains, when_unsatisfiable) are meaningful only when policy is "spread",
-// and min_domains cannot exceed host_count. A RollingUpdate strategy must set
-// its budget.
+// and min_domains cannot exceed host_count.
 func (r *PlacementResource) ValidateConfig(
 	ctx context.Context,
 	request resource.ValidateConfigRequest,
@@ -520,9 +510,6 @@ func validatePlacementConstraints(
 	return diagnostics
 }
 
-// validatePlacementUpdateStrategy requires a RollingUpdate strategy to set
-// rolling_update.max_unavailable, so the service's own default never applies.
-// Unknown values are deferred to apply-time validation.
 func validatePlacementUpdateStrategy(ctx context.Context, updateStrategy types.Object) diag.Diagnostics {
 	if !isKnownSet(updateStrategy) {
 		return nil

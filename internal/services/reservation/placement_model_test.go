@@ -681,8 +681,6 @@ func TestNewPlacementModelUpdateStrategy(t *testing.T) {
 	}
 }
 
-// An update strategy left unset in configuration is unknown at create, and
-// must be omitted so the API applies its default.
 func TestPlacementUpdateStrategyUnknownIsOmitted(t *testing.T) {
 	model := PlacementModel{
 		UpdateStrategy: types.ObjectUnknown(PlacementUpdateStrategyModelAttributeType.AttrTypes),

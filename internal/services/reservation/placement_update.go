@@ -39,8 +39,7 @@ import (
 // Region rejects a rebuild, transport errors and 5xx included, and retries the
 // rebuild shortly after; a placement already in error before the update keeps
 // reading error until the service observes the new spec; and the read itself
-// can meet a passing 5xx. None should fail the apply. A variable so tests can
-// shorten it.
+// can meet a passing 5xx. None should fail the apply.
 //
 //nolint:gochecknoglobals // tests wind it down, as nkswait does.
 var placementFailureGrace = 5 * time.Minute
@@ -56,22 +55,8 @@ var (
 	errPlacementUpdateStrategyUnknown = errors.New("unknown update strategy")
 )
 
-// placementUpdateAttempts bounds the read-modify-writes an update makes when
-// the service reports a conflict: another writer changed the placement between
-// its read and write, and the service asks the caller to repeat from a fresh
-// read.
 const placementUpdateAttempts = 3
 
-// placementUpdateAndWait changes a placement's image in place and waits for
-// the change to take effect.
-//
-// The update endpoint ignores metadata, so the shared operation-tag watcher
-// would never see the write land; the wait reads the placement's own
-// convergence status instead.
-//
-// The update strategy comes from the plan only when the plan changes it from
-// prior; otherwise the one just read is sent back, so a strategy changed
-// outside Terraform since the plan is not written back over.
 func placementUpdateAndWait(
 	ctx context.Context,
 	client *nscale.Client,
@@ -109,8 +94,6 @@ func placementUpdateAndWait(
 		return nil, diagnostics
 	}
 
-	// Nothing the API stores changed, as when only timeouts or the spelling of
-	// the image UUID did, so there is nothing to wait for.
 	if !sent {
 		return current, diagnostics
 	}
@@ -125,9 +108,6 @@ func placementUpdateAndWait(
 	)
 }
 
-// updatePlacement makes one read-modify-write of the placement's spec. It
-// returns the placement as the update left it, and whether it sent an update:
-// it does not when the planned spec matches the read.
 func updatePlacement(
 	ctx context.Context,
 	client *nscale.Client,
@@ -162,9 +142,6 @@ func updatePlacement(
 	return updated, true, nil
 }
 
-// placementSpecUnchanged reports whether requested asks for the spec the API
-// already holds, treating two spellings of one image UUID as the same image,
-// since the API stores it canonicalised.
 func placementSpecUnchanged(current, requested reservationapi.PlacementV2Spec) bool {
 	currentImage, currentErr := uuid.Parse(current.ServerSpec.ImageId)
 	requestedImage, requestedErr := uuid.Parse(requested.ServerSpec.ImageId)
@@ -176,10 +153,8 @@ func placementSpecUnchanged(current, requested reservationapi.PlacementV2Spec) b
 	return reflect.DeepEqual(current, requested)
 }
 
-// waitForPlacementUpdate polls until placementUpdateProgress reports the
-// update done, or a failure, reported or a 5xx read, outlasts
-// placementFailureGrace. A 5xx read reports the last good read as pending,
-// never nil: the watcher gives up on a run of nil results inside the grace.
+// A 5xx read reports the last good read as pending, never nil: the watcher
+// gives up on a run of nil results inside the grace.
 func waitForPlacementUpdate(
 	ctx context.Context,
 	timeout time.Duration,
@@ -252,9 +227,6 @@ func waitForPlacementUpdate(
 	return placement, diagnostics
 }
 
-// placementUpdateProgress reports whether one read shows the update done. The
-// counts describe the old spec until statusCurrent, and can read all zero
-// after it, so provisioned is checked too.
 func placementUpdateProgress(placement *reservationapi.PlacementV2Read) (bool, error) {
 	status := placement.Status
 
@@ -299,8 +271,6 @@ func rollingUpdateProgress(placement *reservationapi.PlacementV2Read, provisione
 	return converged, nil
 }
 
-// placementUpdateStrategyType returns the strategy's type, applying the API's
-// default of Manual when it is absent.
 func placementUpdateStrategyType(
 	strategy *reservationapi.PlacementUpdateStrategyV2,
 ) reservationapi.PlacementUpdateStrategyTypeV2 {
