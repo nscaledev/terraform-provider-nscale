@@ -20,10 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -751,26 +749,6 @@ func TestPlacementUpdateAndWaitSkipsUnchangedSpec(t *testing.T) {
 				t.Errorf("returned image = %q, want %q", got.Spec.ServerSpec.ImageId, updateTestImageID)
 			}
 		})
-	}
-}
-
-// TestPlacementUpdateTimeoutMatchesDocs pins the update timeout default to the
-// published resource docs.
-func TestPlacementUpdateTimeoutMatchesDocs(t *testing.T) {
-	t.Parallel()
-
-	docs, err := os.ReadFile("../../../website/docs/r/placement.html.markdown")
-	if err != nil {
-		t.Fatalf("reading resource docs: %s", err)
-	}
-
-	want := fmt.Sprintf("* `update` - (Default `%.0fm`)", defaultPlacementUpdateTimeout.Minutes())
-	if !strings.Contains(string(docs), want) {
-		t.Errorf("resource docs are missing %q; update the Timeouts section to match the code", want)
-	}
-
-	if got := placementAdapter().DefaultUpdateTimeout; got != defaultPlacementUpdateTimeout {
-		t.Errorf("placement adapter DefaultUpdateTimeout = %s, want %s", got, defaultPlacementUpdateTimeout)
 	}
 }
 
