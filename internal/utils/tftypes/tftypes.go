@@ -21,7 +21,6 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -70,25 +69,6 @@ func ValueBase64BytesPointer(value basetypes.StringValue, attributeName string) 
 	}
 
 	return &decoded, nil
-}
-
-// UUIDStringValue renders a UUID-typed API field as the string held in state.
-//
-// The canonical specs type resource identifiers as UUIDs, while Terraform
-// carries every identifier as a string, so reads convert on the way in and
-// nscale.ParseID converts on the way out.
-func UUIDStringValue(id uuid.UUID) basetypes.StringValue {
-	return types.StringValue(id.String())
-}
-
-// UUIDStringPointerValue is UUIDStringValue for an optional field, mapping an
-// absent identifier to null rather than to the zero UUID.
-func UUIDStringPointerValue(id *uuid.UUID) basetypes.StringValue {
-	if id == nil {
-		return types.StringNull()
-	}
-
-	return types.StringValue(id.String())
 }
 
 func NullableListValueMust(elementType attr.Type, elements []attr.Value) basetypes.ListValue {

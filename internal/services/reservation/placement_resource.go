@@ -19,6 +19,8 @@ package reservation
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"time"
 
 	tftimeouts "github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -42,13 +44,20 @@ import (
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 )
+
+// maxUnavailablePattern matches the API's count or percentage form of
+// rolling_update.max_unavailable. Zero is rejected by the API, and a leading
+// zero would read back in a different spelling.
+var maxUnavailablePattern = regexp.MustCompile(`^[1-9][0-9]*%?$`)
 
 var (
 	_ resource.Resource                   = &PlacementResource{}
 	_ resource.ResourceWithConfigure      = &PlacementResource{}
 	_ resource.ResourceWithImportState    = &PlacementResource{}
+	_ resource.ResourceWithModifyPlan     = &PlacementResource{}
 	_ resource.ResourceWithValidateConfig = &PlacementResource{}
 )
 
@@ -58,12 +67,14 @@ type PlacementResourceModel struct {
 	Timeouts tftimeouts.Value `tfsdk:"timeouts"`
 }
 
-// PlacementResource embeds the generic CRUD base. Placements are immutable (no
-// update endpoint), so the adapter's Update is nil and every configurable
-// attribute is marked for replacement.
+// PlacementResource embeds the generic CRUD base. Only server_spec.image_id and
+// update_strategy can change in place; every other configurable attribute is
+// marked for replacement, as the API rejects any other change.
 type PlacementResource struct {
 	*nscale.GenericResource[PlacementResourceModel, reservationapi.PlacementV2Read]
 }
+
+const defaultPlacementUpdateTimeout = time.Hour
 
 func NewPlacementResource() resource.Resource {
 	return &PlacementResource{
@@ -73,13 +84,14 @@ func NewPlacementResource() resource.Resource {
 
 func placementAdapter() nscale.ResourceAdapter[PlacementResourceModel, reservationapi.PlacementV2Read] {
 	return nscale.ResourceAdapter[PlacementResourceModel, reservationapi.PlacementV2Read]{
-		TypeNameSuffix: "_placement",
-		Title:          "Placement",
-		Name:           "placement",
-		Create:         placementCreate,
-		// Update is intentionally nil: placements are immutable.
-		Update: nil,
-		Delete: placementDelete,
+		TypeNameSuffix:       "_placement",
+		Title:                "Placement",
+		Name:                 "placement",
+		Create:               placementCreate,
+		Update:               nil,
+		UpdateAndWait:        placementUpdateAndWait,
+		DefaultUpdateTimeout: defaultPlacementUpdateTimeout,
+		Delete:               placementDelete,
 		Get: func(
 			ctx context.Context,
 			client *nscale.Client,
@@ -93,6 +105,14 @@ func placementAdapter() nscale.ResourceAdapter[PlacementResourceModel, reservati
 		IDFromModel:       func(m PlacementResourceModel) string { return m.ID.ValueString() },
 		TimeoutsFromModel: func(m PlacementResourceModel) tftimeouts.Value { return m.Timeouts },
 	}
+}
+
+func (r *PlacementResource) ModifyPlan(
+	ctx context.Context,
+	request resource.ModifyPlanRequest,
+	response *resource.ModifyPlanResponse,
+) {
+	nscale.KeepStateWhenUnchanged(ctx, request, response)
 }
 
 func (r *PlacementResource) Schema(
@@ -123,8 +143,10 @@ func (r *PlacementResource) Schema(
 			"description": schema.StringAttribute{
 				MarkdownDescription: "The description of the placement. Changing this forces a new placement to be created.",
 				Optional:            true,
+				// Removing a configured description must replace too: the update
+				// endpoint ignores metadata, so it cannot clear one.
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplaceIfConfigured(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"tags": schema.MapAttribute{
@@ -166,8 +188,10 @@ func (r *PlacementResource) Schema(
 			"constraints": schema.SingleNestedAttribute{
 				MarkdownDescription: "The scheduling policy applied when selecting hosts from the reservation. Changing this forces a new placement to be created.",
 				Required:            true,
+				// Replaced per attribute: an object holding an unknown never
+				// equals its prior state.
 				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.RequiresReplace(),
+					requiresReplaceIfUnknown(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"policy": schema.StringAttribute{
@@ -175,6 +199,9 @@ func (r *PlacementResource) Schema(
 						Required:            true,
 						Validators: []validator.String{
 							stringvalidator.OneOf("pack", "spread"),
+						},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
 						},
 					},
 					"max_skew": schema.Int64Attribute{
@@ -216,30 +243,43 @@ func (r *PlacementResource) Schema(
 				},
 			},
 			"server_spec": schema.SingleNestedAttribute{
-				MarkdownDescription: "Region server options applied to each pinned server. Changing this forces a new placement to be created.",
+				MarkdownDescription: "Region server options applied to each pinned server. Changing `image_id` updates the placement in place; changing anything else forces a new placement to be created.",
 				Required:            true,
 				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.RequiresReplace(),
+					requiresReplaceIfUnknown(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"image_id": schema.StringAttribute{
-						MarkdownDescription: "The image to use for each pinned server.",
+						MarkdownDescription: "The image to use for each pinned server. Changing this updates the placement in place: it marks the servers drifted, and they converge onto the new image according to the placement's update strategy. Under the default `Manual` strategy they stay on their current image until each is reconciled explicitly.",
+						CustomType:          uuidtype.Type{},
 						Required:            true,
+						PlanModifiers: []planmodifier.String{
+							uuidtype.UseStateForSameUUID(),
+						},
 					},
 					"ssh_certificate_authority_id": schema.StringAttribute{
-						MarkdownDescription: "The SSH certificate authority ID.",
+						MarkdownDescription: "The SSH certificate authority ID. Changing this forces a new placement to be created.",
 						Optional:            true,
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"user_data": schema.StringAttribute{
-						MarkdownDescription: "Base64-encoded configuration information or scripts to use upon launch.",
+						MarkdownDescription: "Base64-encoded configuration information or scripts to use upon launch. Changing this forces a new placement to be created.",
 						Optional:            true,
 						Validators: []validator.String{
 							validators.Base64Validator{},
 						},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.RequiresReplace(),
+						},
 					},
 					"networking": schema.SingleNestedAttribute{
-						MarkdownDescription: "Region server networking options applied to each pinned server.",
+						MarkdownDescription: "Region server networking options applied to each pinned server. Changing this forces a new placement to be created.",
 						Optional:            true,
+						PlanModifiers: []planmodifier.Object{
+							requiresReplaceIfPresenceChanges(),
+						},
 						Attributes: map[string]schema.Attribute{
 							"enable_public_ip": schema.BoolAttribute{
 								MarkdownDescription: "Whether or not to provision a public IP for each server.",
@@ -274,6 +314,42 @@ func (r *PlacementResource) Schema(
 					},
 				},
 			},
+			"update_strategy": schema.SingleNestedAttribute{
+				MarkdownDescription: "How the placement's servers converge onto a new `server_spec.image_id`. The API defaults it to `Manual`. Changing this updates the placement in place; setting `RollingUpdate` on a placement whose servers are already drifted starts converging them. Removing it keeps the current strategy: set `type` to `Manual` to switch back.",
+				Optional:            true,
+				Computed:            true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
+				Attributes: map[string]schema.Attribute{
+					"type": schema.StringAttribute{
+						MarkdownDescription: "`Manual` leaves each server on its current image until it is reconciled explicitly. `RollingUpdate` converges drifted servers automatically, at most `rolling_update.max_unavailable` at a time.",
+						Required:            true,
+						Validators: []validator.String{
+							stringvalidator.OneOf(
+								string(reservationapi.PlacementUpdateStrategyTypeV2Manual),
+								string(reservationapi.PlacementUpdateStrategyTypeV2RollingUpdate),
+							),
+						},
+					},
+					"rolling_update": schema.SingleNestedAttribute{
+						MarkdownDescription: "Tuning for the `RollingUpdate` strategy.",
+						Optional:            true,
+						Attributes: map[string]schema.Attribute{
+							"max_unavailable": schema.StringAttribute{
+								MarkdownDescription: "The number of servers that may converge at once, as a count (`\"1\"`) or a percentage of `host_count` (`\"25%\"`, rounded up). Must resolve to at least one server, and the service caps it. Required when `type` is `RollingUpdate`.",
+								Optional:            true,
+								Validators: []validator.String{
+									stringvalidator.RegexMatches(
+										maxUnavailablePattern,
+										"must be a count such as \"1\" or a percentage such as \"25%\"",
+									),
+								},
+							},
+						},
+					},
+				},
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region the placement belongs to.",
 				Computed:            true,
@@ -283,6 +359,14 @@ func (r *PlacementResource) Schema(
 			},
 			"ready_host_count": schema.Int64Attribute{
 				MarkdownDescription: "The number of hosts whose Region server resources are ready.",
+				Computed:            true,
+			},
+			"updated_host_count": schema.Int64Attribute{
+				MarkdownDescription: "The number of servers running `server_spec.image_id` and provisioned.",
+				Computed:            true,
+			},
+			"drifted_host_count": schema.Int64Attribute{
+				MarkdownDescription: "The number of servers not yet running `server_spec.image_id`, including servers still re-provisioning onto it.",
 				Computed:            true,
 			},
 			"project_id": schema.StringAttribute{
@@ -302,18 +386,49 @@ func (r *PlacementResource) Schema(
 			"provisioning_status": schema.StringAttribute{
 				MarkdownDescription: "The provisioning status of the placement.",
 				Computed:            true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 		},
 		Blocks: map[string]schema.Block{
 			"timeouts": tftimeouts.Block(ctx, tftimeouts.Opts{
 				Create: true,
+				Update: true,
 				Delete: true,
 			}),
 		},
 	}
+}
+
+// requiresReplaceIfUnknown replaces the placement when an object is wholly
+// unknown at plan time. The framework does not run the plan modifiers of an
+// unknown object's attributes, so they cannot decide; the object might change
+// in any of them.
+func requiresReplaceIfUnknown() planmodifier.Object {
+	return objectplanmodifier.RequiresReplaceIf(
+		func(
+			_ context.Context,
+			request planmodifier.ObjectRequest,
+			response *objectplanmodifier.RequiresReplaceIfFuncResponse,
+		) {
+			response.RequiresReplace = request.PlanValue.IsUnknown()
+		},
+		"Changing this forces a new placement to be created.",
+		"Changing this forces a new placement to be created.",
+	)
+}
+
+func requiresReplaceIfPresenceChanges() planmodifier.Object {
+	return objectplanmodifier.RequiresReplaceIf(
+		func(
+			_ context.Context,
+			request planmodifier.ObjectRequest,
+			response *objectplanmodifier.RequiresReplaceIfFuncResponse,
+		) {
+			response.RequiresReplace = request.PlanValue.IsUnknown() ||
+				request.StateValue.IsNull() != request.PlanValue.IsNull()
+		},
+		"Adding or removing this forces a new placement to be created.",
+		"Adding or removing this forces a new placement to be created.",
+	)
 }
 
 // ValidateConfig surfaces constraint/policy mismatches at plan time rather than
@@ -330,6 +445,8 @@ func (r *PlacementResource) ValidateConfig(
 	if response.Diagnostics.HasError() {
 		return
 	}
+
+	response.Diagnostics.Append(validatePlacementUpdateStrategy(ctx, model.UpdateStrategy)...)
 
 	if model.Constraints.IsNull() || model.Constraints.IsUnknown() {
 		return
@@ -386,6 +503,40 @@ func validatePlacementConstraints(
 			),
 		)
 	}
+
+	return diagnostics
+}
+
+func validatePlacementUpdateStrategy(ctx context.Context, updateStrategy types.Object) diag.Diagnostics {
+	if !isKnownSet(updateStrategy) {
+		return nil
+	}
+
+	var strategy PlacementUpdateStrategyModel
+	diagnostics := updateStrategy.As(ctx, &strategy, basetypes.ObjectAsOptions{})
+	if diagnostics.HasError() {
+		return diagnostics
+	}
+
+	if strategy.Type.ValueString() != string(reservationapi.PlacementUpdateStrategyTypeV2RollingUpdate) ||
+		strategy.RollingUpdate.IsUnknown() {
+		return diagnostics
+	}
+
+	if !strategy.RollingUpdate.IsNull() {
+		var rollingUpdate PlacementRollingUpdateModel
+		diagnostics.Append(strategy.RollingUpdate.As(ctx, &rollingUpdate, basetypes.ObjectAsOptions{})...)
+
+		if diagnostics.HasError() || !rollingUpdate.MaxUnavailable.IsNull() {
+			return diagnostics
+		}
+	}
+
+	diagnostics.AddAttributeError(
+		path.Root("update_strategy").AtName("rolling_update").AtName("max_unavailable"),
+		"Missing Rolling Update Budget",
+		`update_strategy of type RollingUpdate requires rolling_update.max_unavailable, e.g. "1" or "25%"`,
+	)
 
 	return diagnostics
 }

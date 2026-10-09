@@ -12,8 +12,9 @@ each selected host. A placement consumes capacity from a reservation; the `netwo
 partition boundary, so all hosts in a placement share a single partition key.
 
 The `constraints` block controls how hosts are selected from the reservation (`pack` for locality, `spread` for even
-distribution across domains). The `server_spec` block configures the Region server created for each host. Placements are
-immutable: every configurable argument forces a new placement to be created.
+distribution across domains). The `server_spec` block configures the Region server created for each host. The
+`update_strategy` block controls how servers converge onto a new image. Only `server_spec.image_id` and `update_strategy`
+can change in place; every other argument forces a new placement to be created.
 
 ## Example Usage
 
@@ -64,6 +65,14 @@ resource "nscale_placement" "workers" {
       security_group_ids = [nscale_security_group.training.id]
     }
   }
+
+  update_strategy = {
+    type = "RollingUpdate"
+
+    rolling_update = {
+      max_unavailable = "25%"
+    }
+  }
 }
 ```
 
@@ -77,22 +86,25 @@ resource "nscale_placement" "workers" {
 - `name` (String) The name of the placement. Changing this forces a new placement to be created.
 - `network_id` (String) The identifier of the network to attach hosts to. This also determines the InfiniBand partition boundary; all hosts in a placement share a single partition key. Changing this forces a new placement to be created.
 - `reservation_id` (String) The identifier of the reservation to allocate hosts from. Changing this forces a new placement to be created.
-- `server_spec` (Attributes) Region server options applied to each pinned server. Changing this forces a new placement to be created. (see [below for nested schema](#nestedatt--server_spec))
+- `server_spec` (Attributes) Region server options applied to each pinned server. Changing `image_id` updates the placement in place; changing anything else forces a new placement to be created. (see [below for nested schema](#nestedatt--server_spec))
 
 ### Optional
 
 - `description` (String) The description of the placement. Changing this forces a new placement to be created.
 - `tags` (Map of String) A map of tags assigned to the placement. Changing this forces a new placement to be created.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
+- `update_strategy` (Attributes) How the placement's servers converge onto a new `server_spec.image_id`. The API defaults it to `Manual`. Changing this updates the placement in place; setting `RollingUpdate` on a placement whose servers are already drifted starts converging them. Removing it keeps the current strategy: set `type` to `Manual` to switch back. (see [below for nested schema](#nestedatt--update_strategy))
 
 ### Read-Only
 
 - `creation_time` (String) The timestamp when the placement was created.
+- `drifted_host_count` (Number) The number of servers not yet running `server_spec.image_id`, including servers still re-provisioning onto it.
 - `id` (String) A unique identifier for the placement.
 - `project_id` (String) The identifier of the project the placement is provisioned in.
 - `provisioning_status` (String) The provisioning status of the placement.
 - `ready_host_count` (Number) The number of hosts whose Region server resources are ready.
 - `region_id` (String) The identifier of the region the placement belongs to.
+- `updated_host_count` (Number) The number of servers running `server_spec.image_id` and provisioned.
 
 <a id="nestedatt--constraints"></a>
 ### Nested Schema for `constraints`
@@ -113,13 +125,13 @@ Optional:
 
 Required:
 
-- `image_id` (String) The image to use for each pinned server.
+- `image_id` (String) The image to use for each pinned server. Changing this updates the placement in place: it marks the servers drifted, and they converge onto the new image according to the placement's update strategy. Under the default `Manual` strategy they stay on their current image until each is reconciled explicitly.
 
 Optional:
 
-- `networking` (Attributes) Region server networking options applied to each pinned server. (see [below for nested schema](#nestedatt--server_spec--networking))
-- `ssh_certificate_authority_id` (String) The SSH certificate authority ID.
-- `user_data` (String) Base64-encoded configuration information or scripts to use upon launch.
+- `networking` (Attributes) Region server networking options applied to each pinned server. Changing this forces a new placement to be created. (see [below for nested schema](#nestedatt--server_spec--networking))
+- `ssh_certificate_authority_id` (String) The SSH certificate authority ID. Changing this forces a new placement to be created.
+- `user_data` (String) Base64-encoded configuration information or scripts to use upon launch. Changing this forces a new placement to be created.
 
 <a id="nestedatt--server_spec--networking"></a>
 ### Nested Schema for `server_spec.networking`
@@ -139,6 +151,26 @@ Optional:
 
 - `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
 - `delete` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.
+- `update` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+
+
+<a id="nestedatt--update_strategy"></a>
+### Nested Schema for `update_strategy`
+
+Required:
+
+- `type` (String) `Manual` leaves each server on its current image until it is reconciled explicitly. `RollingUpdate` converges drifted servers automatically, at most `rolling_update.max_unavailable` at a time.
+
+Optional:
+
+- `rolling_update` (Attributes) Tuning for the `RollingUpdate` strategy. (see [below for nested schema](#nestedatt--update_strategy--rolling_update))
+
+<a id="nestedatt--update_strategy--rolling_update"></a>
+### Nested Schema for `update_strategy.rolling_update`
+
+Optional:
+
+- `max_unavailable` (String) The number of servers that may converge at once, as a count (`"1"`) or a percentage of `host_count` (`"25%"`, rounded up). Must resolve to at least one server, and the service caps it. Required when `type` is `RollingUpdate`.
 
 ## Async behaviour
 
@@ -146,11 +178,22 @@ This resource provisions asynchronously. Terraform polls the placement's `provis
 `provisioned`, up to the configured `create` timeout. Deletion is also asynchronous and deletes every Region server the
 placement created. The read-only `ready_host_count` reports how many hosts have ready Region server resources.
 
+Changing `server_spec.image_id` updates the placement in place and marks its servers drifted. Terraform waits, up to the
+configured `update` timeout, until the service has observed the change and the placement is provisioned again. Under the
+`Manual` update strategy (the default) that is all it waits for: the servers stay on their current image until each is
+reconciled explicitly. Under `RollingUpdate` it waits until every server has converged onto the new image, which can
+take a long time for a large placement, and fails if a server fails provisioning, as the rollout cannot complete until a
+further image change. Under either strategy it fails if the placement stays in an error state.
+If the wait fails or times out, the update itself stays applied and the service carries on with it.
+Changing `update_strategy` alone is also an in-place update, waited on the same way. The read-only `updated_host_count`
+and `drifted_host_count` report how many servers run the placement's image and how many do not yet.
+
 ## Timeouts
 
 The `timeouts` block supports:
 
 * `create` - (Default `30m`)
+* `update` - (Default `60m`)
 * `delete` - (Default `30m`)
 
 ## Import
@@ -166,5 +209,11 @@ terraform import nscale_placement.workers XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
 ~> **`max_skew` and `min_domains` apply only to `spread`.** `min_domains` must be less than or equal to `host_count`.
 Supplying them with `policy = "pack"`, or violating the bound, is rejected by the API.
 
-~> **Placements are immutable.** There is no update API. Changing any argument — including any field inside
-`constraints` or `server_spec` — forces the placement (and the Region servers it created) to be replaced.
+~> **Only the image and update strategy change in place.** Changing any other argument — including any other field
+inside `constraints` or `server_spec` — forces the placement (and the Region servers it created) to be replaced.
+
+~> **`RollingUpdate` requires `rolling_update.max_unavailable`.** Terraform rejects an `update_strategy` of type
+`RollingUpdate` that does not set the rollout budget.
+
+~> **Removing `update_strategy` keeps the current strategy.** The API keeps the stored strategy when none is sent, so
+removing the block from configuration does not switch a `RollingUpdate` placement back. Set `type = "Manual"` instead.

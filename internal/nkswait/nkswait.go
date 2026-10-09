@@ -407,7 +407,7 @@ func (t Target[T]) refresh(ctx context.Context, notFoundState string) retry.Stat
 				return &zero, notFoundState, nil
 			}
 
-			if isServerError(err) && transientErrors < pollMaxServerErrors {
+			if nscale.IsServerError(err) && transientErrors < pollMaxServerErrors {
 				transientErrors++
 
 				return nil, "", nil
@@ -420,12 +420,6 @@ func (t Target[T]) refresh(ctx context.Context, notFoundState string) retry.Stat
 
 		return value, Classify(t.Inspect(value)), nil
 	}
-}
-
-func isServerError(err error) bool {
-	e, ok := nscale.AsAPIError(err)
-
-	return ok && e.StatusCode >= http.StatusInternalServerError
 }
 
 // lastReported describes the final observed status, or reports false when the

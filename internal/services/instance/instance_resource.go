@@ -35,6 +35,7 @@ import (
 	computeapi "github.com/nscaledev/nscale-sdk-go/compute"
 
 	"github.com/nscaledev/terraform-provider-nscale/internal/nscale"
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 	"github.com/nscaledev/terraform-provider-nscale/internal/validators"
 )
 
@@ -42,6 +43,7 @@ var (
 	_ resource.Resource                = &InstanceResource{}
 	_ resource.ResourceWithConfigure   = &InstanceResource{}
 	_ resource.ResourceWithImportState = &InstanceResource{}
+	_ resource.ResourceWithModifyPlan  = &InstanceResource{}
 )
 
 type InstanceResourceModel struct {
@@ -85,6 +87,14 @@ func instanceAdapter() nscale.ResourceAdapter[InstanceResourceModel, computeapi.
 		IDFromModel:       func(m InstanceResourceModel) string { return m.ID.ValueString() },
 		TimeoutsFromModel: func(m InstanceResourceModel) tftimeouts.Value { return m.Timeouts },
 	}
+}
+
+func (r *InstanceResource) ModifyPlan(
+	ctx context.Context,
+	request resource.ModifyPlanRequest,
+	response *resource.ModifyPlanResponse,
+) {
+	nscale.KeepStateWhenUnchanged(ctx, request, response)
 }
 
 func (r *InstanceResource) Schema(
@@ -136,17 +146,27 @@ func (r *InstanceResource) Schema(
 				Computed:            true,
 			},
 			"image_id": schema.StringAttribute{
+				CustomType:          uuidtype.Type{},
 				MarkdownDescription: "The identifier of the image used for the instance.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					uuidtype.UseStateForSameUUID(),
+				},
 			},
 			"flavor_id": schema.StringAttribute{
+				CustomType:          uuidtype.Type{},
 				MarkdownDescription: "The identifier of the flavor used for the instance.",
 				Required:            true,
+				PlanModifiers: []planmodifier.String{
+					uuidtype.UseStateForSameUUID(),
+				},
 			},
 			"ssh_certificate_authority_id": schema.StringAttribute{
+				CustomType:          uuidtype.Type{},
 				MarkdownDescription: "The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created. Changing this value forces the instance to be replaced because the CA is installed by cloud-init on first boot and cannot be rotated on a running server.",
 				Optional:            true,
 				PlanModifiers: []planmodifier.String{
+					uuidtype.UseStateForSameUUID(),
 					stringplanmodifier.RequiresReplace(),
 				},
 			},

@@ -18,6 +18,7 @@ package reservation
 
 import (
 	"encoding/base64"
+	"reflect"
 	"testing"
 	"time"
 
@@ -25,6 +26,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	reservationapi "github.com/nscaledev/nscale-sdk-go/reservation"
+
+	"github.com/nscaledev/terraform-provider-nscale/internal/utils/uuidtype"
 )
 
 func objectAsOptions() basetypes.ObjectAsOptions { return basetypes.ObjectAsOptions{} }
@@ -219,7 +222,7 @@ func TestNscalePlacementCreateParams(t *testing.T) {
 		ServerSpec: types.ObjectValueMust(
 			PlacementServerSpecModelAttributeType.AttrTypes,
 			map[string]attr.Value{
-				"image_id":                     types.StringValue("ubuntu-24.04"),
+				"image_id":                     uuidtype.NewValue("ubuntu-24.04"),
 				"ssh_certificate_authority_id": types.StringValue("ca-1"),
 				// Supplied as base64; the create params must carry the decoded bytes
 				// so the SDK does not base64-encode the value a second time.
@@ -306,7 +309,7 @@ func TestNscalePlacementCreateParamsNoNetworking(t *testing.T) {
 		ServerSpec: types.ObjectValueMust(
 			PlacementServerSpecModelAttributeType.AttrTypes,
 			map[string]attr.Value{
-				"image_id":                     types.StringValue("ubuntu-24.04"),
+				"image_id":                     uuidtype.NewValue("ubuntu-24.04"),
 				"ssh_certificate_authority_id": types.StringNull(),
 				"user_data":                    types.StringNull(),
 				"networking":                   types.ObjectNull(PlacementServerNetworkingModelAttributeType.AttrTypes),
@@ -357,7 +360,7 @@ func TestNscalePlacementCreateParamsUnknownNetworkingLists(t *testing.T) {
 		ServerSpec: types.ObjectValueMust(
 			PlacementServerSpecModelAttributeType.AttrTypes,
 			map[string]attr.Value{
-				"image_id":                     types.StringValue("ubuntu-24.04"),
+				"image_id":                     uuidtype.NewValue("ubuntu-24.04"),
 				"ssh_certificate_authority_id": types.StringNull(),
 				"user_data":                    types.StringNull(),
 				"networking": types.ObjectValueMust(
@@ -534,5 +537,224 @@ func TestValidatePlacementConstraints(t *testing.T) {
 				t.Errorf("ErrorsCount() = %d, want %d (%v)", got, testCase.wantErrors, diagnostics)
 			}
 		})
+	}
+}
+
+func TestValidatePlacementUpdateStrategy(t *testing.T) {
+	rollingUpdate := func(maxUnavailable types.String) types.Object {
+		return types.ObjectValueMust(
+			PlacementRollingUpdateModelAttributeType.AttrTypes,
+			map[string]attr.Value{"max_unavailable": maxUnavailable},
+		)
+	}
+
+	strategy := func(strategyType types.String, rollingUpdate types.Object) types.Object {
+		return types.ObjectValueMust(
+			PlacementUpdateStrategyModelAttributeType.AttrTypes,
+			map[string]attr.Value{"type": strategyType, "rolling_update": rollingUpdate},
+		)
+	}
+
+	noRollingUpdate := types.ObjectNull(PlacementRollingUpdateModelAttributeType.AttrTypes)
+
+	testCases := []struct {
+		name           string
+		updateStrategy types.Object
+		wantErrors     int
+	}{
+		{
+			name:           "absent",
+			updateStrategy: types.ObjectNull(PlacementUpdateStrategyModelAttributeType.AttrTypes),
+		},
+		{
+			name:           "unknown",
+			updateStrategy: types.ObjectUnknown(PlacementUpdateStrategyModelAttributeType.AttrTypes),
+		},
+		{
+			name:           "manual without a budget",
+			updateStrategy: strategy(types.StringValue("Manual"), noRollingUpdate),
+		},
+		{
+			name:           "rolling update with a budget",
+			updateStrategy: strategy(types.StringValue("RollingUpdate"), rollingUpdate(types.StringValue("25%"))),
+		},
+		{
+			name:           "rolling update without rolling_update",
+			updateStrategy: strategy(types.StringValue("RollingUpdate"), noRollingUpdate),
+			wantErrors:     1,
+		},
+		{
+			name:           "rolling update without max_unavailable",
+			updateStrategy: strategy(types.StringValue("RollingUpdate"), rollingUpdate(types.StringNull())),
+			wantErrors:     1,
+		},
+		{
+			name:           "unknown type",
+			updateStrategy: strategy(types.StringUnknown(), noRollingUpdate),
+		},
+		{
+			name: "rolling update with unknown rolling_update",
+			updateStrategy: strategy(
+				types.StringValue("RollingUpdate"),
+				types.ObjectUnknown(PlacementRollingUpdateModelAttributeType.AttrTypes),
+			),
+		},
+		{
+			name:           "rolling update with unknown max_unavailable",
+			updateStrategy: strategy(types.StringValue("RollingUpdate"), rollingUpdate(types.StringUnknown())),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			diagnostics := validatePlacementUpdateStrategy(t.Context(), testCase.updateStrategy)
+			if got := diagnostics.ErrorsCount(); got != testCase.wantErrors {
+				t.Errorf("ErrorsCount() = %d, want %d (%v)", got, testCase.wantErrors, diagnostics)
+			}
+		})
+	}
+}
+
+func TestNewPlacementModelUpdateStrategy(t *testing.T) {
+	testCases := []struct {
+		name     string
+		strategy *reservationapi.PlacementUpdateStrategyV2
+		want     types.Object
+	}{
+		{
+			name:     "absent",
+			strategy: nil,
+			want:     types.ObjectNull(PlacementUpdateStrategyModelAttributeType.AttrTypes),
+		},
+		{
+			name: "manual, as the API defaults it",
+			strategy: &reservationapi.PlacementUpdateStrategyV2{
+				Type: reservationapi.PlacementUpdateStrategyTypeV2Manual,
+			},
+			want: types.ObjectValueMust(
+				PlacementUpdateStrategyModelAttributeType.AttrTypes,
+				map[string]attr.Value{
+					"type":           types.StringValue("Manual"),
+					"rolling_update": types.ObjectNull(PlacementRollingUpdateModelAttributeType.AttrTypes),
+				},
+			),
+		},
+		{
+			name: "rolling update with a budget",
+			strategy: &reservationapi.PlacementUpdateStrategyV2{
+				Type: reservationapi.PlacementUpdateStrategyTypeV2RollingUpdate,
+				RollingUpdate: &reservationapi.PlacementRollingUpdateV2{
+					MaxUnavailable: new("25%"),
+				},
+			},
+			want: types.ObjectValueMust(
+				PlacementUpdateStrategyModelAttributeType.AttrTypes,
+				map[string]attr.Value{
+					"type": types.StringValue("RollingUpdate"),
+					"rolling_update": types.ObjectValueMust(
+						PlacementRollingUpdateModelAttributeType.AttrTypes,
+						map[string]attr.Value{"max_unavailable": types.StringValue("25%")},
+					),
+				},
+			),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := newPlacementUpdateStrategyObject(testCase.strategy)
+			if !got.Equal(testCase.want) {
+				t.Errorf("update_strategy = %s, want %s", got, testCase.want)
+			}
+
+			model := PlacementModel{UpdateStrategy: got}
+
+			strategy, diagnostics := model.updateStrategy(t.Context())
+			if diagnostics.HasError() {
+				t.Fatalf("updateStrategy() diagnostics = %v", diagnostics)
+			}
+
+			if !reflect.DeepEqual(strategy, testCase.strategy) {
+				t.Errorf("updateStrategy() = %+v, want it to round-trip to %+v", strategy, testCase.strategy)
+			}
+		})
+	}
+}
+
+func TestPlacementUpdateStrategyUnknownIsOmitted(t *testing.T) {
+	model := PlacementModel{
+		UpdateStrategy: types.ObjectUnknown(PlacementUpdateStrategyModelAttributeType.AttrTypes),
+	}
+
+	strategy, diagnostics := model.updateStrategy(t.Context())
+	if diagnostics.HasError() {
+		t.Fatalf("updateStrategy() diagnostics = %v", diagnostics)
+	}
+
+	if strategy != nil {
+		t.Errorf("updateStrategy() = %+v, want nil", strategy)
+	}
+}
+
+func TestNewPlacementModelRolloutCounts(t *testing.T) {
+	source := &reservationapi.PlacementV2Read{
+		Status: reservationapi.PlacementV2Status{
+			UpdatedHostCount: new(3),
+			DriftedHostCount: new(1),
+		},
+	}
+
+	model := NewPlacementModel(source)
+
+	if model.UpdatedHostCount.ValueInt64() != 3 {
+		t.Errorf("UpdatedHostCount = %s, want 3", model.UpdatedHostCount)
+	}
+
+	if model.DriftedHostCount.ValueInt64() != 1 {
+		t.Errorf("DriftedHostCount = %s, want 1", model.DriftedHostCount)
+	}
+
+	if !NewPlacementModel(&reservationapi.PlacementV2Read{}).DriftedHostCount.IsNull() {
+		t.Error("DriftedHostCount is not null for an absent count")
+	}
+}
+
+func TestNscalePlacementCreateParamsUpdateStrategy(t *testing.T) {
+	strategy := &reservationapi.PlacementUpdateStrategyV2{
+		Type: reservationapi.PlacementUpdateStrategyTypeV2RollingUpdate,
+		RollingUpdate: &reservationapi.PlacementRollingUpdateV2{
+			MaxUnavailable: new("1"),
+		},
+	}
+
+	model := NewPlacementModel(&reservationapi.PlacementV2Read{
+		Spec: reservationapi.PlacementV2Spec{
+			Constraints:    reservationapi.PlacementConstraintsV2{Policy: reservationapi.PlacementPolicyV2Pack},
+			ServerSpec:     reservationapi.PlacementServerSpecV2{ImageId: "ubuntu-24.04"},
+			UpdateStrategy: strategy,
+		},
+	})
+
+	params, diagnostics := model.NscalePlacementCreateParams(t.Context())
+	if diagnostics.HasError() {
+		t.Fatalf("NscalePlacementCreateParams() diagnostics = %v", diagnostics)
+	}
+
+	if !reflect.DeepEqual(params.Spec.UpdateStrategy, strategy) {
+		t.Errorf("UpdateStrategy = %+v, want %+v", params.Spec.UpdateStrategy, strategy)
+	}
+}
+
+func TestMaxUnavailablePattern(t *testing.T) {
+	for _, value := range []string{"1", "12", "25%", "100%"} {
+		if !maxUnavailablePattern.MatchString(value) {
+			t.Errorf("%q rejected, want accepted", value)
+		}
+	}
+
+	for _, value := range []string{"", "0", "0%", "01", "1.5", "25 %", "abc", "-1"} {
+		if maxUnavailablePattern.MatchString(value) {
+			t.Errorf("%q accepted, want rejected", value)
+		}
 	}
 }

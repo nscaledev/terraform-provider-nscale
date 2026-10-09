@@ -89,6 +89,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 	*_role_id) emit NSCALE_TEST_ROLE_ID "$val" "$key" ;;
 	*_flavor_id) emit NSCALE_TEST_FLAVOR_ID "$val" "$key" ;;
 	*_image_id) emit NSCALE_TEST_IMAGE_ID "$val" "$key" ;;
+	*_image_id_alt) emit NSCALE_TEST_IMAGE_ID_ALT "$val" "$key" ;;
 	*_fs_class_id) emit NSCALE_TEST_FILE_STORAGE_CLASS_ID "$val" "$key" ;;
 	*_os_class_id) emit NSCALE_TEST_OBJECT_STORAGE_ENDPOINT_CLASS_ID "$val" "$key" ;;
 	*_reservation_accelerator) emit NSCALE_TEST_RESERVATION_ACCELERATOR "$val" "$key" ;;

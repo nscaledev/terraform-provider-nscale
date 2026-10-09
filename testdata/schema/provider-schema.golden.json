@@ -1940,6 +1940,12 @@
                 "description_kind": "markdown",
                 "type": "string"
               },
+              "drifted_host_count": {
+                "computed": true,
+                "description": "The number of servers not yet running the placement's image, including servers still re-provisioning onto it.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
               "host_count": {
                 "computed": true,
                 "description": "The number of hosts allocated from the reservation.",
@@ -2064,6 +2070,44 @@
                   "map",
                   "string"
                 ]
+              },
+              "update_strategy": {
+                "computed": true,
+                "description": "How the placement's servers converge onto a new image.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "rolling_update": {
+                      "computed": true,
+                      "description": "Tuning for the `RollingUpdate` strategy.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "max_unavailable": {
+                            "computed": true,
+                            "description": "The number of servers that may converge at once, as a count or a percentage of `host_count`.",
+                            "description_kind": "markdown",
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      }
+                    },
+                    "type": {
+                      "computed": true,
+                      "description": "`Manual` or `RollingUpdate`.",
+                      "description_kind": "markdown",
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "single"
+                }
+              },
+              "updated_host_count": {
+                "computed": true,
+                "description": "The number of servers running the placement's image and provisioned.",
+                "description_kind": "markdown",
+                "type": "number"
               }
             },
             "description": "Nscale Placement",
@@ -4418,6 +4462,12 @@
                 "optional": true,
                 "type": "string"
               },
+              "drifted_host_count": {
+                "computed": true,
+                "description": "The number of servers not yet running `server_spec.image_id`, including servers still re-provisioning onto it.",
+                "description_kind": "markdown",
+                "type": "number"
+              },
               "host_count": {
                 "description": "The number of hosts to allocate from the reservation. Must be at least 1. Changing this forces a new placement to be created.",
                 "description_kind": "markdown",
@@ -4473,18 +4523,18 @@
                 "type": "string"
               },
               "server_spec": {
-                "description": "Region server options applied to each pinned server. Changing this forces a new placement to be created.",
+                "description": "Region server options applied to each pinned server. Changing `image_id` updates the placement in place; changing anything else forces a new placement to be created.",
                 "description_kind": "markdown",
                 "nested_type": {
                   "attributes": {
                     "image_id": {
-                      "description": "The image to use for each pinned server.",
+                      "description": "The image to use for each pinned server. Changing this updates the placement in place: it marks the servers drifted, and they converge onto the new image according to the placement's update strategy. Under the default `Manual` strategy they stay on their current image until each is reconciled explicitly.",
                       "description_kind": "markdown",
                       "required": true,
                       "type": "string"
                     },
                     "networking": {
-                      "description": "Region server networking options applied to each pinned server.",
+                      "description": "Region server networking options applied to each pinned server. Changing this forces a new placement to be created.",
                       "description_kind": "markdown",
                       "nested_type": {
                         "attributes": {
@@ -4521,13 +4571,13 @@
                       "optional": true
                     },
                     "ssh_certificate_authority_id": {
-                      "description": "The SSH certificate authority ID.",
+                      "description": "The SSH certificate authority ID. Changing this forces a new placement to be created.",
                       "description_kind": "markdown",
                       "optional": true,
                       "type": "string"
                     },
                     "user_data": {
-                      "description": "Base64-encoded configuration information or scripts to use upon launch.",
+                      "description": "Base64-encoded configuration information or scripts to use upon launch. Changing this forces a new placement to be created.",
                       "description_kind": "markdown",
                       "optional": true,
                       "type": "string"
@@ -4546,6 +4596,45 @@
                   "map",
                   "string"
                 ]
+              },
+              "update_strategy": {
+                "computed": true,
+                "description": "How the placement's servers converge onto a new `server_spec.image_id`. The API defaults it to `Manual`. Changing this updates the placement in place; setting `RollingUpdate` on a placement whose servers are already drifted starts converging them. Removing it keeps the current strategy: set `type` to `Manual` to switch back.",
+                "description_kind": "markdown",
+                "nested_type": {
+                  "attributes": {
+                    "rolling_update": {
+                      "description": "Tuning for the `RollingUpdate` strategy.",
+                      "description_kind": "markdown",
+                      "nested_type": {
+                        "attributes": {
+                          "max_unavailable": {
+                            "description": "The number of servers that may converge at once, as a count (`\"1\"`) or a percentage of `host_count` (`\"25%\"`, rounded up). Must resolve to at least one server, and the service caps it. Required when `type` is `RollingUpdate`.",
+                            "description_kind": "markdown",
+                            "optional": true,
+                            "type": "string"
+                          }
+                        },
+                        "nesting_mode": "single"
+                      },
+                      "optional": true
+                    },
+                    "type": {
+                      "description": "`Manual` leaves each server on its current image until it is reconciled explicitly. `RollingUpdate` converges drifted servers automatically, at most `rolling_update.max_unavailable` at a time.",
+                      "description_kind": "markdown",
+                      "required": true,
+                      "type": "string"
+                    }
+                  },
+                  "nesting_mode": "single"
+                },
+                "optional": true
+              },
+              "updated_host_count": {
+                "computed": true,
+                "description": "The number of servers running `server_spec.image_id` and provisioned.",
+                "description_kind": "markdown",
+                "type": "number"
               }
             },
             "block_types": {
@@ -4560,6 +4649,12 @@
                     },
                     "delete": {
                       "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.",
+                      "description_kind": "plain",
+                      "optional": true,
+                      "type": "string"
+                    },
+                    "update": {
+                      "description": "A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as \"30s\" or \"2h45m\". Valid time units are \"s\" (seconds), \"m\" (minutes), \"h\" (hours).",
                       "description_kind": "plain",
                       "optional": true,
                       "type": "string"

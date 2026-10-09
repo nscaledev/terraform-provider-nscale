@@ -8,7 +8,7 @@ description: |-
 # Data Source: nscale_placement
 
 Retrieves an existing [placement](../r/placement.html) by its identifier, including its scheduling constraints, server
-specification, and ready-host status.
+specification, update strategy, and ready-host and image convergence status.
 
 ## Example Usage
 
@@ -34,6 +34,7 @@ output "ready_host_count" {
 - `constraints` (Attributes) The scheduling policy applied when selecting hosts from the reservation. (see [below for nested schema](#nestedatt--constraints))
 - `creation_time` (String) The timestamp when the placement was created.
 - `description` (String) The description of the placement.
+- `drifted_host_count` (Number) The number of servers not yet running the placement's image, including servers still re-provisioning onto it.
 - `host_count` (Number) The number of hosts allocated from the reservation.
 - `name` (String) The name of the placement.
 - `network_id` (String) The identifier of the network the placement belongs to.
@@ -44,6 +45,8 @@ output "ready_host_count" {
 - `reservation_id` (String) The identifier of the reservation the placement allocates from.
 - `server_spec` (Attributes) Region server options applied to each pinned server. (see [below for nested schema](#nestedatt--server_spec))
 - `tags` (Map of String) A map of tags assigned to the placement.
+- `update_strategy` (Attributes) How the placement's servers converge onto a new image. (see [below for nested schema](#nestedatt--update_strategy))
+- `updated_host_count` (Number) The number of servers running the placement's image and provisioned.
 
 <a id="nestedatt--constraints"></a>
 ### Nested Schema for `constraints`
@@ -74,3 +77,20 @@ Read-Only:
 - `allowed_source_addresses` (List of String) A list of network prefixes that are allowed to egress from each server.
 - `enable_public_ip` (Boolean) Whether or not a public IP is provisioned for each server.
 - `security_group_ids` (List of String) A list of security group IDs applied to each server.
+
+
+
+<a id="nestedatt--update_strategy"></a>
+### Nested Schema for `update_strategy`
+
+Read-Only:
+
+- `rolling_update` (Attributes) Tuning for the `RollingUpdate` strategy. (see [below for nested schema](#nestedatt--update_strategy--rolling_update))
+- `type` (String) `Manual` or `RollingUpdate`.
+
+<a id="nestedatt--update_strategy--rolling_update"></a>
+### Nested Schema for `update_strategy.rolling_update`
+
+Read-Only:
+
+- `max_unavailable` (String) The number of servers that may converge at once, as a count or a percentage of `host_count`.

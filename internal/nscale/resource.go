@@ -52,9 +52,22 @@ type ResourceAdapter[TFModel any, APIRead any] struct {
 	Get func(ctx context.Context, client *Client, id string) (*APIRead, ResourceStatus, error)
 
 	// Update issues the update call (writing an operation tag into its params)
-	// and returns the tag key the update watcher waits for. A nil Update marks
-	// the resource immutable.
+	// and returns the tag key the update watcher waits for. A nil Update and
+	// UpdateAndWait marks the resource immutable.
 	Update func(ctx context.Context, client *Client, id string, plan TFModel) (operationTagKey string, diags diag.Diagnostics)
+
+	// UpdateAndWait replaces Update, which must then be nil, and the
+	// operation-tag watcher for a resource whose update endpoint does not
+	// store tags, so the watcher could never see the write land. It issues
+	// the update, waits within timeout for it to take effect, and returns the
+	// final read.
+	UpdateAndWait func(
+		ctx context.Context,
+		client *Client,
+		id string,
+		plan TFModel,
+		timeout time.Duration,
+	) (*APIRead, diag.Diagnostics) `exhaustruct:"optional"`
 
 	// Delete issues the delete call. The base owns the delete-poll watcher and
 	// tolerates a 404 (already gone).
@@ -72,6 +85,10 @@ type ResourceAdapter[TFModel any, APIRead any] struct {
 	// DefaultCreateTimeout overrides the shared 30m create default for
 	// resources that routinely take longer. Zero keeps the shared default.
 	DefaultCreateTimeout time.Duration `exhaustruct:"optional"`
+
+	// DefaultUpdateTimeout overrides the shared 30m update default for an
+	// UpdateAndWait resource. Zero keeps the shared default.
+	DefaultUpdateTimeout time.Duration `exhaustruct:"optional"`
 
 	// CreateErrorGracePeriod tolerates a transient 'error' status during create;
 	// see CreateStateWatcher.ErrorGracePeriod.
@@ -91,6 +108,10 @@ type GenericResource[TFModel any, APIRead any] struct {
 func NewGenericResource[TFModel, APIRead any](
 	adapter ResourceAdapter[TFModel, APIRead],
 ) *GenericResource[TFModel, APIRead] {
+	if adapter.Update != nil && adapter.UpdateAndWait != nil {
+		panic(fmt.Sprintf("%s adapter sets both Update and UpdateAndWait", adapter.Name))
+	}
+
 	// client is populated later, in Configure.
 	return &GenericResource[TFModel, APIRead]{client: nil, adapter: adapter}
 }
@@ -213,7 +234,7 @@ func (r *GenericResource[TFModel, APIRead]) Update(
 	request resource.UpdateRequest,
 	response *resource.UpdateResponse,
 ) {
-	if r.adapter.Update == nil {
+	if r.adapter.Update == nil && r.adapter.UpdateAndWait == nil {
 		response.Diagnostics.AddError(
 			"Update Not Supported",
 			fmt.Sprintf(
@@ -232,6 +253,11 @@ func (r *GenericResource[TFModel, APIRead]) Update(
 
 	id := r.adapter.IDFromModel(data)
 
+	if r.adapter.UpdateAndWait != nil {
+		r.updateAndWait(ctx, request, id, data, response)
+		return
+	}
+
 	operationTagKey, diagnostics := r.adapter.Update(ctx, r.client, id, data)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
@@ -248,6 +274,38 @@ func (r *GenericResource[TFModel, APIRead]) Update(
 
 	final, ok := stateWatcher.Wait(ctx, operationTagKey, r.adapter.TimeoutsFromModel(data), response)
 	if !ok {
+		return
+	}
+
+	r.adapter.ToModel(final, &data)
+	response.Diagnostics.Append(response.State.Set(ctx, data)...)
+}
+
+func (a ResourceAdapter[TFModel, APIRead]) updateTimeoutDefault() time.Duration {
+	if a.DefaultUpdateTimeout > 0 {
+		return a.DefaultUpdateTimeout
+	}
+
+	return defaultStateWatcherTimeout
+}
+
+func (r *GenericResource[TFModel, APIRead]) updateAndWait(
+	ctx context.Context,
+	request resource.UpdateRequest,
+	id string,
+	data TFModel,
+	response *resource.UpdateResponse,
+) {
+	timeout, diagnostics := r.adapter.TimeoutsFromModel(data).Update(ctx, r.adapter.updateTimeoutDefault())
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
+	final, diagnostics := r.adapter.UpdateAndWait(ctx, r.client, id, data, timeout)
+	response.Diagnostics.Append(diagnostics...)
+
+	if diagnostics.HasError() {
 		return
 	}
 

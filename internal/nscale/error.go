@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -66,6 +67,13 @@ func AsAPIError(err error) (*APIError, bool) {
 		return e, true
 	}
 	return nil, false
+}
+
+// IsServerError reports whether err is an API error with a 5xx status.
+func IsServerError(err error) bool {
+	e, ok := AsAPIError(err)
+
+	return ok && e.StatusCode >= http.StatusInternalServerError
 }
 
 func TerraformDebugLogAPIResponseBody(ctx context.Context, err error) {
