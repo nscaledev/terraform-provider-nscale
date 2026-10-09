@@ -234,6 +234,9 @@ func (m *PlacementModel) NscalePlacementCreateParams(
 			// omitting it lets the API apply its default.
 			ReadinessPolicy: nil,
 			ServerSpec:      serverSpec,
+			// update_strategy is not yet exposed by this provider; omitting it
+			// lets the API apply its default.
+			UpdateStrategy: nil,
 		},
 	}, nil
 }

@@ -12,7 +12,7 @@ require (
 	github.com/hashicorp/terraform-plugin-log v0.10.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.38.2
 	github.com/hashicorp/terraform-plugin-testing v1.14.1
-	github.com/nscaledev/nscale-sdk-go v0.5.0
+	github.com/nscaledev/nscale-sdk-go v0.6.0
 	github.com/unikorn-cloud/compute v1.16.0-rc3
 	github.com/unikorn-cloud/core v1.17.1
 )
