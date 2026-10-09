@@ -335,6 +335,16 @@ func TestPlacementUpdateProgress(t *testing.T) {
 			},
 			wantErr: errPlacementUpdateErrored,
 		},
+		{
+			name: "an unknown strategy fails rather than completing by the manual rule",
+			mutate: func(p *reservationapi.PlacementV2Read) {
+				p.Spec.UpdateStrategy = &reservationapi.PlacementUpdateStrategyV2{Type: "Recreate"}
+				p.Status.ReadyHostCount = new(4)
+				p.Status.UpdatedHostCount = new(0)
+				p.Status.DriftedHostCount = new(4)
+			},
+			wantErr: errPlacementUpdateStrategyUnknown,
+		},
 	}
 
 	for _, testCase := range testCases {

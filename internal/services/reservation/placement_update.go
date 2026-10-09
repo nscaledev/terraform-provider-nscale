@@ -51,8 +51,9 @@ const (
 )
 
 var (
-	errPlacementUpdateErrored = errors.New("placement entered an error state")
-	errPlacementUpdateStalled = errors.New("rolling update cannot complete")
+	errPlacementUpdateErrored         = errors.New("placement entered an error state")
+	errPlacementUpdateStalled         = errors.New("rolling update cannot complete")
+	errPlacementUpdateStrategyUnknown = errors.New("unknown update strategy")
 )
 
 // placementUpdateAttempts bounds the read-modify-writes an update makes when
@@ -283,10 +284,18 @@ func placementUpdateProgress(placement *reservationapi.PlacementV2Read) (bool, e
 	updated := pointer.Dereference(status.UpdatedHostCount)
 	drifted := pointer.Dereference(status.DriftedHostCount)
 
-	strategy := placementUpdateStrategyType(placement.Spec.UpdateStrategy)
-	if strategy != reservationapi.PlacementUpdateStrategyTypeV2RollingUpdate {
+	switch strategy := placementUpdateStrategyType(placement.Spec.UpdateStrategy); strategy {
+	case reservationapi.PlacementUpdateStrategyTypeV2Manual:
 		return provisioned && updated+drifted == placement.Spec.Count, nil
+	case reservationapi.PlacementUpdateStrategyTypeV2RollingUpdate:
+		return rollingUpdateProgress(placement, provisioned)
+	default:
+		return false, fmt.Errorf("%w: %q", errPlacementUpdateStrategyUnknown, strategy)
 	}
+}
+
+func rollingUpdateProgress(placement *reservationapi.PlacementV2Read, provisioned bool) (bool, error) {
+	status := placement.Status
 
 	if stalled := pointer.Dereference(status.StalledCount); stalled > 0 {
 		return false, fmt.Errorf(
@@ -297,8 +306,8 @@ func placementUpdateProgress(placement *reservationapi.PlacementV2Read) (bool, e
 	}
 
 	converged := provisioned &&
-		updated == placement.Spec.Count &&
-		drifted == 0 &&
+		pointer.Dereference(status.UpdatedHostCount) == placement.Spec.Count &&
+		pointer.Dereference(status.DriftedHostCount) == 0 &&
 		pointer.Dereference(status.InFlightCount) == 0
 
 	return converged, nil
