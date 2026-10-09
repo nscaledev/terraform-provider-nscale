@@ -123,11 +123,22 @@ resource "nscale_placement" "workers" {
     when_unsatisfiable = "fail"
   }
 
+  # Changing image_id updates the placement in place. RollingUpdate then
+  # converges the servers onto the new image a quarter of the hosts at a time;
+  # the default, Manual, leaves each on its old image until reconciled.
   server_spec = {
     image_id = var.image_id
 
     networking = {
       security_group_ids = [nscale_security_group.training.id]
+    }
+  }
+
+  update_strategy = {
+    type = "RollingUpdate"
+
+    rolling_update = {
+      max_unavailable = "25%"
     }
   }
 }
@@ -140,6 +151,11 @@ output "reservation_machine_flavor_id" {
 output "placement_ready_host_count" {
   description = "The number of hosts whose Region server resources are ready."
   value       = nscale_placement.workers.ready_host_count
+}
+
+output "placement_drifted_host_count" {
+  description = "The number of servers not yet running the placement's image."
+  value       = nscale_placement.workers.drifted_host_count
 }
 
 output "reservation_unit" {

@@ -19,10 +19,13 @@ package reservation_test
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccPlacementResource_basic(t *testing.T) {
@@ -57,10 +60,21 @@ func TestAccPlacementResource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("nscale_placement.test", "provisioning_status"),
 					resource.TestCheckResourceAttrSet("nscale_placement.test", "creation_time"),
 				),
+				// update_strategy is unconfigured, so the API's default must not diff.
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
 			},
 			// 2. Plan-only: catches spurious diffs across the nested attributes.
 			{
 				Config:   testAccPlacementResourceConfig(name, accelerator, unit, imageID),
+				PlanOnly: true,
+			},
+			// The API stores the image UUID canonicalised; another spelling of it is no change.
+			{
+				Config:   testAccPlacementResourceConfig(name, accelerator, unit, strings.ToUpper(imageID)),
 				PlanOnly: true,
 			},
 			// 3. Import.
@@ -69,6 +83,65 @@ func TestAccPlacementResource_basic(t *testing.T) {
 				ImportState:             true,
 				ImportStateVerify:       true,
 				ImportStateVerifyIgnore: []string{"timeouts"}, // timeouts is provider-side, not returned by the API.
+			},
+		},
+	})
+}
+
+// TestAccPlacementResource_updateImage changes the image of a live placement and
+// checks it is updated in place rather than replaced.
+func TestAccPlacementResource_updateImage(t *testing.T) {
+	name := acctest.RandomWithPrefix("tf-acc-test")
+	accelerator := os.Getenv("NSCALE_TEST_RESERVATION_ACCELERATOR")
+	unit := os.Getenv("NSCALE_TEST_RESERVATION_UNIT")
+	imageID := os.Getenv("NSCALE_TEST_IMAGE_ID")
+	updatedImageID := os.Getenv("NSCALE_TEST_IMAGE_ID_ALT")
+
+	var placementID string
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() {
+			testAccPreCheckPlacement(t)
+
+			if updatedImageID == "" {
+				t.Skip("NSCALE_TEST_IMAGE_ID_ALT must be set for the placement image update test")
+			}
+		},
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccPlacementResourceConfig(name, accelerator, unit, imageID),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("nscale_placement.test", "server_spec.image_id", imageID),
+					resource.TestCheckResourceAttr("nscale_placement.test", "update_strategy.type", "Manual"),
+					func(state *terraform.State) error {
+						placementID = state.RootModule().Resources["nscale_placement.test"].Primary.ID
+						return nil
+					},
+				),
+			},
+			{
+				Config: testAccPlacementResourceConfig(name, accelerator, unit, updatedImageID),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("nscale_placement.test", plancheck.ResourceActionUpdate),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("nscale_placement.test", "server_spec.image_id", updatedImageID),
+					resource.TestCheckResourceAttrWith("nscale_placement.test", "id", func(id string) error {
+						if id != placementID {
+							return fmt.Errorf("placement id = %s, want %s: the placement was replaced", id, placementID)
+						}
+
+						return nil
+					}),
+					resource.TestCheckResourceAttr("nscale_placement.test", "host_count", "1"),
+				),
+			},
+			{
+				Config:   testAccPlacementResourceConfig(name, accelerator, unit, updatedImageID),
+				PlanOnly: true,
 			},
 		},
 	})

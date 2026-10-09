@@ -42,8 +42,11 @@ type PlacementModel struct {
 	HostCount          types.Int64  `tfsdk:"host_count"`
 	Constraints        types.Object `tfsdk:"constraints"`
 	ServerSpec         types.Object `tfsdk:"server_spec"`
+	UpdateStrategy     types.Object `tfsdk:"update_strategy"`
 	RegionID           types.String `tfsdk:"region_id"`
 	ReadyHostCount     types.Int64  `tfsdk:"ready_host_count"`
+	UpdatedHostCount   types.Int64  `tfsdk:"updated_host_count"`
+	DriftedHostCount   types.Int64  `tfsdk:"drifted_host_count"`
 	ProjectID          types.String `tfsdk:"project_id"`
 	CreationTime       types.String `tfsdk:"creation_time"`
 	ProvisioningStatus types.String `tfsdk:"provisioning_status"`
@@ -99,13 +102,34 @@ type PlacementServerSpecModel struct {
 	Networking                types.Object   `tfsdk:"networking"`
 }
 
+// PlacementRollingUpdateModelAttributeType describes the rolling_update
+// sub-object nested inside update_strategy.
+var PlacementRollingUpdateModelAttributeType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"max_unavailable": types.StringType,
+	},
+}
+
+type PlacementRollingUpdateModel struct {
+	MaxUnavailable types.String `tfsdk:"max_unavailable"`
+}
+
+// PlacementUpdateStrategyModelAttributeType describes the update_strategy
+// sub-object.
+var PlacementUpdateStrategyModelAttributeType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"type":           types.StringType,
+		"rolling_update": PlacementRollingUpdateModelAttributeType,
+	},
+}
+
+type PlacementUpdateStrategyModel struct {
+	Type          types.String `tfsdk:"type"`
+	RollingUpdate types.Object `tfsdk:"rolling_update"`
+}
+
 func NewPlacementModel(source *reservationapi.PlacementV2Read) PlacementModel {
 	tags := nscale.RemoveOperationTags(source.Metadata.Tags)
-
-	readyHostCount := types.Int64Null()
-	if source.Status.ReadyHostCount != nil {
-		readyHostCount = types.Int64Value(int64(*source.Status.ReadyHostCount))
-	}
 
 	return PlacementModel{
 		ID:                 types.StringValue(source.Metadata.Id),
@@ -117,8 +141,11 @@ func NewPlacementModel(source *reservationapi.PlacementV2Read) PlacementModel {
 		HostCount:          types.Int64Value(int64(source.Spec.Count)),
 		Constraints:        newPlacementConstraintsObject(source.Spec.Constraints),
 		ServerSpec:         newPlacementServerSpecObject(source.Spec.ServerSpec),
+		UpdateStrategy:     newPlacementUpdateStrategyObject(source.Spec.UpdateStrategy),
 		RegionID:           types.StringValue(source.Status.RegionId),
-		ReadyHostCount:     readyHostCount,
+		ReadyHostCount:     types.Int64PointerValue(int64Pointer(source.Status.ReadyHostCount)),
+		UpdatedHostCount:   types.Int64PointerValue(int64Pointer(source.Status.UpdatedHostCount)),
+		DriftedHostCount:   types.Int64PointerValue(int64Pointer(source.Status.DriftedHostCount)),
 		ProjectID:          types.StringValue(source.Metadata.ProjectId),
 		CreationTime:       types.StringValue(source.Metadata.CreationTime.Format(time.RFC3339)),
 		ProvisioningStatus: types.StringValue(string(source.Metadata.ProvisioningStatus)),
@@ -162,6 +189,40 @@ func newPlacementServerSpecObject(source reservationapi.PlacementServerSpecV2) t
 			"networking":                   newPlacementServerNetworkingObject(source.Networking),
 		},
 	)
+}
+
+func newPlacementUpdateStrategyObject(source *reservationapi.PlacementUpdateStrategyV2) types.Object {
+	if source == nil {
+		return types.ObjectNull(PlacementUpdateStrategyModelAttributeType.AttrTypes)
+	}
+
+	rollingUpdate := types.ObjectNull(PlacementRollingUpdateModelAttributeType.AttrTypes)
+	if source.RollingUpdate != nil {
+		rollingUpdate = types.ObjectValueMust(
+			PlacementRollingUpdateModelAttributeType.AttrTypes,
+			map[string]attr.Value{
+				"max_unavailable": types.StringPointerValue(source.RollingUpdate.MaxUnavailable),
+			},
+		)
+	}
+
+	return types.ObjectValueMust(
+		PlacementUpdateStrategyModelAttributeType.AttrTypes,
+		map[string]attr.Value{
+			"type":           types.StringValue(string(source.Type)),
+			"rolling_update": rollingUpdate,
+		},
+	)
+}
+
+func int64Pointer(value *int) *int64 {
+	if value == nil {
+		return nil
+	}
+
+	converted := int64(*value)
+
+	return &converted
 }
 
 func newPlacementServerNetworkingObject(source *reservationapi.PlacementServerNetworkingV2) types.Object {
@@ -219,6 +280,11 @@ func (m *PlacementModel) NscalePlacementCreateParams(
 		return reservationapi.PlacementV2Create{}, diagnostics
 	}
 
+	updateStrategy, diagnostics := m.updateStrategy(ctx)
+	if diagnostics.HasError() {
+		return reservationapi.PlacementV2Create{}, diagnostics
+	}
+
 	return reservationapi.PlacementV2Create{
 		Metadata: reservationapi.ResourceMetadata{
 			Name:        m.Name.ValueString(),
@@ -234,10 +300,49 @@ func (m *PlacementModel) NscalePlacementCreateParams(
 			// omitting it lets the API apply its default.
 			ReadinessPolicy: nil,
 			ServerSpec:      serverSpec,
-			// update_strategy is not yet exposed by this provider; omitting it
-			// lets the API apply its default.
-			UpdateStrategy: nil,
+			UpdateStrategy:  updateStrategy,
 		},
+	}, nil
+}
+
+// NscalePlacementUpdateParams builds the update request body by laying the
+// planned image and update strategy over the placement as last read.
+//
+// The API rejects any change but the image and update strategy, comparing the
+// request against its own rendering of the stored spec. Starting from a read
+// rather than from the plan keeps every other field exactly as the API renders
+// it: building it from the plan would, for example, send unset networking
+// lists as empty lists where the API renders them absent, and be rejected.
+// The API ignores metadata on update; the read's is sent to satisfy the schema.
+func (m *PlacementModel) NscalePlacementUpdateParams(
+	ctx context.Context,
+	current *reservationapi.PlacementV2Read,
+) (reservationapi.PlacementV2Update, diag.Diagnostics) {
+	var serverSpec PlacementServerSpecModel
+	if diagnostics := m.ServerSpec.As(ctx, &serverSpec, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
+		return reservationapi.PlacementV2Update{}, diagnostics
+	}
+
+	updateStrategy, diagnostics := m.updateStrategy(ctx)
+	if diagnostics.HasError() {
+		return reservationapi.PlacementV2Update{}, diagnostics
+	}
+
+	spec := current.Spec
+	spec.ServerSpec.ImageId = serverSpec.ImageID.ValueString()
+
+	// An absent strategy sends back the one just read.
+	if updateStrategy != nil {
+		spec.UpdateStrategy = updateStrategy
+	}
+
+	return reservationapi.PlacementV2Update{
+		Metadata: reservationapi.ResourceMetadata{
+			Name:        current.Metadata.Name,
+			Description: current.Metadata.Description,
+			Tags:        current.Metadata.Tags,
+		},
+		Spec: spec,
 	}, nil
 }
 
@@ -295,6 +400,41 @@ func (m *PlacementModel) serverSpec(ctx context.Context) (reservationapi.Placeme
 		UserData:                  userData,
 		Networking:                networking,
 	}, nil
+}
+
+// updateStrategy returns the configured update strategy, or nil when it is
+// unset so the API keeps its own: Manual on create, the stored one on update.
+func (m *PlacementModel) updateStrategy(
+	ctx context.Context,
+) (*reservationapi.PlacementUpdateStrategyV2, diag.Diagnostics) {
+	if m.UpdateStrategy.IsNull() || m.UpdateStrategy.IsUnknown() {
+		return nil, nil
+	}
+
+	var model PlacementUpdateStrategyModel
+	if diagnostics := m.UpdateStrategy.As(ctx, &model, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
+		return nil, diagnostics
+	}
+
+	strategy := &reservationapi.PlacementUpdateStrategyV2{
+		Type:          reservationapi.PlacementUpdateStrategyTypeV2(model.Type.ValueString()),
+		RollingUpdate: nil,
+	}
+
+	if model.RollingUpdate.IsNull() || model.RollingUpdate.IsUnknown() {
+		return strategy, nil
+	}
+
+	var rollingUpdate PlacementRollingUpdateModel
+	if diagnostics := model.RollingUpdate.As(ctx, &rollingUpdate, basetypes.ObjectAsOptions{}); diagnostics.HasError() {
+		return nil, diagnostics
+	}
+
+	strategy.RollingUpdate = &reservationapi.PlacementRollingUpdateV2{
+		MaxUnavailable: rollingUpdate.MaxUnavailable.ValueStringPointer(),
+	}
+
+	return strategy, nil
 }
 
 func (m *PlacementServerSpecModel) networking(

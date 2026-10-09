@@ -151,12 +151,40 @@ func (s *PlacementDataSource) Schema(
 					},
 				},
 			},
+			"update_strategy": schema.SingleNestedAttribute{
+				MarkdownDescription: "How the placement's servers converge onto a new image.",
+				Computed:            true,
+				Attributes: map[string]schema.Attribute{
+					"type": schema.StringAttribute{
+						MarkdownDescription: "`Manual` or `RollingUpdate`.",
+						Computed:            true,
+					},
+					"rolling_update": schema.SingleNestedAttribute{
+						MarkdownDescription: "Tuning for the `RollingUpdate` strategy.",
+						Computed:            true,
+						Attributes: map[string]schema.Attribute{
+							"max_unavailable": schema.StringAttribute{
+								MarkdownDescription: "The number of servers that may converge at once, as a count or a percentage of `host_count`.",
+								Computed:            true,
+							},
+						},
+					},
+				},
+			},
 			"region_id": schema.StringAttribute{
 				MarkdownDescription: "The identifier of the region the placement belongs to.",
 				Computed:            true,
 			},
 			"ready_host_count": schema.Int64Attribute{
 				MarkdownDescription: "The number of hosts whose Region server resources are ready.",
+				Computed:            true,
+			},
+			"updated_host_count": schema.Int64Attribute{
+				MarkdownDescription: "The number of servers running the placement's image and provisioned.",
+				Computed:            true,
+			},
+			"drifted_host_count": schema.Int64Attribute{
+				MarkdownDescription: "The number of servers not yet running the placement's image, including servers still re-provisioning onto it.",
 				Computed:            true,
 			},
 			"project_id": schema.StringAttribute{
