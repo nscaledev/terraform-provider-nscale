@@ -18,6 +18,7 @@ package nscale
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -132,7 +133,16 @@ type CreateStateWatcher[T any] struct {
 	// DefaultTimeout applies when the config sets no create timeout. Zero means
 	// the shared defaultStateWatcherTimeout.
 	DefaultTimeout time.Duration `exhaustruct:"optional"`
+
+	// ErrorGracePeriod keeps waiting through an 'error' status for this long
+	// before failing, for resources whose backend can report error and then
+	// recover on its own. Zero fails on the first 'error'.
+	ErrorGracePeriod time.Duration `exhaustruct:"optional"`
 }
+
+// createStateTransientError is the synthetic pending state for an 'error'
+// status still inside CreateStateWatcher.ErrorGracePeriod.
+const createStateTransientError = "error (within grace period)"
 
 func (w *CreateStateWatcher[T]) Wait(
 	ctx context.Context,
@@ -152,6 +162,7 @@ func (w *CreateStateWatcher[T]) Wait(
 
 	var lastStatus ResourceStatus
 	var haveStatus bool
+	errorGrace := ErrorGrace{Period: w.ErrorGracePeriod}
 
 	stateWatcher := retry.StateChangeConf{
 		Timeout: timeout,
@@ -159,6 +170,7 @@ func (w *CreateStateWatcher[T]) Wait(
 			string(ProvisioningStatusProvisioning),
 			string(ProvisioningStatusPending),
 			string(ProvisioningStatusUnknown),
+			createStateTransientError,
 		},
 		Target: []string{
 			string(ProvisioningStatusProvisioned),
@@ -175,6 +187,11 @@ func (w *CreateStateWatcher[T]) Wait(
 			}
 			lastStatus = status
 			haveStatus = true
+
+			if errorGrace.Tolerate(status.ProvisioningStatus == ProvisioningStatusError) {
+				return result, createStateTransientError, nil
+			}
+
 			return result, string(status.ProvisioningStatus), nil
 		},
 	}
@@ -184,6 +201,23 @@ func (w *CreateStateWatcher[T]) Wait(
 	state, err := stateWatcher.WaitForStateContext(ctx)
 	if err != nil {
 		TerraformDebugLogAPIResponseBody(ctx, err)
+		// The resource may still recover, but it's tainted now; the only fix
+		// is a longer create timeout.
+		if e := (*retry.TimeoutError)(nil); errors.As(err, &e) && e.LastState == createStateTransientError {
+			response.Diagnostics.AddError(
+				fmt.Sprintf("%s Still in Error State at Create Timeout", w.ResourceTitle),
+				fmt.Sprintf(
+					"%s %s (name %s) was still reporting 'error' when the %s create timeout expired, within the %s it is allowed to recover. Set a longer create timeout in the resource's timeouts block, e.g. timeouts { create = \"%s\" }.",
+					w.ResourceTitle,
+					lastStatus.ID,
+					lastStatus.Name,
+					timeout,
+					w.ErrorGracePeriod,
+					timeout+w.ErrorGracePeriod,
+				),
+			)
+			return zero, false
+		}
 		response.Diagnostics.AddError(
 			fmt.Sprintf("Failed to Wait for %s to be Created", w.ResourceTitle),
 			fmt.Sprintf("An error occurred while waiting for the %s to be created: %s", w.ResourceName, err),

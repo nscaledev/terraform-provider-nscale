@@ -72,6 +72,10 @@ type ResourceAdapter[TFModel any, APIRead any] struct {
 	// DefaultCreateTimeout overrides the shared 30m create default for
 	// resources that routinely take longer. Zero keeps the shared default.
 	DefaultCreateTimeout time.Duration `exhaustruct:"optional"`
+
+	// CreateErrorGracePeriod tolerates a transient 'error' status during create;
+	// see CreateStateWatcher.ErrorGracePeriod.
+	CreateErrorGracePeriod time.Duration `exhaustruct:"optional"`
 }
 
 // GenericResource implements the resource.Resource lifecycle once, driven by a
@@ -158,9 +162,10 @@ func (r *GenericResource[TFModel, APIRead]) Create(
 	id := r.adapter.IDFromModel(data)
 
 	stateWatcher := CreateStateWatcher[APIRead]{
-		ResourceTitle:  r.adapter.Title,
-		ResourceName:   r.adapter.Name,
-		DefaultTimeout: r.adapter.DefaultCreateTimeout,
+		ResourceTitle:    r.adapter.Title,
+		ResourceName:     r.adapter.Name,
+		DefaultTimeout:   r.adapter.DefaultCreateTimeout,
+		ErrorGracePeriod: r.adapter.CreateErrorGracePeriod,
 		GetFunc: func(ctx context.Context) (*APIRead, ResourceStatus, error) {
 			return r.adapter.Get(ctx, r.client, id)
 		},

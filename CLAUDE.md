@@ -51,7 +51,7 @@ The repo uses the **legacy `website/docs/{r,d}/*.html.markdown`** layout, not th
 ## Verifying a feature add
 
 - `make fmt lint` — gofmt + golangci-lint.
-- `make test` — unit tests (`go test ./...`).
+- `make test` — unit tests (`go test ./...`). Needs `terraform` on PATH: some unit tests (e.g. the network transient-error test) drive real Terraform against a mock API via `resource.UnitTest`.
 - `make schema-check` — diff the provider schema against the committed baseline; run `make schema-update` and commit the result if you changed the schema on purpose (see "Schema baseline" above).
 - `make testacc` — acceptance tests (requires live API credentials; gated behind `TF_ACC=1`).
 - Confirm the example in `examples/<service>/main.tf` actually applies against a real project before shipping.

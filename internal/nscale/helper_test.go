@@ -2,6 +2,7 @@ package nscale
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -254,6 +255,161 @@ func TestCreateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
 	}
 }
 
+// TestCreateStateWatcherWaitRecoversFromTransientError ensures that, with a
+// grace period, an 'error' that recovers to 'provisioned' is not a failure.
+func TestCreateStateWatcherWaitRecoversFromTransientError(t *testing.T) {
+	statuses := []ProvisioningStatus{
+		ProvisioningStatusProvisioning,
+		ProvisioningStatusError,
+		ProvisioningStatusError,
+		ProvisioningStatusProvisioned,
+	}
+
+	var calls int
+
+	finalResult := &waitTestResource{name: "ready"}
+
+	watcher := CreateStateWatcher[waitTestResource]{
+		ResourceTitle:    "Network",
+		ResourceName:     "network",
+		ErrorGracePeriod: time.Minute,
+		GetFunc: func(ctx context.Context) (*waitTestResource, ResourceStatus, error) {
+			status := statuses[min(calls, len(statuses)-1)]
+			calls++
+
+			if status == ProvisioningStatusProvisioned {
+				return finalResult, ResourceStatus{ProvisioningStatus: status}, nil
+			}
+
+			return &waitTestResource{name: string(status)}, ResourceStatus{ProvisioningStatus: status}, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var response resource.CreateResponse
+	var timeouts tftimeouts.Value
+
+	got, ok := watcher.Wait(ctx, timeouts, &response)
+	if !ok {
+		t.Fatalf("Wait() returned ok=false with diagnostics: %#v", response.Diagnostics)
+	}
+
+	if got != finalResult {
+		t.Fatalf("Wait() returned %p, want %p", got, finalResult)
+	}
+
+	if calls != len(statuses) {
+		t.Fatalf("GetFunc call count = %d, want %d", calls, len(statuses))
+	}
+
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("Wait() returned unexpected diagnostics: %#v", response.Diagnostics)
+	}
+}
+
+// TestCreateStateWatcherWaitFailsWhenErrorOutlastsGracePeriod ensures the grace
+// period only delays a genuine failure rather than hiding it.
+func TestCreateStateWatcherWaitFailsWhenErrorOutlastsGracePeriod(t *testing.T) {
+	const (
+		resourceID  = "0d3c1a43-5c1e-4b8e-9a43-7f0f6a3f2b11"
+		wantSummary = "Network Entered Error State"
+	)
+
+	var calls int
+
+	watcher := CreateStateWatcher[waitTestResource]{
+		ResourceTitle:    "Network",
+		ResourceName:     "network",
+		ErrorGracePeriod: 200 * time.Millisecond,
+		GetFunc: func(ctx context.Context) (*waitTestResource, ResourceStatus, error) {
+			calls++
+
+			return &waitTestResource{name: "failed"}, ResourceStatus{
+				ID:                 resourceID,
+				ProvisioningStatus: ProvisioningStatusError,
+			}, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var response resource.CreateResponse
+	var timeouts tftimeouts.Value
+
+	started := time.Now()
+
+	_, ok := watcher.Wait(ctx, timeouts, &response)
+	if ok {
+		t.Fatalf("Wait() returned ok=true, want ok=false when error outlasts the grace period")
+	}
+
+	if elapsed := time.Since(started); elapsed < watcher.ErrorGracePeriod {
+		t.Fatalf("Wait() failed after %s, want at least the %s grace period", elapsed, watcher.ErrorGracePeriod)
+	}
+
+	if calls < 2 {
+		t.Fatalf("GetFunc call count = %d, want >= 2 (watcher must keep polling through the grace period)", calls)
+	}
+
+	errs := response.Diagnostics.Errors()
+	if len(errs) != 1 || errs[0].Summary() != wantSummary {
+		t.Fatalf("Wait() diagnostics = %#v, want a single %q error", response.Diagnostics, wantSummary)
+	}
+
+	if !strings.Contains(errs[0].Detail(), resourceID) {
+		t.Fatalf("Wait() diagnostic detail did not include resource ID %q: %s", resourceID, errs[0].Detail())
+	}
+}
+
+// TestCreateStateWatcherWaitTimesOutWithinGracePeriod ensures a create timeout
+// shorter than the grace period tells the user to raise timeouts.create rather
+// than reporting a generic wait failure.
+func TestCreateStateWatcherWaitTimesOutWithinGracePeriod(t *testing.T) {
+	const (
+		resourceID  = "8a7e0c52-3f4d-4b6e-9c1a-2d5e6f7a8b9c"
+		wantSummary = "Network Still in Error State at Create Timeout"
+	)
+
+	watcher := CreateStateWatcher[waitTestResource]{
+		ResourceTitle:    "Network",
+		ResourceName:     "network",
+		DefaultTimeout:   300 * time.Millisecond,
+		ErrorGracePeriod: time.Minute,
+		GetFunc: func(ctx context.Context) (*waitTestResource, ResourceStatus, error) {
+			return &waitTestResource{name: "failed"}, ResourceStatus{
+				ID:                 resourceID,
+				ProvisioningStatus: ProvisioningStatusError,
+			}, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var response resource.CreateResponse
+	var timeouts tftimeouts.Value
+
+	_, ok := watcher.Wait(ctx, timeouts, &response)
+	if ok {
+		t.Fatalf("Wait() returned ok=true, want ok=false when the create timeout expires in error")
+	}
+
+	errs := response.Diagnostics.Errors()
+	if len(errs) != 1 || errs[0].Summary() != wantSummary {
+		t.Fatalf("Wait() diagnostics = %#v, want a single %q error", response.Diagnostics, wantSummary)
+	}
+
+	wantExample := fmt.Sprintf("create = %q", watcher.DefaultTimeout+watcher.ErrorGracePeriod)
+	for _, want := range []string{resourceID, wantExample} {
+		if !strings.Contains(errs[0].Detail(), want) {
+			t.Fatalf("Wait() diagnostic detail did not include %q: %s", want, errs[0].Detail())
+		}
+	}
+}
+
 // TestUpdateStateWatcherWaitTreatsErrorAsTerminal ensures the update waiter exits cleanly with a
 // diagnostic when the API reports provisioningStatus=error during an update.
 func TestUpdateStateWatcherWaitTreatsErrorAsTerminal(t *testing.T) {
@@ -395,7 +551,9 @@ func TestCreateStateWatcherWaitUsesDefaultTimeout(t *testing.T) {
 	if ctx.Err() != nil {
 		t.Fatalf("Wait() ran until the test deadline (%s) instead of giving up after DefaultTimeout", time.Since(start))
 	}
-	if !response.Diagnostics.HasError() {
-		t.Fatal("Wait() gave up without an error diagnostic")
+	const wantSummary = "Failed to Wait for Reservation to be Created"
+	errs := response.Diagnostics.Errors()
+	if len(errs) != 1 || errs[0].Summary() != wantSummary {
+		t.Fatalf("Wait() diagnostics = %#v, want a single %q error", response.Diagnostics, wantSummary)
 	}
 }
