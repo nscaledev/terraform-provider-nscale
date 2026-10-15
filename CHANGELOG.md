@@ -11,6 +11,13 @@ in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) style, using the
 categories `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 `DEPRECATIONS` and `DOCS`; they are preserved as-is below.
 
+## [1.7.0](https://github.com/nscaledev/terraform-provider-nscale/compare/v1.6.1...v1.7.0) (2026-10-09)
+
+
+### Features
+
+* **reservation:** update placement image and strategy in place ([#95](https://github.com/nscaledev/terraform-provider-nscale/issues/95)) ([a3d489c](https://github.com/nscaledev/terraform-provider-nscale/commit/a3d489c63f1269e7b2f09b9ce449ed1c94745c67))
+
 ## [1.6.1](https://github.com/nscaledev/terraform-provider-nscale/compare/v1.6.0...v1.6.1) (2026-10-09)
 
 
