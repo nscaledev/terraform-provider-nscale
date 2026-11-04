@@ -11,6 +11,13 @@ in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) style, using the
 categories `BREAKING CHANGES`, `FEATURES`, `ENHANCEMENTS`, `BUG FIXES`,
 `DEPRECATIONS` and `DOCS`; they are preserved as-is below.
 
+## [1.8.0](https://github.com/nscaledev/terraform-provider-nscale/compare/v1.7.0...v1.8.0) (2026-11-04)
+
+
+### Features
+
+* Upgrade github.com/getkin/kin-openapi to 0.149.0 (resolves 3 findings) ([#98](https://github.com/nscaledev/terraform-provider-nscale/issues/98)) ([9146d2f](https://github.com/nscaledev/terraform-provider-nscale/commit/9146d2f745777410193f71944983a17ba65d382f))
+
 ## [1.7.0](https://github.com/nscaledev/terraform-provider-nscale/compare/v1.6.1...v1.7.0) (2026-10-09)
 
 
