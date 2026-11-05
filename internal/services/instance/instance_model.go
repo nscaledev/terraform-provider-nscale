@@ -168,7 +168,9 @@ func (m *InstanceModel) nscaleInstanceSpecIDs() (instanceSpecIDs, diag.Diagnosti
 	return ids, diagnostics
 }
 
-func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate, diag.Diagnostics) {
+// NscaleInstanceUpdateParams builds the update from the plan. prior is the
+// state before the update.
+func (m *InstanceModel) NscaleInstanceUpdateParams(prior InstanceModel) (computeapi.InstanceUpdate, diag.Diagnostics) {
 	tags, diagnostics := tftypes.ValueTagListPointer(m.Tags)
 	if diagnostics.HasError() {
 		return computeapi.InstanceUpdate{}, diagnostics
@@ -193,6 +195,12 @@ func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate,
 	userData, diagnostics := tftypes.ValueBase64BytesPointer(m.UserData, "user_data")
 	if diagnostics.HasError() {
 		return computeapi.InstanceUpdate{}, diagnostics
+	}
+
+	// Compute keeps the stored user data when the field is omitted, and
+	// clears it on "". A nil slice would encode as null, so use an empty one.
+	if m.UserData.IsNull() && !prior.UserData.IsNull() {
+		userData = &[]byte{}
 	}
 
 	ids, diagnostics := m.nscaleInstanceSpecIDs()

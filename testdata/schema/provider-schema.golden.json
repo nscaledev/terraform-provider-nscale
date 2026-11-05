@@ -3266,7 +3266,7 @@
                 ]
               },
               "user_data": {
-                "description": "Base64-encoded configuration information or scripts to pass to the instance at boot time.",
+                "description": "Base64-encoded configuration information or scripts to pass to the instance at boot time. Omit `user_data` to have none; removing it from configuration clears it on the next apply. On a pinned bare-metal server, changing `user_data`, including clearing it, may reimage the server in place.",
                 "description_kind": "markdown",
                 "optional": true,
                 "type": "string"

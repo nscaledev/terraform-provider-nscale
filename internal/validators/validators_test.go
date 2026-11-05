@@ -69,6 +69,29 @@ func TestBase64Validator(t *testing.T) {
 	}
 }
 
+func TestNotEmptyValidator(t *testing.T) {
+	testCases := []struct {
+		name    string
+		value   types.String
+		wantErr bool
+	}{
+		{"value", types.StringValue("aGk="), false},
+		{"empty string", types.StringValue(""), true},
+		{"null is skipped", types.StringNull(), false},
+		{"unknown is skipped", types.StringUnknown(), false},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			response := runStringValidator(NotEmptyValidator{}, testCase.value)
+
+			if got := response.Diagnostics.HasError(); got != testCase.wantErr {
+				t.Fatalf("HasError() = %v, want %v (diags: %v)", got, testCase.wantErr, response.Diagnostics)
+			}
+		})
+	}
+}
+
 func TestCIDRValidator(t *testing.T) {
 	testCases := []struct {
 		name    string

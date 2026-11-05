@@ -117,7 +117,7 @@ func TestNscaleInstanceUpdateParamsDecodesUserData(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString([]byte(testUserDataPlaintext))
 	model := testInstanceModel(types.StringValue(encoded))
 
-	params, diagnostics := model.NscaleInstanceUpdateParams()
+	params, diagnostics := model.NscaleInstanceUpdateParams(InstanceModel{})
 	if diagnostics.HasError() {
 		t.Fatalf("NscaleInstanceUpdateParams() diagnostics = %v", diagnostics)
 	}
@@ -177,7 +177,7 @@ func TestNscaleInstanceCreateParamsOmitsUnsetSSHCertificateAuthority(t *testing.
 func TestNscaleInstanceUpdateParamsRejectsInvalidUserData(t *testing.T) {
 	model := testInstanceModel(types.StringValue("not!valid!base64"))
 
-	if _, diagnostics := model.NscaleInstanceUpdateParams(); !diagnostics.HasError() {
+	if _, diagnostics := model.NscaleInstanceUpdateParams(InstanceModel{}); !diagnostics.HasError() {
 		t.Error("NscaleInstanceUpdateParams() diagnostics = none, want an error for malformed base64")
 	}
 }

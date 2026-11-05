@@ -22,6 +22,11 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 func TestNewGenericResourceRejectsBothUpdates(t *testing.T) {
@@ -34,7 +39,7 @@ func TestNewGenericResourceRejectsBothUpdates(t *testing.T) {
 	}()
 
 	NewGenericResource(ResourceAdapter[struct{}, struct{}]{
-		Update: func(context.Context, *Client, string, struct{}) (string, diag.Diagnostics) {
+		Update: func(context.Context, *Client, string, struct{}, struct{}) (string, diag.Diagnostics) {
 			return "", nil
 		},
 		UpdateAndWait: func(
@@ -43,4 +48,48 @@ func TestNewGenericResourceRejectsBothUpdates(t *testing.T) {
 			return nil, nil
 		},
 	})
+}
+
+// Update hands the adapter the prior state as well as the plan, so a resource
+// can tell a value removed from config from one that was never set.
+func TestGenericResourceUpdatePassesPriorState(t *testing.T) {
+	t.Parallel()
+
+	type model struct {
+		Value types.String `tfsdk:"value"`
+	}
+
+	ctx := context.Background()
+	testSchema := schema.Schema{Attributes: map[string]schema.Attribute{
+		"value": schema.StringAttribute{Optional: true},
+	}}
+	schemaType := testSchema.Type().TerraformType(ctx)
+	raw := func(value string) tftypes.Value {
+		return tftypes.NewValue(schemaType, map[string]tftypes.Value{
+			"value": tftypes.NewValue(tftypes.String, value),
+		})
+	}
+
+	var gotPlan, gotPrior model
+	generic := NewGenericResource(ResourceAdapter[model, struct{}]{
+		Update: func(_ context.Context, _ *Client, _ string, plan, prior model) (string, diag.Diagnostics) {
+			gotPlan, gotPrior = plan, prior
+
+			var diagnostics diag.Diagnostics
+			diagnostics.AddError("stop", "stop before waiting")
+
+			return "", diagnostics
+		},
+		IDFromModel: func(model) string { return "id" },
+	})
+
+	var response resource.UpdateResponse
+	generic.Update(ctx, resource.UpdateRequest{
+		Plan:  tfsdk.Plan{Schema: testSchema, Raw: raw("planned")},
+		State: tfsdk.State{Schema: testSchema, Raw: raw("prior")},
+	}, &response)
+
+	if gotPlan.Value.ValueString() != "planned" || gotPrior.Value.ValueString() != "prior" {
+		t.Errorf("Update got plan %s, prior %s; want planned, prior", gotPlan.Value, gotPrior.Value)
+	}
 }
