@@ -52,9 +52,16 @@ type ResourceAdapter[TFModel any, APIRead any] struct {
 	Get func(ctx context.Context, client *Client, id string) (*APIRead, ResourceStatus, error)
 
 	// Update issues the update call (writing an operation tag into its params)
-	// and returns the tag key the update watcher waits for. A nil Update and
-	// UpdateAndWait marks the resource immutable.
-	Update func(ctx context.Context, client *Client, id string, plan TFModel) (operationTagKey string, diags diag.Diagnostics)
+	// and returns the tag key the update watcher waits for. prior is the state
+	// before the update. A nil Update and UpdateAndWait marks the resource
+	// immutable.
+	Update func(
+		ctx context.Context,
+		client *Client,
+		id string,
+		plan TFModel,
+		prior TFModel,
+	) (operationTagKey string, diags diag.Diagnostics)
 
 	// UpdateAndWait replaces Update, which must then be nil, and the
 	// operation-tag watcher for a resource whose update endpoint does not
@@ -254,11 +261,17 @@ func (r *GenericResource[TFModel, APIRead]) Update(
 	id := r.adapter.IDFromModel(data)
 
 	if r.adapter.UpdateAndWait != nil {
-		r.updateAndWait(ctx, request, id, data, response)
+		r.updateAndWait(ctx, id, data, response)
 		return
 	}
 
-	operationTagKey, diagnostics := r.adapter.Update(ctx, r.client, id, data)
+	prior, diagnostics := ReadTerraformState[TFModel](ctx, request.State.Get)
+	if diagnostics.HasError() {
+		response.Diagnostics.Append(diagnostics...)
+		return
+	}
+
+	operationTagKey, diagnostics := r.adapter.Update(ctx, r.client, id, data, prior)
 	if diagnostics.HasError() {
 		response.Diagnostics.Append(diagnostics...)
 		return
@@ -291,7 +304,6 @@ func (a ResourceAdapter[TFModel, APIRead]) updateTimeoutDefault() time.Duration 
 
 func (r *GenericResource[TFModel, APIRead]) updateAndWait(
 	ctx context.Context,
-	request resource.UpdateRequest,
 	id string,
 	data TFModel,
 	response *resource.UpdateResponse,

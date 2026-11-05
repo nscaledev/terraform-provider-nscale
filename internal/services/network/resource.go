@@ -252,6 +252,7 @@ func networkUpdate(
 	client *nscale.Client,
 	id string,
 	plan NetworkResourceModel,
+	_ NetworkResourceModel,
 ) (string, diag.Diagnostics) {
 	params, diagnostics := plan.NscaleNetworkUpdateParams()
 	if diagnostics.HasError() {

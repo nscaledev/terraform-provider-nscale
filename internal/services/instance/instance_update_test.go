@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -57,7 +58,69 @@ func TestInstanceUpdateSecurityGroupPreservesBootState(t *testing.T) {
 	)
 
 	var received computeapi.InstanceUpdate
-	server := newInstanceUpdateServer(t, &received)
+	if err := json.Unmarshal(sendInstanceUpdate(t, model, model), &received); err != nil {
+		t.Fatalf("decode update: %v", err)
+	}
+
+	assertCompleteInstanceUpdate(t, received, model, gzipUserData)
+}
+
+// Compute keeps stored user data when userData is omitted and clears it on "",
+// so removing user_data from config must send "" or the next plan re-adds it.
+func TestInstanceUpdateClearsRemovedUserData(t *testing.T) {
+	stored := types.StringValue(base64.StdEncoding.EncodeToString([]byte("#cloud-config")))
+
+	for _, test := range []struct {
+		name  string
+		prior types.String
+		plan  types.String
+		want  string // raw JSON of spec.userData, "" for omitted
+	}{
+		{name: "removed", prior: stored, plan: types.StringNull(), want: `""`},
+		{name: "set empty", prior: stored, plan: types.StringValue(""), want: `""`},
+		{name: "never set", prior: types.StringNull(), plan: types.StringNull(), want: ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan := InstanceResourceModel{InstanceModel: testInstanceModel(test.plan)}
+			prior := InstanceResourceModel{InstanceModel: testInstanceModel(test.prior)}
+
+			var body struct {
+				Spec map[string]json.RawMessage `json:"spec"`
+			}
+			if err := json.Unmarshal(sendInstanceUpdate(t, plan, prior), &body); err != nil {
+				t.Fatalf("decode update: %v", err)
+			}
+
+			if got := string(body.Spec["userData"]); got != test.want {
+				t.Errorf("spec.userData = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+// sendInstanceUpdate runs instanceUpdate against a test server and returns the
+// request body it sent.
+func sendInstanceUpdate(t *testing.T, plan, prior InstanceResourceModel) []byte {
+	t.Helper()
+
+	var body []byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Errorf("method = %s, want PUT", r.Method)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var err error
+		if body, err = io.ReadAll(r.Body); err != nil {
+			t.Errorf("read update: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{}`))
+	}))
 	t.Cleanup(server.Close)
 
 	compute, err := computeapi.NewClient(server.URL)
@@ -69,33 +132,13 @@ func TestInstanceUpdateSecurityGroupPreservesBootState(t *testing.T) {
 		t.Context(),
 		&nscale.Client{Compute: compute},
 		"a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5a6b7",
-		model,
+		plan,
+		prior,
 	); diagnostics.HasError() {
 		t.Fatalf("instanceUpdate() diagnostics = %v", diagnostics)
 	}
 
-	assertCompleteInstanceUpdate(t, received, model, gzipUserData)
-}
-
-func newInstanceUpdateServer(t *testing.T, received *computeapi.InstanceUpdate) *httptest.Server {
-	t.Helper()
-
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPut {
-			t.Errorf("method = %s, want PUT", r.Method)
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		if err := json.NewDecoder(r.Body).Decode(received); err != nil {
-			t.Errorf("decode update: %v", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{}`))
-	}))
+	return body
 }
 
 func assertCompleteInstanceUpdate(

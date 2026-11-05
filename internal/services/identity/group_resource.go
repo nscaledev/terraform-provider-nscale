@@ -232,6 +232,7 @@ func groupUpdate(
 	client *nscale.Client,
 	id string,
 	plan GroupResourceModel,
+	_ GroupResourceModel,
 ) (string, diag.Diagnostics) {
 	params, diagnostics := plan.NscaleGroupUpdateParams(ctx)
 	if diagnostics.HasError() {

@@ -296,8 +296,9 @@ func instanceUpdate(
 	client *nscale.Client,
 	id string,
 	plan InstanceResourceModel,
+	prior InstanceResourceModel,
 ) (string, diag.Diagnostics) {
-	params, diagnostics := plan.NscaleInstanceUpdateParams()
+	params, diagnostics := plan.NscaleInstanceUpdateParams(prior.InstanceModel)
 	if diagnostics.HasError() {
 		return "", diagnostics
 	}

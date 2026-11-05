@@ -197,6 +197,7 @@ func projectUpdate(
 	client *nscale.Client,
 	id string,
 	plan ProjectResourceModel,
+	_ ProjectResourceModel,
 ) (string, diag.Diagnostics) {
 	params, diagnostics := plan.NscaleProjectUpdateParams(ctx)
 	if diagnostics.HasError() {

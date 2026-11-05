@@ -360,6 +360,7 @@ func computeClusterUpdate(
 	client *nscale.Client,
 	id string,
 	plan ComputeClusterResourceModel,
+	_ ComputeClusterResourceModel,
 ) (string, diag.Diagnostics) {
 	projectID, diagnostics := client.ResolveProjectID("")
 	if diagnostics.HasError() {
