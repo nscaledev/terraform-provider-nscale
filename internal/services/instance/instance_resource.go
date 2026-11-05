@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -124,10 +125,13 @@ func (r *InstanceResource) Schema(
 				Optional:            true,
 			},
 			"user_data": schema.StringAttribute{
-				MarkdownDescription: "Base64-encoded configuration information or scripts to pass to the instance at boot time.",
-				Optional:            true,
+				MarkdownDescription: "Base64-encoded configuration information or scripts to pass to the instance at boot time. " +
+					"Omit `user_data` to have none; removing it from configuration clears it on the next apply. " +
+					"On a pinned bare-metal server, changing `user_data`, including clearing it, may reimage the server in place.",
+				Optional: true,
 				Validators: []validator.String{
 					validators.Base64Validator{},
+					stringvalidator.LengthAtLeast(1),
 				},
 			},
 			"public_ip": schema.StringAttribute{

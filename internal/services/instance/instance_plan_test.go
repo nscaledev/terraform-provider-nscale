@@ -231,3 +231,59 @@ func (h instancePlanHarness) plan(
 	}
 	return response
 }
+
+// An empty user_data is rejected: omitting the attribute is the one way to
+// have none, and "" never matched what a read returns.
+func TestInstanceRejectsEmptyUserData(t *testing.T) {
+	ctx := context.Background()
+	planner := newInstancePlanHarness(ctx, t)
+
+	for _, test := range []struct {
+		userData types.String
+		wantErr  bool
+	}{
+		{userData: types.StringValue(""), wantErr: true},
+		{userData: types.StringValue("aGk="), wantErr: false},
+		{userData: types.StringNull(), wantErr: false},
+		{userData: types.StringUnknown(), wantErr: false},
+	} {
+		t.Run(test.userData.String(), func(t *testing.T) {
+			config := instancePlanConfig(instancePlanModel())
+			config.UserData = test.userData
+
+			var userDataErrors int
+			for _, diagnostic := range planner.validate(config) {
+				if diagnostic.Severity != tfprotov6.DiagnosticSeverityError {
+					continue
+				}
+				if !diagnostic.Attribute.Equal(tftypes.NewAttributePath().WithAttributeName("user_data")) {
+					t.Errorf("unexpected diagnostic: %s: %s", diagnostic.Summary, diagnostic.Detail)
+					continue
+				}
+				userDataErrors++
+			}
+
+			if got := userDataErrors > 0; got != test.wantErr {
+				t.Errorf("user_data rejected = %v, want %v", got, test.wantErr)
+			}
+		})
+	}
+}
+
+func (h instancePlanHarness) validate(config instance.InstanceResourceModel) []*tfprotov6.Diagnostic {
+	h.t.Helper()
+
+	server, err := providerserver.NewProtocol6WithError(provider.New())()
+	if err != nil {
+		h.t.Fatalf("provider server: %v", err)
+	}
+	response, err := server.ValidateResourceConfig(h.ctx, &tfprotov6.ValidateResourceConfigRequest{
+		TypeName: "nscale_instance",
+		Config:   h.dynamic(config),
+	})
+	if err != nil {
+		h.t.Fatalf("ValidateResourceConfig() error = %v", err)
+	}
+
+	return response.Diagnostics
+}
