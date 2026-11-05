@@ -124,10 +124,13 @@ func (r *InstanceResource) Schema(
 				Optional:            true,
 			},
 			"user_data": schema.StringAttribute{
-				MarkdownDescription: "Base64-encoded configuration information or scripts to pass to the instance at boot time.",
-				Optional:            true,
+				MarkdownDescription: "Base64-encoded configuration information or scripts to pass to the instance at boot time. " +
+					"Omit `user_data` to have none; removing it from configuration clears it on the next apply. " +
+					"On a pinned bare-metal server, changing `user_data`, including clearing it, may reimage the server in place.",
+				Optional: true,
 				Validators: []validator.String{
 					validators.Base64Validator{},
+					validators.NotEmptyValidator{},
 				},
 			},
 			"public_ip": schema.StringAttribute{

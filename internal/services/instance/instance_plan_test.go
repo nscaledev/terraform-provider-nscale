@@ -259,3 +259,79 @@ func (h instancePlanHarness) plan(
 	}
 	return response
 }
+
+// An empty user_data is rejected: omitting the attribute is the one way to
+// have none, and "" never matched what a read returns.
+func TestInstanceRejectsEmptyUserData(t *testing.T) {
+	ctx := context.Background()
+	planner := newInstancePlanHarness(ctx, t)
+
+	for _, test := range []struct {
+		userData types.String
+		wantErr  bool
+	}{
+		{userData: types.StringValue(""), wantErr: true},
+		{userData: types.StringValue("aGk="), wantErr: false},
+		{userData: types.StringNull(), wantErr: false},
+	} {
+		t.Run(test.userData.String(), func(t *testing.T) {
+			config := instance.InstanceResourceModel{
+				InstanceModel: instance.NewInstanceModel(&computeapi.InstanceRead{
+					Metadata: computeapi.ProjectScopedResourceReadMetadata{Name: "test-instance"},
+					Spec: computeapi.InstanceSpec{
+						FlavorId:   uuid.MustParse("2f8a1d4e-6b3c-4f5a-9e0d-7c1b8a2f3d40"),
+						ImageId:    uuid.MustParse("5c9b2e7f-1a4d-4b8c-8f2e-3d6a9b0c1e52"),
+						Networking: &computeapi.InstanceNetworking{},
+					},
+					Status: computeapi.InstanceStatus{NetworkId: "network-1"},
+				}),
+				Timeouts: tftimeouts.Value{Object: types.ObjectNull(map[string]attr.Type{
+					"create": types.StringType,
+					"update": types.StringType,
+					"delete": types.StringType,
+				})},
+			}
+			config.ID = types.StringNull()
+			config.PublicIP = types.StringNull()
+			config.PrivateIP = types.StringNull()
+			config.PowerState = types.StringNull()
+			config.RegionID = types.StringNull()
+			config.CreationTime = types.StringNull()
+			config.UserData = test.userData
+
+			var userDataErrors int
+			for _, diagnostic := range planner.validate(config) {
+				if diagnostic.Severity != tfprotov6.DiagnosticSeverityError {
+					continue
+				}
+				if !diagnostic.Attribute.Equal(tftypes.NewAttributePath().WithAttributeName("user_data")) {
+					t.Errorf("unexpected diagnostic: %s: %s", diagnostic.Summary, diagnostic.Detail)
+					continue
+				}
+				userDataErrors++
+			}
+
+			if got := userDataErrors > 0; got != test.wantErr {
+				t.Errorf("user_data rejected = %v, want %v", got, test.wantErr)
+			}
+		})
+	}
+}
+
+func (h instancePlanHarness) validate(config instance.InstanceResourceModel) []*tfprotov6.Diagnostic {
+	h.t.Helper()
+
+	server, err := providerserver.NewProtocol6WithError(provider.New())()
+	if err != nil {
+		h.t.Fatalf("provider server: %v", err)
+	}
+	response, err := server.ValidateResourceConfig(h.ctx, &tfprotov6.ValidateResourceConfigRequest{
+		TypeName: "nscale_instance",
+		Config:   h.dynamic(config),
+	})
+	if err != nil {
+		h.t.Fatalf("ValidateResourceConfig() error = %v", err)
+	}
+
+	return response.Diagnostics
+}

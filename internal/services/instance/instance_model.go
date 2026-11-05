@@ -199,7 +199,7 @@ func (m *InstanceModel) NscaleInstanceUpdateParams(prior InstanceModel) (compute
 
 	// Compute keeps the stored user data when the field is omitted, and
 	// clears it on "". A nil slice would encode as null, so use an empty one.
-	if userData == nil && prior.UserData.ValueString() != "" {
+	if m.UserData.IsNull() && !prior.UserData.IsNull() {
 		userData = &[]byte{}
 	}
 

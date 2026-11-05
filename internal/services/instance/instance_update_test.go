@@ -77,7 +77,6 @@ func TestInstanceUpdateClearsRemovedUserData(t *testing.T) {
 		want  string // raw JSON of spec.userData, "" for omitted
 	}{
 		{name: "removed", prior: stored, plan: types.StringNull(), want: `""`},
-		{name: "set empty", prior: stored, plan: types.StringValue(""), want: `""`},
 		{name: "never set", prior: types.StringNull(), plan: types.StringNull(), want: ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
