@@ -396,6 +396,8 @@ linters:
         - empty
         - stdlib
         - generic
+        # RequireNKS exposes the generated SDK's client interface.
+        - ^github\.com/nscaledev/nscale-sdk-go/kubernetes\.ClientInterface$
         # terraform-plugin-framework constructors return interfaces by convention
         - github.com/hashicorp/terraform-plugin-framework/provider.Provider
         - github.com/hashicorp/terraform-plugin-framework/resource.Resource

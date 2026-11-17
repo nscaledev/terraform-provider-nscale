@@ -84,7 +84,7 @@ resource "nscale_instance" "example" {
 - `ssh_certificate_authority_id` (String) The identifier of the SSH certificate authority used to bootstrap login trust when the backing server is created. Changing this value forces the instance to be replaced because the CA is installed by cloud-init on first boot and cannot be rotated on a running server.
 - `tags` (Map of String) A map of tags assigned to the instance.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
-- `user_data` (String) Base64-encoded configuration information or scripts to pass to the instance at boot time.
+- `user_data` (String) Base64-encoded configuration information or scripts to pass to the instance at boot time. Omit `user_data` to have none; removing it from configuration clears it on the next apply. On a pinned bare-metal server, changing `user_data`, including clearing it, may reimage the server in place.
 
 ### Read-Only
 

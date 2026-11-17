@@ -195,6 +195,12 @@ func (m *InstanceModel) NscaleInstanceUpdateParams() (computeapi.InstanceUpdate,
 		return computeapi.InstanceUpdate{}, diagnostics
 	}
 
+	// Compute keeps the stored user data when the field is omitted, and
+	// clears it on "". A nil slice would encode as null, so use an empty one.
+	if m.UserData.IsNull() {
+		userData = &[]byte{}
+	}
+
 	ids, diagnostics := m.nscaleInstanceSpecIDs()
 	if diagnostics.HasError() {
 		return computeapi.InstanceUpdate{}, diagnostics
